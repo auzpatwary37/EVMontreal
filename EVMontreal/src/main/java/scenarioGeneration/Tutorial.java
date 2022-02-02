@@ -1,13 +1,21 @@
 package scenarioGeneration;
 
-import java.lang.ModuleLayer.Controller;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.Reader;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVRecord;
+import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
+import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.population.PopulationWriter;
 import org.matsim.contrib.ev.EvConfigGroup;
@@ -56,6 +64,7 @@ public class Tutorial {
 		String configIn = "";
 		String planInput = "";
 		String networkInput = "";
+		String chargerFileInput = "";
 		
 		String planOutput = "";
 		String vehicleOutput = "";
@@ -63,6 +72,18 @@ public class Tutorial {
 		String chargerOutput = "";
 		String evVehicleOutput = "";
 		String configOut = "";
+		
+		double BatteryCapMin = 30;
+		double BatteryCapMax = 60;// put the min and max same to make capacity non random
+		
+		double socMIn = 20;
+		
+		//ChargerTypes and power 
+		
+		Map<String,Double> cp = new HashMap<>();
+		cp.put("Level 1", 50.);
+		cp.put("Level 2", 70.);
+		cp.put("Fast", 100.);
 		
 		//____________________________________________________
 		
@@ -108,13 +129,13 @@ public class Tutorial {
 					vs.addVehicle(v);
 					
 					//Create vehicle in the ElectricVehicle file
-					Double b = (30+(60-30)*random.nextDouble())*36e5;
-					Double c = 20*36e5+(b-20*36e5)*random.nextDouble();
+					Double b = (BatteryCapMin+(BatteryCapMax-BatteryCapMin)*random.nextDouble())*36e5;
+					Double c = socMIn*36e5+(b-20*36e5)*random.nextDouble();
 					ElectricVehicleSpecification s = ImmutableElectricVehicleSpecification.newBuilder()
 							.id(Id.create(p.getKey().toString(), ElectricVehicle.class))
 							.batteryCapacity(b.intValue())
 							.initialSoc(c.intValue())
-							.chargerTypes(ImmutableList.of("default"))
+							.chargerTypes(ImmutableList.copyOf(cp.keySet()))
 							.vehicleType(ev1.getId().toString())
 							.build();
 
@@ -131,19 +152,71 @@ public class Tutorial {
 		ChargingInfrastructureSpecification csp = new ChargingInfrastructureSpecificationImpl();// Create container for charger specification
 		
 		Network net = NetworkUtils.readNetwork(networkInput); // read network
+		//______________________________________________________________________
+		//Reading the charger csv file 
 		
-		//put the logic for selecting charger links and put the charger creation in a loop. One is demonstrated
+		String chargerFileHeader = "charger_id,wkt_geom,Fuel Type,Station Na,Street Add,Intersecti,City,State,ZIP,Plus4,Station Ph,Status Cod,Expected D,Groups Wit,Access Day,Cards Acce,BD Blends,NG Fill Ty,NG PSI,EV Level1,EV Level2,EV DC Fast,EV Other I,power,num_plug,EV Network,EV Netwo_1,Geocode St,Latitude,Longitude,Date Last,ID,Updated At,Owner Type,Federal Ag,Federal _1,Open Date,Hydrogen S,NG Vehicle,LPG Primar,E85 Blende,EV Connect,Country,Intersec_1,Access D_1,BD Blend_1,Groups W_1,Hydrogen I,Access Cod,Access Det,Federal _2,Facility T,CNG Dispen,CNG On-Sit,CNG Total,CNG Storag,LNG On-Sit,E85 Other,EV Pricing,EV Prici_1,LPG Nozzle,Hydrogen P,Hydrogen_1,CNG Fill T,CNG PSI,CNG Vehicl,LNG Vehicl,EV On-Site,Restricted,join_ID,join_fromID,join_toID,join_length,join_freespeed,join_capacity,join_lanes,join_visWidth,join_type,distance";
 		
-		//scenario.getActivityFacilities().getFacilitiesForActivityType(null) It is possible to use activity facilities as well
-		ChargerSpecification c = ImmutableChargerSpecification.newBuilder()
-				.id(Id.create("ChargerId",Charger.class))
-				.linkId(Id.createLinkId(""))
-				.chargerType("default")
-				.plugCount(3)
-				.plugPower(3600000*220)
-				.build();
+		String[] headers = chargerFileHeader.split(",");
 		
-		csp.addChargerSpecification(c);
+		Reader in;
+		Iterable<CSVRecord> records = null;
+		try {
+			in = new FileReader(chargerFileInput);
+		
+			 records = CSVFormat.DEFAULT
+	      .withHeader(headers)
+	      .withFirstRecordAsHeader()
+	      .parse(in);
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		
+		catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		for (CSVRecord record : records) {
+	        
+			Coord coord = new Coord(Double.parseDouble(record.get("Longitude")),Double.parseDouble(record.get("Latitude")));
+			Id<Link> linkId = NetworkUtils.getNearestRightEntryLink(net, coord).getId();
+			String baseChargerId = record.get("charger_id");
+			
+			
+			
+			int noOfl1 = Integer.parseInt(record.get("EV Level1"));
+			int noOfl2 = Integer.parseInt(record.get("EV Level2"));
+			int noOfFast = Integer.parseInt(record.get("EV DC Fast"));
+			
+			Map<String,Integer> plugCount = new HashMap<>();
+			
+			plugCount.put("Level 1", noOfl1);
+			plugCount.put("Level 2", noOfl2);
+			plugCount.put("Fast", noOfFast);
+			
+			
+			for(Entry<String, Integer> d:plugCount.entrySet()) {
+			
+				for(int i=0;i<d.getValue();i++) {
+					ChargerSpecification c = ImmutableChargerSpecification.newBuilder()
+							.id(Id.create(baseChargerId+"_"+d.getKey()+"_"+i,Charger.class))
+							.linkId(linkId)
+							.chargerType(d.getKey())
+							.plugCount(d.getValue())
+							.plugPower(3600000*cp.get(d.getKey()))
+							.build();
+					
+					csp.addChargerSpecification(c);
+				}
+			}
+			
+		}
+		
+		
+		//__________________________________________________________________		
 		
 		
 
