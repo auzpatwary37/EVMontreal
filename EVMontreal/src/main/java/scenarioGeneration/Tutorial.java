@@ -53,35 +53,40 @@ import com.google.common.collect.ImmutableList;
 import urbanEV.UrbanEVConfigGroup;
 import urbanEV.UrbanEVModule;
 import urbanEV.UrbanVehicleChargingHandler;
-
+/**
+ * 
+ * @author Ashraf
+ *
+ */
 public class Tutorial {
 	public static void main(String[] args) {
 		
 		//Inputs
-		double evPercentage = 0.1;
+		double evPercentage = 0.1; // Percentage of cars to take as EV
 		
 		
-		String configIn = "";
-		String planInput = "";
-		String networkInput = "";
-		String chargerFileInput = "";
+		String configIn = "";// input MATSim Montreal Config without ev
+		String planInput = "";// Population file without EV
+		String networkInput = "";// Input Network File
+		String chargerFileInput = "";//Charger file with exactly same headers as given to me by Arsham but in .csv format. Save the excel as csv and input its file location
 		
-		String planOutput = "";
-		String vehicleOutput = "";
+		String planOutput = ""; // Saving location of the EV included population
+		String vehicleOutput = ""; // Vehicle xml file write location
 		
-		String chargerOutput = "";
-		String evVehicleOutput = "";
-		String configOut = "";
+		String chargerOutput = ""; // charger xml file write location
+		String evVehicleOutput = "";// ev vehicle file write location
+		String configOut = ""; // Config out file write location. The charger file, vehicle file, plan file, ev vehicle file locations are already set in the config as the out location. 
 		
-		double BatteryCapMin = 30;
-		double BatteryCapMax = 60;// put the min and max same to make capacity non random
+		double BatteryCapMin = 30; // Min Battery capacity
+		double BatteryCapMax = 60;// Max Battery Capacity
+		//put the min and max same to make capacity non random
 		
-		double socMIn = 20;
+		double socMIn = 20; // Min initial soc level. 
 		
 		//ChargerTypes and power 
 		
 		Map<String,Double> cp = new HashMap<>();
-		cp.put("Level 1", 50.);
+		cp.put("Level 1", 50.); 
 		cp.put("Level 2", 70.);
 		cp.put("Fast", 100.);
 		
@@ -243,7 +248,7 @@ public class Tutorial {
 
 		new ElectricFleetWriter(sp.getVehicleSpecifications().values().stream()).write(evVehicleOutput);
 		
-		EvConfigGroup evgroup = new EvConfigGroup();
+		EvConfigGroup evgroup = new EvConfigGroup(); 
 		evgroup.setChargersFile(chargerOutput);
 		evgroup.setVehiclesFile(evVehicleOutput);
 		
@@ -255,8 +260,17 @@ public class Tutorial {
 		
 		
 		new ConfigWriter(config).write(configOut);
-
-
+		
+		//____________________________
+		//running steps according to runningUrbanEV
+		
+		Config configRun = ConfigUtils.createConfig();
+		ConfigUtils.loadConfig(configRun,configOut);
+		Scenario scRun = ScenarioUtils.loadScenario(configRun);
+		Controler controler = new Controler(scRun);
+		createUrbanEVController(controler);
+		
+		controler.run();
 	}
 	/**
 	 * Use this function after creating the controller before running urban ev. 
