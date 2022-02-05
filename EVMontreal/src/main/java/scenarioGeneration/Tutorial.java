@@ -1,4 +1,4 @@
-package scenarioGeneration;
+package org.matsim.run;
 
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -40,6 +40,8 @@ import org.matsim.core.config.groups.PlansCalcRouteConfigGroup;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.scenario.ScenarioUtils;
+import org.matsim.core.utils.geometry.CoordinateTransformation;
+import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 import org.matsim.vehicles.EngineInformation;
 import org.matsim.vehicles.MatsimVehicleWriter;
 import org.matsim.vehicles.Vehicle;
@@ -50,89 +52,90 @@ import org.matsim.vehicles.VehiclesFactory;
 
 import com.google.common.collect.ImmutableList;
 
-import urbanEV.UrbanEVConfigGroup;
-import urbanEV.UrbanEVModule;
-import urbanEV.UrbanVehicleChargingHandler;
+import org.matsim.urbanEV.UrbanEVConfigGroup;
+import org.matsim.urbanEV.UrbanEVModule;
+import org.matsim.urbanEV.UrbanVehicleChargingHandler;
 /**
- * 
+ *
  * @author Ashraf
  *
  */
 public class Tutorial {
 	public static void main(String[] args) {
-		
+
 		//Inputs
 		double evPercentage = 0.1; // Percentage of cars to take as EV
-		
-		
-		String configIn = "";// input MATSim Montreal Config without ev
-		String planInput = "";// Population file without EV
-		String networkInput = "";// Input Network File
-		String chargerFileInput = "";//Charger file with exactly same headers as given to me by Arsham but in .csv format. Save the excel as csv and input its file location
-		
-		String planOutput = ""; // Saving location of the EV included population
-		String vehicleOutput = ""; // Vehicle xml file write location
-		
-		String chargerOutput = ""; // charger xml file write location
-		String evVehicleOutput = "";// ev vehicle file write location
-		String configOut = ""; // Config out file write location. The charger file, vehicle file, plan file, ev vehicle file locations are already set in the config as the out location. 
-		
+
+
+		String configIn = "config_ev.xml";// input MATSim Montreal Config without ev
+		String planInput = "prepared_population.xml.gz";// Population file without EV
+		String networkInput = "montreal_network.xml.gz";// Input Network File
+		String chargerFileInput = "cleaned_station.csv";//Charger file with exactly same headers as given to me by Arsham but in .csv format. Save the excel as csv and input its file location
+
+		String planOutput = "Output/plan.xml"; // Saving location of the EV included population
+		String vehicleOutput = "Output/vehicle.xml"; // Vehicle xml file write location
+
+		String chargerOutput = "Output/charger.xml"; // charger xml file write location
+		String evVehicleOutput = "Output/evehicle.xml";// ev vehicle file write location
+		String configOut = "Output/config.xml"; // Config out file write location. The charger file, vehicle file, plan file, ev vehicle file locations are already set in the config as the out location.
+		String resultOut = "Output";
+
 		double BatteryCapMin = 30; // Min Battery capacity
 		double BatteryCapMax = 60;// Max Battery Capacity
 		//put the min and max same to make capacity non random
-		
-		double socMIn = 20; // Min initial soc level. 
-		
-		//ChargerTypes and power 
-		
+
+		double socMIn = 20; // Min initial soc level.
+
+		//ChargerTypes and power
+
 		Map<String,Double> cp = new HashMap<>();
-		cp.put("Level 1", 50.); 
+		cp.put("Level 1", 50.);
 		cp.put("Level 2", 70.);
 		cp.put("Fast", 100.);
-		
+
 		//____________________________________________________
-		
-		
-		
+
+
+
 		Config config = ConfigUtils.createConfig();
 		ConfigUtils.loadConfig(config,configIn);
 		config.plans().setInputFile(planInput);
-		
+
 		Scenario scenario = ScenarioUtils.loadScenario(config);
-		
+
 		Vehicles vs = scenario.getVehicles();
 		VehiclesFactory vf = vs.getFactory();
-		
+
 		//Create a vehicleType with ev
 		VehicleType ev1 = vf.createVehicleType(Id.create("ev1", VehicleType.class));
 		VehicleUtils.setHbefaTechnology(ev1.getEngineInformation(),"electricity");
 		vs.addVehicleType(ev1);
-		
+
 		//Create a vehicleType without ev
 		VehicleType noEV = vf.createVehicleType(Id.create("nonEv", VehicleType.class));
 		VehicleUtils.setHbefaTechnology(ev1.getEngineInformation(),EngineInformation.FuelType.gasoline.toString());
 		vs.addVehicleType(noEV);
-		
+
 		//Crate container for electric vehicle specification
 		ElectricFleetSpecification sp = new ElectricFleetSpecificationImpl();
-		
-		
+
+
 		Random random = new Random();
 		scenario.getPopulation().getPersons().entrySet().forEach(p->{
 
 //		PersonUtils.setCarAvail(p.getValue(),"always"); requested by rena Feb 1, 2022.
 //		PersonUtils.getCarAvail(p.getValue());
-			
-			
+
+
 			String cc = (String) p.getValue().getAttributes().getAttribute("carAvail");
-			
+
 			if(cc.equals("always")) {// have cars
 				if(Math.random()<=evPercentage) {
 					Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), ev1);// create ev vehicle in the vehicles file.
 					Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
 					vMap.put(v.getId(), v);
 					vs.addVehicle(v);
-					
+
 					//Create vehicle in the ElectricVehicle file
 					Double b = (BatteryCapMin+(BatteryCapMax-BatteryCapMin)*random.nextDouble())*36e5;
 					Double c = socMIn*36e5+(b-20*36e5)*random.nextDouble();
@@ -153,79 +156,80 @@ public class Tutorial {
 				}
 			}
 		});
-		
+
 		ChargingInfrastructureSpecification csp = new ChargingInfrastructureSpecificationImpl();// Create container for charger specification
-		
+
 		Network net = NetworkUtils.readNetwork(networkInput); // read network
+		CoordinateTransformation tsf = TransformationFactory.getCoordinateTransformation(TransformationFactory.WGS84, "EPSG:32188");
 		//______________________________________________________________________
-		//Reading the charger csv file 
-		
+		//Reading the charger csv file
+
 		String chargerFileHeader = "charger_id,wkt_geom,Fuel Type,Station Na,Street Add,Intersecti,City,State,ZIP,Plus4,Station Ph,Status Cod,Expected D,Groups Wit,Access Day,Cards Acce,BD Blends,NG Fill Ty,NG PSI,EV Level1,EV Level2,EV DC Fast,EV Other I,power,num_plug,EV Network,EV Netwo_1,Geocode St,Latitude,Longitude,Date Last,ID,Updated At,Owner Type,Federal Ag,Federal _1,Open Date,Hydrogen S,NG Vehicle,LPG Primar,E85 Blende,EV Connect,Country,Intersec_1,Access D_1,BD Blend_1,Groups W_1,Hydrogen I,Access Cod,Access Det,Federal _2,Facility T,CNG Dispen,CNG On-Sit,CNG Total,CNG Storag,LNG On-Sit,E85 Other,EV Pricing,EV Prici_1,LPG Nozzle,Hydrogen P,Hydrogen_1,CNG Fill T,CNG PSI,CNG Vehicl,LNG Vehicl,EV On-Site,Restricted,join_ID,join_fromID,join_toID,join_length,join_freespeed,join_capacity,join_lanes,join_visWidth,join_type,distance";
-		
+
 		String[] headers = chargerFileHeader.split(",");
-		
+
 		Reader in;
 		Iterable<CSVRecord> records = null;
 		try {
 			in = new FileReader(chargerFileInput);
-		
-			 records = CSVFormat.DEFAULT
-	      .withHeader(headers)
-	      .withFirstRecordAsHeader()
-	      .parse(in);
+
+			records = CSVFormat.DEFAULT
+					.withHeader(headers)
+					.withFirstRecordAsHeader()
+					.parse(in);
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
-		
+
+
 		catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
+
 		for (CSVRecord record : records) {
-	        
+
 			Coord coord = new Coord(Double.parseDouble(record.get("Longitude")),Double.parseDouble(record.get("Latitude")));
+			coord = tsf.transform(coord);
 			Id<Link> linkId = NetworkUtils.getNearestRightEntryLink(net, coord).getId();
 			String baseChargerId = record.get("charger_id");
-			
-			
-			
+
+
+
 			int noOfl1 = Integer.parseInt(record.get("EV Level1"));
 			int noOfl2 = Integer.parseInt(record.get("EV Level2"));
 			int noOfFast = Integer.parseInt(record.get("EV DC Fast"));
-			
+
 			Map<String,Integer> plugCount = new HashMap<>();
-			
+
 			plugCount.put("Level 1", noOfl1);
 			plugCount.put("Level 2", noOfl2);
 			plugCount.put("Fast", noOfFast);
-			
-			
+
+
 			for(Entry<String, Integer> d:plugCount.entrySet()) {
-			
-				for(int i=0;i<d.getValue();i++) {
+				if (d.getValue() != 0) {
 					ChargerSpecification c = ImmutableChargerSpecification.newBuilder()
-							.id(Id.create(baseChargerId+"_"+d.getKey()+"_"+i,Charger.class))
+							.id(Id.create(baseChargerId + "_" + d.getKey(), Charger.class))
 							.linkId(linkId)
 							.chargerType(d.getKey())
 							.plugCount(d.getValue())
-							.plugPower(3600000*cp.get(d.getKey()))
+							.plugPower(1000 * cp.get(d.getKey()))
 							.build();
-					
+
 					csp.addChargerSpecification(c);
 				}
 			}
-			
-		}
-		
-		
-		//__________________________________________________________________		
-		
-		
 
-		
+		}
+
+
+		//__________________________________________________________________
+
+
+
+
 		UrbanEVConfigGroup evReplanningCfg = new UrbanEVConfigGroup(); // create the urbanEV config group
 		config.addModule(evReplanningCfg);
 
@@ -247,38 +251,38 @@ public class Tutorial {
 
 
 		new ElectricFleetWriter(sp.getVehicleSpecifications().values().stream()).write(evVehicleOutput);
-		
-		EvConfigGroup evgroup = new EvConfigGroup(); 
+
+		EvConfigGroup evgroup = new EvConfigGroup();
 		evgroup.setChargersFile(chargerOutput);
 		evgroup.setVehiclesFile(evVehicleOutput);
-		
+
 		config.plans().setInputFile(planOutput);
-		
+
 		config.vehicles().setVehiclesFile(vehicleOutput);
-		
+
 		config.addModule(evgroup);
-		
-		
+
+
 		new ConfigWriter(config).write(configOut);
-		
+
 		//____________________________
 		//running steps according to runningUrbanEV
-		
+
 		Config configRun = ConfigUtils.createConfig();
 		ConfigUtils.loadConfig(configRun,configOut);
 		Scenario scRun = ScenarioUtils.loadScenario(configRun);
 		Controler controler = new Controler(scRun);
 		createUrbanEVController(controler);
-		
-		controler.run();
+
+	//	controler.run();
 	}
 	/**
-	 * Use this function after creating the controller before running urban ev. 
+	 * Use this function after creating the controller before running urban ev.
 	 * @param controler
 	 * @return
 	 */
 	public static Controler createUrbanEVController(Controler controler) {
-		
+
 		//plug in UrbanEVModule
 		controler.addOverridingModule(new UrbanEVModule());
 		//register EV qsim components
