@@ -46,10 +46,10 @@ import com.google.inject.Inject;
 
 public class ChargePricingEventHandler implements ChargingStartEventHandler, ChargingEndEventHandler, LinkLeaveEventHandler, PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler{
 	
-	@Inject
+
 	private ChargingInfrastructure chargingInfrastructure;
 	
-	@Inject
+	
 	private ElectricFleet fleet;
 	
 	@Inject
@@ -72,8 +72,10 @@ public class ChargePricingEventHandler implements ChargingStartEventHandler, Cha
 	//private Map<String,Set<Id<Person>>> vehicleToPersonMapping = new HashMap<>();
 	
 	@Inject
-	ChargePricingEventHandler(final MatsimServices controler) {
+	ChargePricingEventHandler(final MatsimServices controler,ChargingInfrastructure chargingInfrastructure, ElectricFleet data) {
 		events = controler.getEvents();
+		this.fleet = data;
+		this.chargingInfrastructure = chargingInfrastructure;
 		price.put("Level 1", 0.28);
 		price.put("Level 2 ", 0.58);
 		price.put("Fast", 0.78);
