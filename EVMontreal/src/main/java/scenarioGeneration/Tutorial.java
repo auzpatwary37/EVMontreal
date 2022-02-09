@@ -1,4 +1,4 @@
-package org.matsim.run;
+package scenarioGeneration;
 
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -17,6 +17,7 @@ import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
+import org.matsim.api.core.v01.network.Node;
 import org.matsim.api.core.v01.population.PopulationWriter;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.EvModule;
@@ -52,9 +53,9 @@ import org.matsim.vehicles.VehiclesFactory;
 
 import com.google.common.collect.ImmutableList;
 
-import org.matsim.urbanEV.UrbanEVConfigGroup;
-import org.matsim.urbanEV.UrbanEVModule;
-import org.matsim.urbanEV.UrbanVehicleChargingHandler;
+//import org.matsim.urbanEV.UrbanEVConfigGroup;
+//import org.matsim.urbanEV.UrbanEVModule;
+//import org.matsim.urbanEV.UrbanVehicleChargingHandler;
 /**
  *
  * @author Ashraf
@@ -67,7 +68,7 @@ public class Tutorial {
 		double evPercentage = 0.1; // Percentage of cars to take as EV
 
 
-		String configIn = "config_ev.xml";// input MATSim Montreal Config without ev
+		String configIn = "config_with_calibrated_parameters.xml";// input MATSim Montreal Config without ev
 		String planInput = "prepared_population.xml.gz";// Population file without EV
 		String networkInput = "montreal_network.xml.gz";// Input Network File
 		String chargerFileInput = "cleaned_station.csv";//Charger file with exactly same headers as given to me by Arsham but in .csv format. Save the excel as csv and input its file location
@@ -94,10 +95,12 @@ public class Tutorial {
 		cp.put("Fast", 100.);
 
 		//____________________________________________________
-
+		
+		
 
 
 		Config config = ConfigUtils.createConfig();
+		config.network().setInputFile(resultOut);
 		ConfigUtils.loadConfig(config,configIn);
 		config.plans().setInputFile(planInput);
 
@@ -160,6 +163,17 @@ public class Tutorial {
 		ChargingInfrastructureSpecification csp = new ChargingInfrastructureSpecificationImpl();// Create container for charger specification
 
 		Network net = NetworkUtils.readNetwork(networkInput); // read network
+		
+		Map<Id<Link>, ? extends Link>linkSet = new HashMap<>(net.getLinks());
+		linkSet.entrySet().stream().forEach(l->{
+			if(!l.getValue().getAllowedModes().contains("car") && !l.getValue().getAllowedModes().contains("car_passenger"))net.removeLink(l.getKey());
+		});
+		Map<Id<Node>, ? extends Node>nodeSet = new HashMap<>(net.getNodes());
+		nodeSet.entrySet().stream().forEach(n->{
+			if(n.getValue().getInLinks().size()==0 && n.getValue().getOutLinks().size()==0)net.removeNode(n.getKey());
+		});
+		
+
 		CoordinateTransformation tsf = TransformationFactory.getCoordinateTransformation(TransformationFactory.WGS84, "EPSG:32188");
 		//______________________________________________________________________
 		//Reading the charger csv file
@@ -230,19 +244,19 @@ public class Tutorial {
 
 
 
-		UrbanEVConfigGroup evReplanningCfg = new UrbanEVConfigGroup(); // create the urbanEV config group
-		config.addModule(evReplanningCfg);
-
-		//TODO actually, should also work with all AccessEgressTypes but we have to check (write JUnit test)
-		config.plansCalcRoute().setAccessEgressType(PlansCalcRouteConfigGroup.AccessEgressType.walkConstantTimeToLink);
-
-		//register charging interaction activities for car
-		config.planCalcScore().addActivityParams(
-				new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGOUT_INTERACTION)
-						.setScoringThisActivityAtAll(false));
-		config.planCalcScore().addActivityParams(
-				new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGIN_INTERACTION)
-						.setScoringThisActivityAtAll(false));
+		//UrbanEVConfigGroup evReplanningCfg = new UrbanEVConfigGroup(); // create the urbanEV config group
+//		config.addModule(evReplanningCfg);
+//
+//		//TODO actually, should also work with all AccessEgressTypes but we have to check (write JUnit test)
+//		config.plansCalcRoute().setAccessEgressType(PlansCalcRouteConfigGroup.AccessEgressType.walkConstantTimeToLink);
+//
+//		//register charging interaction activities for car
+//		config.planCalcScore().addActivityParams(
+//				new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGOUT_INTERACTION)
+//						.setScoringThisActivityAtAll(false));
+//		config.planCalcScore().addActivityParams(
+//				new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGIN_INTERACTION)
+//						.setScoringThisActivityAtAll(false));
 
 
 		new ChargerWriter(csp.getChargerSpecifications().values().stream()).write(chargerOutput);
@@ -255,12 +269,14 @@ public class Tutorial {
 		EvConfigGroup evgroup = new EvConfigGroup();
 		evgroup.setChargersFile(chargerOutput);
 		evgroup.setVehiclesFile(evVehicleOutput);
+		config.removeModule(evgroup.getName());
+		config.addModule(evgroup);
 
 		config.plans().setInputFile(planOutput);
 
 		config.vehicles().setVehiclesFile(vehicleOutput);
 
-		config.addModule(evgroup);
+		
 
 
 		new ConfigWriter(config).write(configOut);
@@ -284,7 +300,7 @@ public class Tutorial {
 	public static Controler createUrbanEVController(Controler controler) {
 
 		//plug in UrbanEVModule
-		controler.addOverridingModule(new UrbanEVModule());
+		//controler.addOverridingModule(new UrbanEVModule());
 		//register EV qsim components
 		controler.configureQSimComponents(components -> components.addNamedComponent(EvModule.EV_COMPONENT));
 		return controler;
