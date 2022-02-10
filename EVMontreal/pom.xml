@@ -105,12 +105,11 @@
 	    <artifactId>junit-vintage-engine</artifactId>
 	    <version>5.7.0</version>
 	</dependency>
+
   <dependency>
 			<groupId>org.matsim</groupId>
 			<artifactId>matsim</artifactId>
-			<type>test-jar</type>
 			<version>${matsim.version}</version>
-			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.matsim.contrib</groupId>
@@ -212,7 +211,12 @@
     <artifactId>commons-io</artifactId>
     <version>2.11.0</version>
 </dependency>
-
-
+<!-- 
+<dependency>
+	    <groupId>com.github.matsim-scenarios</groupId>
+	    <artifactId>matsim-berlin</artifactId>
+	    <version>ev-5.5.2-g5d9dd01-144</version>
+	</dependency>
+-->
 </dependencies>
 </project>

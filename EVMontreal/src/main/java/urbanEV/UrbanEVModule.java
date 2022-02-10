@@ -62,7 +62,7 @@ public class UrbanEVModule extends AbstractModule {
 	@Override
 	public void install() {
 		UrbanEVConfigGroup configGroup = (UrbanEVConfigGroup) config.getModules().get(UrbanEVConfigGroup.GROUP_NAME);
-		if(configGroup == null) throw new IllegalArgumentException("no config group of type " + UrbanEVConfigGroup.GROUP_NAME + " was specified in the config");
+		//if(configGroup == null) throw new IllegalArgumentException("no config group of type " + UrbanEVConfigGroup.GROUP_NAME + " was specified in the config");
 
 
 		//standard EV stuff except for ElectricFleetModule

@@ -30,18 +30,21 @@ import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.EvModule;
-import org.matsim.contrib.ev.charging.VehicleChargingHandler;
-import org.matsim.contrib.ev.routing.EvNetworkRoutingProvider;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
-import org.matsim.core.controler.AbstractModule;
+import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
+import org.matsim.core.config.groups.PlansCalcRouteConfigGroup;
+import org.matsim.core.config.groups.QSimConfigGroup.VehiclesSource;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
-import org.matsim.core.mobsim.qsim.AbstractQSimModule;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.vehicles.VehicleCapacity;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.Vehicles;
+
+import urbanEV.UrbanEVConfigGroup;
+import urbanEV.UrbanEVModule;
+import urbanEV.UrbanVehicleChargingHandler;
 
 public class RunEvExample {
 	static final String DEFAULT_CONFIG_FILE = "montreal scenario5\\5_percent\\config.xml";
@@ -68,10 +71,14 @@ public class RunEvExample {
 	}
 
 	public void run(URL configUrl) {
-		Config config = ConfigUtils.loadConfig(configUrl, new EvConfigGroup());
+		Config config = ConfigUtils.loadConfig(configUrl, new EvConfigGroup(), new UrbanEVConfigGroup());
 		config.plans().setInputFile("plan.xml");
 		((EvConfigGroup)config.getModules().get("ev")).setTimeProfiles(true);
-		config.controler().setLastIteration(100);
+		
+//	    UrbanEVConfigGroup urbanEVConfigGroup = new UrbanEVConfigGroup();
+//	    config.addModule(urbanEVConfigGroup);
+		
+	    config.controler().setLastIteration(100);
 		config.controler().setOutputDirectory("EV_5Percent_100Iter");
 		config.controler()
 				.setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
@@ -79,7 +86,7 @@ public class RunEvExample {
 		config.qsim().setStorageCapFactor(0.1);
 		config.global().setNumberOfThreads(11);
 		config.qsim().setNumberOfThreads(6);
-		
+		//config.qsim().setVehiclesSource(VehiclesSource.defaultVehicle);
 		
 		
 		Scenario scenario = ScenarioUtils.loadScenario(config);
@@ -88,24 +95,41 @@ public class RunEvExample {
 		
 		config.planCalcScore().setPerforming_utils_hr(14);
 		
+//		UrbanEVConfigGroup evReplanningCfg = new UrbanEVConfigGroup(); // create the urbanEV config group
+//		
+//		config.addModule(evReplanningCfg);
+
+		//TODO actually, should also work with all AccessEgressTypes but we have to check (write JUnit test)
+		config.plansCalcRoute().setAccessEgressType(PlansCalcRouteConfigGroup.AccessEgressType.none);
+
+		//register charging interaction activities for car
+		config.planCalcScore().addActivityParams(
+				new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGOUT_INTERACTION)
+						.setScoringThisActivityAtAll(false));
+		config.planCalcScore().addActivityParams(
+				new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGIN_INTERACTION)
+						.setScoringThisActivityAtAll(false));
+		
+		
 		Controler controler = new Controler(scenario);
-		controler.addOverridingModule(new EvModule());
+		//controler.addOverridingModule(new EvModule());
+		controler.addOverridingModule(new UrbanEVModule());
 		//controler.addOverridingModule(new EVPriceModule());
-		controler.addOverridingModule(new AbstractModule() {
-			@Override
-			public void install() {
-				addRoutingModuleBinding(TransportMode.car).toProvider(new EvNetworkRoutingProvider(TransportMode.car));
-				installQSimModule(new AbstractQSimModule() {
-					@Override
-					protected void configureQSim() {
-						bind(VehicleChargingHandler.class).asEagerSingleton();
-						bind(ChargePricingEventHandler.class).asEagerSingleton();
-						addMobsimScopeEventHandlerBinding().to(VehicleChargingHandler.class);
-						addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
-					}
-				});
-			}
-		});
+//		controler.addOverridingModule(new AbstractModule() {
+//			@Override
+//			public void install() {
+//				addRoutingModuleBinding(TransportMode.car).toProvider(new EvNetworkRoutingProvider(TransportMode.car));
+//				installQSimModule(new AbstractQSimModule() {
+//					@Override
+//					protected void configureQSim() {
+//						bind(VehicleChargingHandler.class).asEagerSingleton();
+//						bind(ChargePricingEventHandler.class).asEagerSingleton();
+//						addMobsimScopeEventHandlerBinding().to(VehicleChargingHandler.class);
+//						addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
+//					}
+//				});
+//			}
+//		});
 
 		controler.configureQSimComponents(components -> components.addNamedComponent(EvModule.EV_COMPONENT));
 

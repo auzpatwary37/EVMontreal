@@ -53,6 +53,10 @@ import org.matsim.vehicles.VehiclesFactory;
 
 import com.google.common.collect.ImmutableList;
 
+import urbanEV.UrbanEVConfigGroup;
+import urbanEV.UrbanEVModule;
+import urbanEV.UrbanVehicleChargingHandler;
+
 //import org.matsim.urbanEV.UrbanEVConfigGroup;
 //import org.matsim.urbanEV.UrbanEVModule;
 //import org.matsim.urbanEV.UrbanVehicleChargingHandler;
@@ -81,11 +85,11 @@ public class Tutorial {
 		String configOut = "Output/config.xml"; // Config out file write location. The charger file, vehicle file, plan file, ev vehicle file locations are already set in the config as the out location.
 		String resultOut = "Output";
 
-		double BatteryCapMin = 2; // Min Battery capacity
-		double BatteryCapMax = 3;// Max Battery Capacity
+		double BatteryCapMin = 30; // Min Battery capacity
+		double BatteryCapMax = 50;// Max Battery Capacity
 		//put the min and max same to make capacity non random
 
-		double socMIn = 1; // Min initial soc level.
+		double socMIn = 20; // Min initial soc level.
 
 		//ChargerTypes and power
 
@@ -244,19 +248,7 @@ public class Tutorial {
 
 
 
-		//UrbanEVConfigGroup evReplanningCfg = new UrbanEVConfigGroup(); // create the urbanEV config group
-//		config.addModule(evReplanningCfg);
-//
-//		//TODO actually, should also work with all AccessEgressTypes but we have to check (write JUnit test)
-//		config.plansCalcRoute().setAccessEgressType(PlansCalcRouteConfigGroup.AccessEgressType.walkConstantTimeToLink);
-//
-//		//register charging interaction activities for car
-//		config.planCalcScore().addActivityParams(
-//				new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGOUT_INTERACTION)
-//						.setScoringThisActivityAtAll(false));
-//		config.planCalcScore().addActivityParams(
-//				new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGIN_INTERACTION)
-//						.setScoringThisActivityAtAll(false));
+		
 
 
 		new ChargerWriter(csp.getChargerSpecifications().values().stream()).write(chargerOutput);
@@ -269,6 +261,7 @@ public class Tutorial {
 		EvConfigGroup evgroup = new EvConfigGroup();
 		evgroup.setChargersFile(chargerOutput);
 		evgroup.setVehiclesFile(evVehicleOutput);
+		evgroup.setTimeProfiles(false);
 		config.removeModule(evgroup.getName());
 		config.addModule(evgroup);
 
@@ -286,11 +279,25 @@ public class Tutorial {
 
 		Config configRun = ConfigUtils.createConfig();
 		ConfigUtils.loadConfig(configRun,configOut);
+		
+		UrbanEVConfigGroup evReplanningCfg = new UrbanEVConfigGroup(); // create the urbanEV config group
+		configRun.addModule(evReplanningCfg);
+
+		//TODO actually, should also work with all AccessEgressTypes but we have to check (write JUnit test)
+		configRun.plansCalcRoute().setAccessEgressType(PlansCalcRouteConfigGroup.AccessEgressType.walkConstantTimeToLink);
+
+		//register charging interaction activities for car
+		configRun.planCalcScore().addActivityParams(
+				new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGOUT_INTERACTION)
+						.setScoringThisActivityAtAll(false));
+		configRun.planCalcScore().addActivityParams(
+				new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGIN_INTERACTION)
+						.setScoringThisActivityAtAll(false));
 		Scenario scRun = ScenarioUtils.loadScenario(configRun);
 		Controler controler = new Controler(scRun);
-		createUrbanEVController(controler);
-
-	//	controler.run();
+		controler.addOverridingModule(new UrbanEVModule());
+		controler.configureQSimComponents(components -> components.addNamedComponent(EvModule.EV_COMPONENT));
+		controler.run();
 	}
 	/**
 	 * Use this function after creating the controller before running urban ev.
@@ -298,9 +305,27 @@ public class Tutorial {
 	 * @return
 	 */
 	public static Controler createUrbanEVController(Controler controler) {
+		controler.addOverridingModule(new EvModule());
+		//controler.addOverridingModule(new EVPriceModule());
+//		controler.addOverridingModule(new AbstractModule() {
+//			@Override
+//			public void install() {
+//				addRoutingModuleBinding(TransportMode.car).toProvider(new EvNetworkRoutingProvider(TransportMode.car));
+//				installQSimModule(new AbstractQSimModule() {
+//					@Override
+//					protected void configureQSim() {
+//						bind(VehicleChargingHandler.class).asEagerSingleton();
+//						bind(ChargePricingEventHandler.class).asEagerSingleton();
+//						//addMobsimScopeEventHandlerBinding().to(VehicleChargingHandler.class);
+//						//addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
+//					}
+//				});
+//			}
+//		});
 
+		
 		//plug in UrbanEVModule
-		//controler.addOverridingModule(new UrbanEVModule());
+		controler.addOverridingModule(new UrbanEVModule());
 		//register EV qsim components
 		controler.configureQSimComponents(components -> components.addNamedComponent(EvModule.EV_COMPONENT));
 		return controler;
