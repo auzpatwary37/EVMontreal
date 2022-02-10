@@ -81,11 +81,11 @@ public class Tutorial {
 		String configOut = "Output/config.xml"; // Config out file write location. The charger file, vehicle file, plan file, ev vehicle file locations are already set in the config as the out location.
 		String resultOut = "Output";
 
-		double BatteryCapMin = 30; // Min Battery capacity
-		double BatteryCapMax = 60;// Max Battery Capacity
+		double BatteryCapMin = 2; // Min Battery capacity
+		double BatteryCapMax = 3;// Max Battery Capacity
 		//put the min and max same to make capacity non random
 
-		double socMIn = 20; // Min initial soc level.
+		double socMIn = 1; // Min initial soc level.
 
 		//ChargerTypes and power
 
@@ -141,7 +141,7 @@ public class Tutorial {
 
 					//Create vehicle in the ElectricVehicle file
 					Double b = (BatteryCapMin+(BatteryCapMax-BatteryCapMin)*random.nextDouble())*36e5;
-					Double c = socMIn*36e5+(b-20*36e5)*random.nextDouble();
+					Double c = socMIn*36e5+(b-socMIn*36e5)*random.nextDouble();
 					ElectricVehicleSpecification s = ImmutableElectricVehicleSpecification.newBuilder()
 							.id(Id.create(p.getKey().toString(), ElectricVehicle.class))
 							.batteryCapacity(b.intValue())

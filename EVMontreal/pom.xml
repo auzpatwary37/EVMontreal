@@ -23,8 +23,8 @@
 <!--		<matsim.version>14.0-SNAPSHOT</matsim.version>-->
 
 <!--		!! matsim-examples is currently on a more modern version since I want to modernize some things there. kai, apr'21 !!-->
-		<matsim-examples.version>14.0-SNAPSHOT</matsim-examples.version>
-
+		
+		<matsim.version>14.0-PR1512</matsim.version> <!-- 18.05.2021-->
 		<maven.compiler.source>11</maven.compiler.source>
 		<maven.compiler.target>11</maven.compiler.target>
 	
@@ -55,11 +55,15 @@
   </build>
   
  <repositories>
-  <repository>
-    <id>matsim</id>
-    <name>MATSim release repository</name>
-    <url>http://dl.bintray.com/matsim/matsim</url>
-  </repository>
+<repository>
+			<id>matsim</id>
+			<url>https://repo.matsim.org/repository/matsim</url>
+		</repository>
+
+		<repository>
+			<id>jitpack.io</id>
+			<url>https://jitpack.io</url>
+		</repository>
   
   <repository>
     <id>ojo-snapshots</id>
@@ -85,17 +89,17 @@
       <releases><enabled>false</enabled></releases>
     </repository>
 
-		<repository>
-		    <id>jitpack.io</id>
-		    <url>https://jitpack.io</url>
-		</repository>
 
 
 </repositories>
 
 
 <dependencies>
- 
+ 	<dependency>
+			<groupId>org.matsim</groupId>
+			<artifactId>matsim</artifactId>
+			<version>${matsim.version}</version>
+		</dependency>
 	<dependency>
 	    <groupId>org.junit.vintage</groupId>
 	    <artifactId>junit-vintage-engine</artifactId>
@@ -113,11 +117,7 @@
 			<artifactId>roadpricing</artifactId>
 			<version>${matsim.version}</version>
 		</dependency>
-		<dependency>
-			<groupId>org.matsim.contrib</groupId>
-			<artifactId>ev</artifactId>
-			<version>${matsim.version}</version>
-		</dependency>
+
 		<dependency>
 			<groupId>org.matsim.contrib</groupId>
 			<artifactId>emissions</artifactId>
@@ -128,7 +128,11 @@
 			<artifactId>signals</artifactId>
 			<version>${matsim.version}</version>
 		</dependency>
-
+		<dependency>
+			<groupId>org.matsim.contrib</groupId>
+			<artifactId>ev</artifactId>
+			<version>${matsim.version}</version>
+		</dependency>
 
         <dependency>
             <groupId>org.geotools</groupId>
@@ -197,7 +201,11 @@
     <artifactId>jackcess</artifactId>
     <version>4.0.1</version>
 </dependency>
-
+	<dependency>
+	    <groupId>com.github.matsim-scenarios</groupId>
+	    <artifactId>matsim-berlin</artifactId>
+	    <version>5.6.0</version>
+	</dependency>
 
 <dependency>
     <groupId>commons-io</groupId>

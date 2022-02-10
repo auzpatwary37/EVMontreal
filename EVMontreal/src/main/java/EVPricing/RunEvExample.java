@@ -39,6 +39,9 @@ import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
 import org.matsim.core.mobsim.qsim.AbstractQSimModule;
 import org.matsim.core.scenario.ScenarioUtils;
+import org.matsim.vehicles.VehicleCapacity;
+import org.matsim.vehicles.VehicleType;
+import org.matsim.vehicles.Vehicles;
 
 public class RunEvExample {
 	static final String DEFAULT_CONFIG_FILE = "montreal scenario5\\5_percent\\config.xml";
@@ -68,10 +71,23 @@ public class RunEvExample {
 		Config config = ConfigUtils.loadConfig(configUrl, new EvConfigGroup());
 		config.plans().setInputFile("plan.xml");
 		((EvConfigGroup)config.getModules().get("ev")).setTimeProfiles(true);
-		config.controler().setLastIteration(20);
+		config.controler().setLastIteration(100);
+		config.controler().setOutputDirectory("EV_5Percent_100Iter");
 		config.controler()
 				.setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
+		config.qsim().setFlowCapFactor(0.1);
+		config.qsim().setStorageCapFactor(0.1);
+		config.global().setNumberOfThreads(11);
+		config.qsim().setNumberOfThreads(6);
+		
+		
+		
 		Scenario scenario = ScenarioUtils.loadScenario(config);
+		
+		scaleDownPt(scenario.getTransitVehicles(), 0.1);
+		
+		config.planCalcScore().setPerforming_utils_hr(14);
+		
 		Controler controler = new Controler(scenario);
 		controler.addOverridingModule(new EvModule());
 		//controler.addOverridingModule(new EVPriceModule());
@@ -94,5 +110,14 @@ public class RunEvExample {
 		controler.configureQSimComponents(components -> components.addNamedComponent(EvModule.EV_COMPONENT));
 
 		controler.run();
+	}
+	
+	public static void scaleDownPt(Vehicles transitVehicles, double portion) {
+		for(VehicleType vt: transitVehicles.getVehicleTypes().values()) {
+			VehicleCapacity vc = vt.getCapacity();
+			vc.setSeats((int) Math.ceil(vc.getSeats().intValue() * portion));
+			vc.setStandingRoom((int) Math.ceil(vc.getStandingRoom().intValue() * portion));
+			vt.setPcuEquivalents(vt.getPcuEquivalents() * portion);
+		}
 	}
 }

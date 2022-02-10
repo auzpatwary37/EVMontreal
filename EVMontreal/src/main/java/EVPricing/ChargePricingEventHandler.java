@@ -83,7 +83,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		this.fleet = data;
 		this.chargingInfrastructure = chargingInfrastructure;
 		price.put("Level 1", 0.28);
-		price.put("Level 2 ", 0.58);
+		price.put("Level 2", 0.58);
 		price.put("Fast", 0.78);
 		personIdForEV = new HashMap<>();
 		controler.getScenario().getPopulation().getPersons().values().forEach(p->{
@@ -112,7 +112,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		double pricePerkWhr = this.price.get(chargerType);
 		Double juleCharged= cd.v.getBattery().getSoc()-cd.initialSoc;//warning: unit Conversion
 		Double cost = pricePerkWhr*juleCharged/3600000;
-		this.events.processEvent(new PersonMoneyEvent(event.getTime(), pId, cost*-1, this.ChargingCostName, cd.charger.toString(), chargerType));
+		this.events.processEvent(new PersonMoneyEvent(event.getTime(), pId, cost*-1, this.ChargingCostName, cd.charger.toString()+"___"+chargerType));
 		this.personLists.remove(pId.toString());
 		}
 
@@ -161,7 +161,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 			double cost = this.gasMoneyCostPer_m*distance;
 			double indCost = cost/this.vehicleToPersonMapping.get(vId).size();
 			for(Id<Person> pId :this.vehicleToPersonMapping.get(vId)) {
-				this.events.processEvent(new PersonMoneyEvent(time, pId, indCost, this.gasMoneyString, null, vId.toString()));
+				this.events.processEvent(new PersonMoneyEvent(time, pId, indCost, this.gasMoneyString,  vId.toString()));
 			}
 			
 		}
@@ -181,6 +181,10 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	@Override
 	public void handleEvent(TransitDriverStartsEvent event) {
 		transitVehicles.add(event.getVehicleId());
+	}
+	@Override
+	public void cleanupAfterMobsim(int iteration) {
+		
 	}
 	
 }
