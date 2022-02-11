@@ -31,6 +31,7 @@ import org.matsim.contrib.ev.discharging.AuxEnergyConsumption;
 import org.matsim.contrib.ev.discharging.DischargingModule;
 import org.matsim.contrib.ev.discharging.DriveEnergyConsumption;
 import org.matsim.contrib.ev.fleet.ElectricFleet;
+import org.matsim.contrib.ev.fleet.ElectricFleetModule;
 import org.matsim.contrib.ev.fleet.ElectricFleetSpecification;
 import org.matsim.contrib.ev.fleet.ElectricFleets;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureModule;
@@ -66,15 +67,17 @@ public class UrbanEVModule extends AbstractModule {
 
 
 		//standard EV stuff except for ElectricFleetModule
+		install(new ElectricFleetModule());
 		install(new ChargingInfrastructureModule());
 		install(new ChargingModule());
 		install(new DischargingModule());
 		install(new EvStatsModule());
+		
 
 		//bind custom EVFleet stuff
-		bind(MATSimVehicleWrappingEVSpecificationProvider.class).in(Singleton.class);
-		bind(ElectricFleetSpecification.class).toProvider(MATSimVehicleWrappingEVSpecificationProvider.class);
-		addControlerListenerBinding().to(MATSimVehicleWrappingEVSpecificationProvider.class);
+//		bind(MATSimVehicleWrappingEVSpecificationProvider.class).in(Singleton.class);
+//		bind(ElectricFleetSpecification.class).toProvider(MATSimVehicleWrappingEVSpecificationProvider.class);
+//		addControlerListenerBinding().to(MATSimVehicleWrappingEVSpecificationProvider.class);
 		installQSimModule(new AbstractQSimModule() {
 			@Override
 			protected void configureQSim() {
@@ -90,27 +93,27 @@ public class UrbanEVModule extends AbstractModule {
 
 			}
 		});
-		installQSimModule(new AbstractQSimModule() {
-			@Override
-			protected void configureQSim() {
-				bind(ElectricFleet.class).toProvider(new Provider<>() {
-					@Inject
-					private ElectricFleetSpecification fleetSpecification;
-					@Inject
-					private DriveEnergyConsumption.Factory driveConsumptionFactory;
-					@Inject
-					private AuxEnergyConsumption.Factory auxConsumptionFactory;
-					@Inject
-					private ChargingPower.Factory chargingPowerFactory;
-
-					@Override
-					public ElectricFleet get() {
-						return ElectricFleets.createDefaultFleet(fleetSpecification, driveConsumptionFactory,
-								auxConsumptionFactory, chargingPowerFactory);
-					}
-				}).asEagerSingleton();
-			}
-		});
+//		installQSimModule(new AbstractQSimModule() {
+//			@Override
+//			protected void configureQSim() {
+//				bind(ElectricFleet.class).toProvider(new Provider<>() {
+//					@Inject
+//					private ElectricFleetSpecification fleetSpecification;
+//					@Inject
+//					private DriveEnergyConsumption.Factory driveConsumptionFactory;
+//					@Inject
+//					private AuxEnergyConsumption.Factory auxConsumptionFactory;
+//					@Inject
+//					private ChargingPower.Factory chargingPowerFactory;
+//
+//					@Override
+//					public ElectricFleet get() {
+//						return ElectricFleets.createDefaultFleet(fleetSpecification, driveConsumptionFactory,
+//								auxConsumptionFactory, chargingPowerFactory);
+//					}
+//				}).asEagerSingleton();
+//			}
+//		});
 
 		//bind urban ev planning stuff
 		addMobsimListenerBinding().to(UrbanEVTripsPlanner.class);

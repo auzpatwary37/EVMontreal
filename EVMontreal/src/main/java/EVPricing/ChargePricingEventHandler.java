@@ -54,6 +54,8 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 
 	private ChargingInfrastructureSpecification chargingInfrastructure;
 	
+	@Inject
+	private ChargerPricingProfiles pricingProfies;
 	
 	private ElectricFleet fleet;
 	
@@ -154,6 +156,8 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 			this.vehicleToPersonMapping.get(event.getVehicleId()).remove(event.getPersonId());
 		}
 	}
+	
+	
 
 	void chargePeopleForGasoline(Id<Vehicle> vId, double time) {
 		if(!this.vehicleToPersonMapping.get(vId).isEmpty()){
@@ -187,6 +191,11 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		
 	}
 	
+//	void tutorial(Id<Charger> cId) {
+//		this.pricingProfies.getChargerPricingProfiles().get(cId).getPricingProfile().get(cId)
+//	}
+	
+	// to do here
 }
 
 class chargingDetails{

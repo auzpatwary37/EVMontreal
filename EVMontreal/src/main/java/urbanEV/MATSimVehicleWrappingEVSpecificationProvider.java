@@ -72,7 +72,7 @@ class MATSimVehicleWrappingEVSpecificationProvider implements Provider<ElectricF
 	}
 
 	private void registerEVs(Plan plan){
-		Set<Vehicle> vehSet = TripStructureUtils.getLegs(plan).stream()
+		Set<Vehicle> vehSet = TripStructureUtils.getLegs(plan).stream().filter(leg->leg.getMode().equals("car")||leg.getMode().equals("car_passenger"))
 				.map(leg -> vehicles.getVehicles().get(VehicleUtils.getVehicleId(plan.getPerson(), leg.getMode())))
 				.filter(vehicle -> VehicleUtils.getHbefaTechnology(vehicle.getType().getEngineInformation()) != null &&
 						VehicleUtils.getHbefaTechnology(vehicle.getType().getEngineInformation()).equals("electricity"))

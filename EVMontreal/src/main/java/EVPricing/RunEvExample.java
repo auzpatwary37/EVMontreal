@@ -24,17 +24,23 @@ package EVPricing;/*
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
+import org.matsim.api.core.v01.Coord;
+import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.EvModule;
+import org.matsim.contrib.ev.infrastructure.Charger;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
 import org.matsim.core.config.groups.PlansCalcRouteConfigGroup;
 import org.matsim.core.config.groups.QSimConfigGroup.VehiclesSource;
+import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
 import org.matsim.core.scenario.ScenarioUtils;
@@ -84,8 +90,8 @@ public class RunEvExample {
 				.setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
 		config.qsim().setFlowCapFactor(0.1);
 		config.qsim().setStorageCapFactor(0.1);
-		config.global().setNumberOfThreads(11);
-		config.qsim().setNumberOfThreads(6);
+		config.global().setNumberOfThreads(4);
+		config.qsim().setNumberOfThreads(2);
 		//config.qsim().setVehiclesSource(VehiclesSource.defaultVehicle);
 		
 		
@@ -115,9 +121,26 @@ public class RunEvExample {
 		//controler.addOverridingModule(new EvModule());
 		controler.addOverridingModule(new UrbanEVModule());
 		//controler.addOverridingModule(new EVPriceModule());
-//		controler.addOverridingModule(new AbstractModule() {
-//			@Override
-//			public void install() {
+		Coord coord = new Coord(311903.,5049020.);
+		Map<String,Coord> zones = new HashMap<>();
+		
+		zones.put("zone1", coord);
+		
+		double[] nonLinear = new double[4];
+		nonLinear[0] = .1;
+		nonLinear[1] = .12;
+		nonLinear[2] = .15;
+		nonLinear[3] = .2;
+		
+		
+		
+		ChargerPricingProfiles pricingProfiles = new ChargerPricingProfiles(zones,new HashMap<Id<Charger>,Charger>(),.13);
+
+		
+		controler.addOverridingModule(new AbstractModule() {
+			@Override
+			public void install() {
+				bind(ChargerPricingProfiles.class).toInstance(pricingProfiles);
 //				addRoutingModuleBinding(TransportMode.car).toProvider(new EvNetworkRoutingProvider(TransportMode.car));
 //				installQSimModule(new AbstractQSimModule() {
 //					@Override
@@ -128,9 +151,10 @@ public class RunEvExample {
 //						addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
 //					}
 //				});
-//			}
-//		});
-
+			}
+		});
+		
+		
 		controler.configureQSimComponents(components -> components.addNamedComponent(EvModule.EV_COMPONENT));
 
 		controler.run();

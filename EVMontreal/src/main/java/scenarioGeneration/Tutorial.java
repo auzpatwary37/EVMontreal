@@ -21,6 +21,7 @@ import org.matsim.api.core.v01.network.Node;
 import org.matsim.api.core.v01.population.PopulationWriter;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.EvModule;
+import org.matsim.contrib.ev.charging.VehicleChargingHandler;
 import org.matsim.contrib.ev.fleet.ElectricFleetSpecification;
 import org.matsim.contrib.ev.fleet.ElectricFleetSpecificationImpl;
 import org.matsim.contrib.ev.fleet.ElectricFleetWriter;
@@ -33,17 +34,21 @@ import org.matsim.contrib.ev.infrastructure.ChargerWriter;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureSpecification;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureSpecificationImpl;
 import org.matsim.contrib.ev.infrastructure.ImmutableChargerSpecification;
+import org.matsim.contrib.ev.routing.EvNetworkRoutingProvider;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.ConfigWriter;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
 import org.matsim.core.config.groups.PlansCalcRouteConfigGroup;
+import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
+import org.matsim.core.mobsim.qsim.AbstractQSimModule;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 import org.matsim.vehicles.EngineInformation;
+import org.matsim.vehicles.EngineInformation.FuelType;
 import org.matsim.vehicles.MatsimVehicleWriter;
 import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleType;
@@ -53,6 +58,8 @@ import org.matsim.vehicles.VehiclesFactory;
 
 import com.google.common.collect.ImmutableList;
 
+import EVPricing.ChargePricingEventHandler;
+import urbanEV.EVUtils;
 import urbanEV.UrbanEVConfigGroup;
 import urbanEV.UrbanEVModule;
 import urbanEV.UrbanVehicleChargingHandler;
@@ -90,6 +97,7 @@ public class Tutorial {
 		//put the min and max same to make capacity non random
 
 		double socMIn = 20; // Min initial soc level.
+		double chargeAtStartOfDayAboveSocMin = 5;
 
 		//ChargerTypes and power
 
@@ -117,6 +125,8 @@ public class Tutorial {
 		VehicleType ev1 = vf.createVehicleType(Id.create("ev1", VehicleType.class));
 		VehicleUtils.setHbefaTechnology(ev1.getEngineInformation(),"electricity");
 		vs.addVehicleType(ev1);
+		EVUtils.setChargerTypes(ev1.getEngineInformation(), ImmutableList.copyOf(cp.keySet()));
+		EVUtils.setInitialEnergy(ev1.getEngineInformation(), socMIn+chargeAtStartOfDayAboveSocMin);
 
 		//Create a vehicleType without ev
 		VehicleType noEV = vf.createVehicleType(Id.create("nonEv", VehicleType.class));
@@ -142,7 +152,7 @@ public class Tutorial {
 					Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
 					vMap.put(v.getId(), v);
 					vs.addVehicle(v);
-
+					
 					//Create vehicle in the ElectricVehicle file
 					Double b = (BatteryCapMin+(BatteryCapMax-BatteryCapMin)*random.nextDouble())*36e5;
 					Double c = socMIn*36e5+(b-socMIn*36e5)*random.nextDouble();
@@ -153,7 +163,7 @@ public class Tutorial {
 							.chargerTypes(ImmutableList.copyOf(cp.keySet()))
 							.vehicleType(ev1.getId().toString())
 							.build();
-
+					
 					sp.addVehicleSpecification(s);
 				}else {
 					Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), noEV);// Create a non EV vehicle
@@ -297,7 +307,7 @@ public class Tutorial {
 		Controler controler = new Controler(scRun);
 		controler.addOverridingModule(new UrbanEVModule());
 		controler.configureQSimComponents(components -> components.addNamedComponent(EvModule.EV_COMPONENT));
-		controler.run();
+	//	controler.run();
 	}
 	/**
 	 * Use this function after creating the controller before running urban ev.
@@ -307,21 +317,21 @@ public class Tutorial {
 	public static Controler createUrbanEVController(Controler controler) {
 		controler.addOverridingModule(new EvModule());
 		//controler.addOverridingModule(new EVPriceModule());
-//		controler.addOverridingModule(new AbstractModule() {
-//			@Override
-//			public void install() {
-//				addRoutingModuleBinding(TransportMode.car).toProvider(new EvNetworkRoutingProvider(TransportMode.car));
-//				installQSimModule(new AbstractQSimModule() {
-//					@Override
-//					protected void configureQSim() {
-//						bind(VehicleChargingHandler.class).asEagerSingleton();
-//						bind(ChargePricingEventHandler.class).asEagerSingleton();
-//						//addMobsimScopeEventHandlerBinding().to(VehicleChargingHandler.class);
-//						//addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
-//					}
-//				});
-//			}
-//		});
+		controler.addOverridingModule(new AbstractModule() {
+			@Override
+			public void install() {
+				addRoutingModuleBinding(TransportMode.car).toProvider(new EvNetworkRoutingProvider(TransportMode.car));
+				installQSimModule(new AbstractQSimModule() {
+					@Override
+					protected void configureQSim() {
+						bind(VehicleChargingHandler.class).asEagerSingleton();
+						bind(ChargePricingEventHandler.class).asEagerSingleton();
+						//addMobsimScopeEventHandlerBinding().to(VehicleChargingHandler.class);
+						//addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
+					}
+				});
+			}
+		});
 
 		
 		//plug in UrbanEVModule

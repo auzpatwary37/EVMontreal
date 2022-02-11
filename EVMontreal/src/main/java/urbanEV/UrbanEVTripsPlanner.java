@@ -188,7 +188,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 	 * @return
 	 */
 	private Set<Id<Vehicle>> getUsedEV(Plan plan) {
-		return TripStructureUtils.getLegs(plan).stream()
+		return TripStructureUtils.getLegs(plan).stream().filter(leg->leg.getMode().equals("car")||leg.getMode().equals("car_passenger"))
 				.map(leg -> VehicleUtils.getVehicleId(plan.getPerson(), leg.getMode()))
 				.filter(vehicleId -> isEV(vehicleId))
 				.collect(toSet());
