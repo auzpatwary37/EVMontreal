@@ -80,7 +80,7 @@ public class RunEvExample {
 		Config config = ConfigUtils.loadConfig(configUrl, new EvConfigGroup(), new UrbanEVConfigGroup());
 		config.plans().setInputFile("plan.xml");
 		((EvConfigGroup)config.getModules().get("ev")).setTimeProfiles(true);
-		
+		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(true);
 //	    UrbanEVConfigGroup urbanEVConfigGroup = new UrbanEVConfigGroup();
 //	    config.addModule(urbanEVConfigGroup);
 		

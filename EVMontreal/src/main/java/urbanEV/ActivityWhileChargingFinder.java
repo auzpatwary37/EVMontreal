@@ -129,7 +129,7 @@ public class ActivityWhileChargingFinder {
 			log.warn("could not find activity within given list of plan elements");
 			return null;
 		}
-		if(actIndex == planElements.size() - 1) {
+		if(actIndex == planElements.size() - 1) {//Why is this null??
 			log.warn("the given activity is the last activity in the given list of plan elements");
 			return null;
 		}

@@ -5,9 +5,11 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.Set;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
@@ -18,6 +20,7 @@ import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.network.Node;
+import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.PopulationWriter;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.EvModule;
@@ -105,6 +108,7 @@ public class Tutorial {
 		cp.put("Level 1", 50.);
 		cp.put("Level 2", 70.);
 		cp.put("Fast", 100.);
+		cp.put("home",11.5);
 
 		//____________________________________________________
 		
@@ -134,48 +138,10 @@ public class Tutorial {
 		vs.addVehicleType(noEV);
 
 		//Crate container for electric vehicle specification
-		ElectricFleetSpecification sp = new ElectricFleetSpecificationImpl();
-
-
-		Random random = new Random();
-		scenario.getPopulation().getPersons().entrySet().forEach(p->{
-
-//		PersonUtils.setCarAvail(p.getValue(),"always"); requested by rena Feb 1, 2022.
-//		PersonUtils.getCarAvail(p.getValue());
-
-
-			String cc = (String) p.getValue().getAttributes().getAttribute("carAvail");
-
-			if(cc.equals("always")) {// have cars
-				if(Math.random()<=evPercentage) {
-					Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), ev1);// create ev vehicle in the vehicles file.
-					Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
-					vMap.put(v.getId(), v);
-					vs.addVehicle(v);
-					
-					//Create vehicle in the ElectricVehicle file
-					Double b = (BatteryCapMin+(BatteryCapMax-BatteryCapMin)*random.nextDouble())*36e5;
-					Double c = socMIn*36e5+(b-socMIn*36e5)*random.nextDouble();
-					ElectricVehicleSpecification s = ImmutableElectricVehicleSpecification.newBuilder()
-							.id(Id.create(p.getKey().toString(), ElectricVehicle.class))
-							.batteryCapacity(b.intValue())
-							.initialSoc(c.intValue())
-							.chargerTypes(ImmutableList.copyOf(cp.keySet()))
-							.vehicleType(ev1.getId().toString())
-							.build();
-					
-					sp.addVehicleSpecification(s);
-				}else {
-					Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), noEV);// Create a non EV vehicle
-					Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
-					vMap.put(v.getId(), v);
-					vs.addVehicle(v);
-				}
-			}
-		});
+		
 
 		ChargingInfrastructureSpecification csp = new ChargingInfrastructureSpecificationImpl();// Create container for charger specification
-
+		Set<Id<Link>> chargerLinkIds = new HashSet<>();
 		Network net = NetworkUtils.readNetwork(networkInput); // read network
 		
 		Map<Id<Link>, ? extends Link>linkSet = new HashMap<>(net.getLinks());
@@ -189,6 +155,8 @@ public class Tutorial {
 		
 
 		CoordinateTransformation tsf = TransformationFactory.getCoordinateTransformation(TransformationFactory.WGS84, "EPSG:32188");
+		Map<String,Coord> homeChargerLocations = new HashMap<>();
+		
 		//______________________________________________________________________
 		//Reading the charger csv file
 
@@ -234,7 +202,7 @@ public class Tutorial {
 			plugCount.put("Level 1", noOfl1);
 			plugCount.put("Level 2", noOfl2);
 			plugCount.put("Fast", noOfFast);
-
+			
 
 			for(Entry<String, Integer> d:plugCount.entrySet()) {
 				if (d.getValue() != 0) {
@@ -247,6 +215,7 @@ public class Tutorial {
 							.build();
 
 					csp.addChargerSpecification(c);
+					chargerLinkIds.add(linkId);
 				}
 			}
 
@@ -256,8 +225,64 @@ public class Tutorial {
 		//__________________________________________________________________
 
 
+		ElectricFleetSpecification sp = new ElectricFleetSpecificationImpl();
+		
+
+		Random random = new Random();
+		scenario.getPopulation().getPersons().entrySet().forEach(p->{
+
+//		PersonUtils.setCarAvail(p.getValue(),"always"); requested by rena Feb 1, 2022.
+//		PersonUtils.getCarAvail(p.getValue());
 
 
+			String cc = (String) p.getValue().getAttributes().getAttribute("carAvail");
+
+			if(cc.equals("always")) {// have cars
+				if(Math.random()<=evPercentage) {
+					Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), ev1);// create ev vehicle in the vehicles file.
+					Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
+					vMap.put(v.getId(), v);
+					vs.addVehicle(v);
+					
+					//Create vehicle in the ElectricVehicle file
+					Double b = (BatteryCapMin+(BatteryCapMax-BatteryCapMin)*random.nextDouble())*36e5;
+					Double c = socMIn*36e5+(b-socMIn*36e5)*random.nextDouble();
+					ElectricVehicleSpecification s = ImmutableElectricVehicleSpecification.newBuilder()
+							.id(Id.create(p.getKey().toString(), ElectricVehicle.class))
+							.batteryCapacity(b.intValue())
+							.initialSoc(c.intValue())
+							.chargerTypes(ImmutableList.copyOf(cp.keySet()))
+							.vehicleType(ev1.getId().toString())
+							.build();
+					
+					sp.addVehicleSpecification(s);
+					// Now insert a charger at the home location. 
+					p.getValue().getSelectedPlan().getPlanElements().stream().filter(pp->pp instanceof Activity)
+					.filter(a->((Activity)a).getType().equals("home")).forEach(a->homeChargerLocations.put(p.getKey().toString(),((Activity)a).getCoord()));
+					
+				}else {
+					Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), noEV);// Create a non EV vehicle
+					Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
+					vMap.put(v.getId(), v);
+					vs.addVehicle(v);
+				}
+			}
+		});
+		
+		for(Entry<String, Coord> d:homeChargerLocations.entrySet()) {
+			Id<Link> linkId = NetworkUtils.getNearestRightEntryLink(net, d.getValue()).getId();
+			if(!chargerLinkIds.contains(linkId)) {
+			ChargerSpecification c = ImmutableChargerSpecification.newBuilder()
+					.id(Id.create(d.getKey()+"_home", Charger.class))
+					.linkId(linkId)
+					.chargerType("home")
+					.plugCount(1)
+					.plugPower(1000 * 11.5)
+					.build();
+
+			csp.addChargerSpecification(c);
+			}
+		}
 		
 
 
