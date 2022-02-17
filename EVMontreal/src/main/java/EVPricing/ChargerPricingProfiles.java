@@ -17,13 +17,21 @@ public class ChargerPricingProfiles {
 	private final Map<String,Coord> zone;
 	private Map<Id<Charger>,ChargerPricingProfile> chargerPricingProfiles = new HashMap<>();
 	
+	public ChargerPricingProfiles(Map<String,Coord> zones) {
+		this.zone = zones;
+	}
+	
+	public void addChargerPricingProfile(ChargerPricingProfile profile) {
+		this.chargerPricingProfiles.put(profile.getChargerId(), profile);
+	}
+	
 	/**
 	 * Use this to create a flat priced charger
 	 * @param zones
 	 * @param chargerSet
 	 * @param price
 	 */
-	public ChargerPricingProfiles(Map<String,Coord> zones, Map<Id<Charger>,Charger> chargerSet, double price) {
+	public ChargerPricingProfiles(Map<String,Coord> zones, Map<Id<Charger>,Charger> chargerSet, double price, double profileTimeStepInMin) {
 		this.zone = zones;
 		Network zoneNet = NetworkUtils.createNetwork();
 		this.zone.entrySet().stream().forEach(z->{
@@ -31,7 +39,7 @@ public class ChargerPricingProfiles {
 		});
 		chargerSet.entrySet().stream().forEach(cId->{
 			String zoneId = NetworkUtils.getNearestNode(zoneNet,cId.getValue().getCoord()).getId().toString();
-			new ChargerPricingProfile(cId.getKey(),zoneId, price);
+			new ChargerPricingProfile(cId.getKey(),zoneId, price, profileTimeStepInMin);
 		});
 	}
 	
@@ -48,7 +56,7 @@ public class ChargerPricingProfiles {
 		});
 		chargerSet.entrySet().stream().forEach(cId->{
 			String zoneId = NetworkUtils.getNearestNode(zoneNet,cId.getValue().getCoord()).getId().toString();
-			new ChargerPricingProfile(cId.getKey(),zoneId);
+			new ChargerPricingProfile(cId.getKey(),zoneId,60);
 		});
 	}
 	/**
@@ -57,7 +65,7 @@ public class ChargerPricingProfiles {
 	 * @param chargerSet
 	 * @param faltNonLinear
 	 */
-	public ChargerPricingProfiles(Map<String,Coord> zones, Map<Id<Charger>,Charger> chargerSet, double[] flatNonLinear) {
+	public ChargerPricingProfiles(Map<String,Coord> zones, Map<Id<Charger>,Charger> chargerSet, double[] flatNonLinear, double profileTimeStepInMin) {
 		this.zone = zones;
 		Network zoneNet = NetworkUtils.createNetwork();
 		this.zone.entrySet().stream().forEach(z->{
@@ -65,7 +73,7 @@ public class ChargerPricingProfiles {
 		});
 		chargerSet.entrySet().stream().forEach(cId->{
 			String zoneId = NetworkUtils.getNearestNode(zoneNet,cId.getValue().getCoord()).getId().toString();
-			new ChargerPricingProfile(cId.getKey(),zoneId, flatNonLinear);
+			new ChargerPricingProfile(cId.getKey(),zoneId, flatNonLinear, profileTimeStepInMin);
 		});
 	}
 
@@ -78,7 +86,7 @@ public class ChargerPricingProfiles {
 	 * @param chargerSet
 	 * @param faltNonLinear
 	 */
-	public ChargerPricingProfiles(Map<String,Coord> zones, Map<Id<Charger>,Charger> chargerSet, Map<String,Map<Integer, double[]>> zonalflatNonLinearDynamic) {
+	public ChargerPricingProfiles(Map<String,Coord> zones, Map<Id<Charger>,Charger> chargerSet, Map<String,Map<Integer, double[]>> zonalflatNonLinearDynamic,double profileTimeStepInMin) {
 		this.zone = zones;
 		Network zoneNet = NetworkUtils.createNetwork();
 		this.zone.entrySet().stream().forEach(z->{
@@ -86,7 +94,7 @@ public class ChargerPricingProfiles {
 		});
 		chargerSet.entrySet().stream().forEach(cId->{
 			String zoneId = NetworkUtils.getNearestNode(zoneNet,cId.getValue().getCoord()).getId().toString();
-			new ChargerPricingProfile(cId.getKey(),zoneId, zonalflatNonLinearDynamic.get(zoneId));
+			new ChargerPricingProfile(cId.getKey(),zoneId, zonalflatNonLinearDynamic.get(zoneId),profileTimeStepInMin);
 		});
 	}
 

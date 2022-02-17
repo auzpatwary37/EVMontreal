@@ -80,7 +80,7 @@ public class Tutorial {
 
 		//Inputs
 		double evPercentage = 0.1; // Percentage of cars to take as EV
-
+		boolean assignChargersToEveryone = false;
 
 		String configIn = "config_with_calibrated_parameters.xml";// input MATSim Montreal Config without ev
 		String planInput = "prepared_population.xml.gz";// Population file without EV
@@ -237,7 +237,7 @@ public class Tutorial {
 
 			String cc = (String) p.getValue().getAttributes().getAttribute("carAvail");
 
-			if(cc.equals("always")) {// have cars
+			if(cc.equals("always") && p.getValue().getSelectedPlan().getPlanElements().size()>1) {// have cars and have at least one leg 
 				if(Math.random()<=evPercentage) {
 					Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), ev1);// create ev vehicle in the vehicles file.
 					Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
@@ -260,6 +260,21 @@ public class Tutorial {
 					p.getValue().getSelectedPlan().getPlanElements().stream().filter(pp->pp instanceof Activity)
 					.filter(a->((Activity)a).getType().equals("home")).forEach(a->homeChargerLocations.put(p.getKey().toString(),((Activity)a).getCoord()));
 					
+					// check if have access to at least one charger
+					Set<Id<Link>> actLinkIds = new HashSet<>();
+					p.getValue().getSelectedPlan().getPlanElements().stream().filter(pp->pp instanceof Activity)
+					.forEach(a->actLinkIds.add(((Activity)a).getLinkId()));
+					boolean haveAccessToCharger = false;
+					for(Id<Link> lIds:actLinkIds) {
+						if(chargerLinkIds.contains(lIds)) {
+							haveAccessToCharger = true;
+							break;
+						}
+					}
+					if(haveAccessToCharger == false) {
+						homeChargerLocations.put(p.getKey().toString(), ((Activity)p.getValue().getSelectedPlan().getPlanElements().get(0)).getCoord());
+					}
+					
 				}else {
 					Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), noEV);// Create a non EV vehicle
 					Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
@@ -269,21 +284,22 @@ public class Tutorial {
 			}
 		});
 		
-		for(Entry<String, Coord> d:homeChargerLocations.entrySet()) {
-			Id<Link> linkId = NetworkUtils.getNearestRightEntryLink(net, d.getValue()).getId();
-			if(!chargerLinkIds.contains(linkId)) {
-			ChargerSpecification c = ImmutableChargerSpecification.newBuilder()
-					.id(Id.create(d.getKey()+"_home", Charger.class))
-					.linkId(linkId)
-					.chargerType("home")
-					.plugCount(1)
-					.plugPower(1000 * 11.5)
-					.build();
-
-			csp.addChargerSpecification(c);
+		if(assignChargersToEveryone) {
+			for(Entry<String, Coord> d:homeChargerLocations.entrySet()) {
+				Id<Link> linkId = NetworkUtils.getNearestRightEntryLink(net, d.getValue()).getId();
+				if(!chargerLinkIds.contains(linkId)) {
+				ChargerSpecification c = ImmutableChargerSpecification.newBuilder()
+						.id(Id.create(d.getKey()+"_home", Charger.class))
+						.linkId(linkId)
+						.chargerType("home")
+						.plugCount(1)
+						.plugPower(1000 * 11.5)
+						.build();
+	
+				csp.addChargerSpecification(c);
+				}
 			}
 		}
-		
 
 
 		new ChargerWriter(csp.getChargerSpecifications().values().stream()).write(chargerOutput);

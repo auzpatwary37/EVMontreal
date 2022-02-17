@@ -80,7 +80,12 @@ public class RunEvExample {
 		Config config = ConfigUtils.loadConfig(configUrl, new EvConfigGroup(), new UrbanEVConfigGroup());
 		config.plans().setInputFile("plan.xml");
 		((EvConfigGroup)config.getModules().get("ev")).setTimeProfiles(true);
-		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(true);
+		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(false);
+		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(500);
+		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaximumChargingProceduresPerAgent(2);
+		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.25);
+		
+		
 //	    UrbanEVConfigGroup urbanEVConfigGroup = new UrbanEVConfigGroup();
 //	    config.addModule(urbanEVConfigGroup);
 		
@@ -134,7 +139,7 @@ public class RunEvExample {
 		
 		
 		
-		ChargerPricingProfiles pricingProfiles = new ChargerPricingProfiles(zones,new HashMap<Id<Charger>,Charger>(),.13);
+		ChargerPricingProfiles pricingProfiles = new ChargerPricingProfiles(zones,new HashMap<Id<Charger>,Charger>(),.13,15);
 
 		
 		controler.addOverridingModule(new AbstractModule() {

@@ -31,6 +31,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -343,13 +345,20 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 					if (chargingBegin == null) throw new IllegalStateException();
 					double chargingDuration = legFromCharger.getDepartureTime().seconds() - chargingBegin;
 
-					ChargerSpecification chargerSpecification = chargingInfrastructureSpecification.getChargerSpecifications()
+					ChargerSpecification chargerSpecification = null;
+							
+					Optional<ChargerSpecification> a = chargingInfrastructureSpecification.getChargerSpecifications()
 							.values()
 							.stream()
 							.filter(charger -> charger.getLinkId().equals(((Activity) planElement).getLinkId()))
 							.filter(charger -> pseudoVehicle.getChargerTypes().contains(charger.getChargerType()))
-							.findAny().orElseThrow();
+							.findAny();
 
+					if( !a.isPresent()) {
+						throw new NoSuchElementException();
+					}else {
+						chargerSpecification = a.get();
+					}
 					pseudoVehicle.getBattery().changeSoc(pseudoVehicle.getChargingPower().calcChargingPower(chargerSpecification) * chargingDuration);
 				}
 			} else throw new IllegalArgumentException();
