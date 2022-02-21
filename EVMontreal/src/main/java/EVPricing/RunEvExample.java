@@ -90,13 +90,13 @@ public class RunEvExample {
 //	    config.addModule(urbanEVConfigGroup);
 		
 	    config.controler().setLastIteration(100);
-		config.controler().setOutputDirectory("EV_5Percent_100Iter");
+		config.controler().setOutputDirectory("EV_5Percent_100Iter_1");
 		config.controler()
 				.setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
 		config.qsim().setFlowCapFactor(0.1);
 		config.qsim().setStorageCapFactor(0.1);
-		config.global().setNumberOfThreads(4);
-		config.qsim().setNumberOfThreads(2);
+		config.global().setNumberOfThreads(14);
+		config.qsim().setNumberOfThreads(10);
 		//config.qsim().setVehiclesSource(VehiclesSource.defaultVehicle);
 		
 		

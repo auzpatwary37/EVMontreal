@@ -110,11 +110,13 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		
 		Id<Person> pId = this.personIdForEV.get(event.getVehicleId());
 		chargingDetails cd = this.personLists.get(pId.toString());
-		String chargerType = this.chargingInfrastructure.getChargerSpecifications().get(cd.charger).getChargerType();
-		double pricePerkWhr = this.price.get(chargerType);
-		Double juleCharged= cd.v.getBattery().getSoc()-cd.initialSoc;//warning: unit Conversion
-		Double cost = pricePerkWhr*juleCharged/3600000;
-		this.events.processEvent(new PersonMoneyEvent(event.getTime(), pId, cost*-1, this.ChargingCostName, cd.charger.toString()+"___"+chargerType));
+		cd.endingTime = event.getTime();
+//		String chargerType = this.chargingInfrastructure.getChargerSpecifications().get(cd.charger).getChargerType();
+//		double pricePerkWhr = this.price.get(chargerType);
+//		Double juleCharged= cd.v.getBattery().getSoc()-cd.initialSoc;//warning: unit Conversion
+//		Double cost = pricePerkWhr*juleCharged/3600000;
+//		this.events.processEvent(new PersonMoneyEvent(event.getTime(), pId, cost*-1, this.ChargingCostName, cd.charger.toString()+"___"+chargerType));
+		this.chargePeopleForElectricity(cd);
 		this.personLists.remove(pId.toString());
 		}
 
@@ -168,6 +170,35 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 				this.events.processEvent(new PersonMoneyEvent(time, pId, indCost, this.gasMoneyString,  vId.toString()));
 			}
 			
+		}
+	}
+	
+	void chargePeopleForElectricity(chargingDetails cd) {
+		Id<Vehicle> vId = Id.createVehicleId(cd.v.getId().toString());
+		if(!this.vehicleToPersonMapping.get(vId).isEmpty()){
+			int timeId = (int)(cd.startingTime/3600);
+			double[] pricingProfile = this.pricingProfies.getChargerPricingProfiles().get(vId).getPricingProfile().get(timeId);
+			double pricingTimeBeanSize = this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getProfileTimeStepInMin()*60;
+			double cost = 0;
+			double chargerCapacity = this.chargingInfrastructure.getChargerSpecifications().get(cd.charger).getPlugPower();
+			double time = cd.endingTime-cd.startingTime;
+			cd.v.getChargingPower().calcChargingPower(null);
+			double timeIn = 0;
+			double timeOut = pricingTimeBeanSize-1;
+			for(double d:pricingProfile) {
+				if(time>timeIn) {
+					if(time>timeOut) {
+						cost+=pricingTimeBeanSize*chargerCapacity/3600000*d;//Warning: unit conversion
+					}else {
+						cost+=(time-timeIn)*chargerCapacity/3600000*d;//Warning: unit conversion
+					}
+				}
+				timeIn+=pricingTimeBeanSize;
+				timeOut+=pricingTimeBeanSize;
+			}
+		
+			this.events.processEvent(new PersonMoneyEvent(time, this.personIdForEV.get(cd.v.getId()), cost, this.ChargingCostName,  cd.charger.toString()+"___"+vId.toString()));
+
 		}
 	}
 

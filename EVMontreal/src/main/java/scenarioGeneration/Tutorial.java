@@ -80,7 +80,7 @@ public class Tutorial {
 
 		//Inputs
 		double evPercentage = 0.1; // Percentage of cars to take as EV
-		boolean assignChargersToEveryone = false;
+		boolean assignChargersToEveryone = true;
 
 		String configIn = "config_with_calibrated_parameters.xml";// input MATSim Montreal Config without ev
 		String planInput = "prepared_population.xml.gz";// Population file without EV
@@ -271,9 +271,9 @@ public class Tutorial {
 							break;
 						}
 					}
-					if(haveAccessToCharger == false) {
-						homeChargerLocations.put(p.getKey().toString(), ((Activity)p.getValue().getSelectedPlan().getPlanElements().get(0)).getCoord());
-					}
+//					if(haveAccessToCharger == false) {
+//						homeChargerLocations.put(p.getKey().toString(), ((Activity)p.getValue().getSelectedPlan().getPlanElements().get(0)).getCoord());
+//					}
 					
 				}else {
 					Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), noEV);// Create a non EV vehicle

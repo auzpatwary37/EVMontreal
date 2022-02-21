@@ -205,7 +205,10 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 
 		UrbanEVConfigGroup configGroup = (UrbanEVConfigGroup) config.getModules().get(UrbanEVConfigGroup.GROUP_NAME);
 
-		for (Plan plan : selectedEVPlans.keySet()) {
+		selectedEVPlans.entrySet().parallelStream().forEach(pl->{
+			
+		Plan plan = pl.getKey();
+		//for (Plan plan : selectedEVPlans.keySet()) {
 
 			//from here we deal with the modifiable plan (only!?)
 
@@ -215,8 +218,8 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 			Set<String> modesWithVehicles = new HashSet<>(scenario.getConfig().qsim().getMainModes());
 			modesWithVehicles.addAll(scenario.getConfig().plansCalcRoute().getNetworkModes());
 
-
-			for (Id<Vehicle> ev : selectedEVPlans.get(plan)) {
+			for(Id<Vehicle> ev: pl.getValue()) {
+		//	for (Id<Vehicle> ev : selectedEVPlans.get(plan)) {
 				//only replan cnt times per vehicle and person. otherwise, there might be a leg which is just too long and we end up in an infinity loop...
 				int cnt = configGroup.getMaximumChargingProceduresPerAgent();
 //				boolean pluginAtHomeBeforeMobSim = configGroup.getPluginAtHomeBeforeMobSim;
@@ -299,7 +302,8 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 
 				} while (legWithCriticalSOC != null && cnt > 0);
 			}
-		}
+		//}
+		});
 	}
 
 	/**
