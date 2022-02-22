@@ -26,6 +26,7 @@ import org.matsim.contrib.ev.charging.ChargingEndEventHandler;
 import org.matsim.contrib.ev.charging.ChargingStartEvent;
 import org.matsim.contrib.ev.charging.ChargingStartEventHandler;
 import org.matsim.contrib.ev.fleet.ElectricFleet;
+import org.matsim.contrib.ev.fleet.ElectricFleetSpecification;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
 import org.matsim.contrib.ev.infrastructure.Charger;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureSpecification;
@@ -53,6 +54,9 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	
 
 	private ChargingInfrastructureSpecification chargingInfrastructure;
+	
+	@Inject
+	private ElectricFleetSpecification electricFleetSpecification;
 	
 	@Inject
 	private ChargerPricingProfiles pricingProfies;

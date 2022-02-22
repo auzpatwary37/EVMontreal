@@ -205,10 +205,10 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 
 		UrbanEVConfigGroup configGroup = (UrbanEVConfigGroup) config.getModules().get(UrbanEVConfigGroup.GROUP_NAME);
 
-		selectedEVPlans.entrySet().parallelStream().forEach(pl->{
-			
-		Plan plan = pl.getKey();
-		//for (Plan plan : selectedEVPlans.keySet()) {
+//		selectedEVPlans.entrySet().parallelStream().forEach(pl->{
+//			
+//		Plan plan = pl.getKey();
+		for (Plan plan : selectedEVPlans.keySet()) {
 
 			//from here we deal with the modifiable plan (only!?)
 
@@ -218,8 +218,8 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 			Set<String> modesWithVehicles = new HashSet<>(scenario.getConfig().qsim().getMainModes());
 			modesWithVehicles.addAll(scenario.getConfig().plansCalcRoute().getNetworkModes());
 
-			for(Id<Vehicle> ev: pl.getValue()) {
-		//	for (Id<Vehicle> ev : selectedEVPlans.get(plan)) {
+		//	for(Id<Vehicle> ev: pl.getValue()) {
+			for (Id<Vehicle> ev : selectedEVPlans.get(plan)) {
 				//only replan cnt times per vehicle and person. otherwise, there might be a leg which is just too long and we end up in an infinity loop...
 				int cnt = configGroup.getMaximumChargingProceduresPerAgent();
 //				boolean pluginAtHomeBeforeMobSim = configGroup.getPluginAtHomeBeforeMobSim;
@@ -241,6 +241,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 //					Activity originalActWhileCharging = EditPlans.findRealActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(firstEvLeg));
 //					Activity lastAct = EditPlans.findRealActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(firstEvLeg));
 					Activity actWhileCharging = (Activity) modifiablePlan.getPlanElements().get(0);
+					actWhileCharging =  EditPlans.findRealActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(firstEvLeg));// comment this line out TODO: figure out this line 
 					Network modeNetwork = this.singleModeNetworksCache.getSingleModeNetworksCache().get(firstEvLeg.getMode());
 					Link chargingLink = modeNetwork.getLinks().get(actWhileCharging.getLinkId());
 					String routingMode = TripStructureUtils.getRoutingMode(firstEvLeg);
@@ -302,8 +303,26 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 
 				} while (legWithCriticalSOC != null && cnt > 0);
 			}
-		//}
-		});
+			if(!isConsistant(modifiablePlan)) {
+				System.out.println("Plan is not consistant!!! Debug!!!");
+			}
+		}
+			
+		//});
+	}
+	
+	
+	private boolean isConsistant(Plan plan) {
+		List<Activity> acts = new ArrayList<>();
+		plan.getPlanElements().stream().filter(pe-> pe instanceof Activity).forEach(a->acts.add(((Activity)a)));
+		int charging = 0;
+		for(Activity a:acts) {
+			if(a.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER))charging++;
+			else if(a.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))charging--;
+			if(charging>1)return false;
+		}
+		
+		return true;
 	}
 
 	/**
@@ -458,6 +477,9 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 		planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, pluginTripOrigin, actWhileCharging, chargingLink, tripRouter);
 		planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, plugoutTripOrigin, plugoutTripDestination, chargingLink, tripRouter, PlanRouter.calcEndOfActivity(plugoutTripOrigin, modifiablePlan, config));
 
+		if(!isConsistant(modifiablePlan)) {
+			System.out.println("Plan is not consistant!!! Debug!!!");
+		}
 	}
 
 	private void planPlugoutTrip(Plan plan, String routingMode, ElectricVehicleSpecification electricVehicleSpecification, Activity origin, Activity destination, Link chargingLink, TripRouter tripRouter, double now) {

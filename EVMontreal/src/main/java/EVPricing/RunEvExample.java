@@ -26,12 +26,17 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.log4j.Logger;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
+import org.matsim.api.core.v01.population.Activity;
+import org.matsim.api.core.v01.population.Person;
+import org.matsim.api.core.v01.population.PlanElement;
+import org.matsim.api.core.v01.population.Population;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.EvModule;
 import org.matsim.contrib.ev.infrastructure.Charger;
@@ -43,6 +48,7 @@ import org.matsim.core.config.groups.QSimConfigGroup.VehiclesSource;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
+import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.vehicles.VehicleCapacity;
 import org.matsim.vehicles.VehicleType;
@@ -80,7 +86,7 @@ public class RunEvExample {
 		Config config = ConfigUtils.loadConfig(configUrl, new EvConfigGroup(), new UrbanEVConfigGroup());
 		config.plans().setInputFile("plan.xml");
 		((EvConfigGroup)config.getModules().get("ev")).setTimeProfiles(true);
-		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(false);
+		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(true);
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(500);
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaximumChargingProceduresPerAgent(2);
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.25);
@@ -100,9 +106,6 @@ public class RunEvExample {
 		//config.qsim().setVehiclesSource(VehiclesSource.defaultVehicle);
 		
 		
-		Scenario scenario = ScenarioUtils.loadScenario(config);
-		
-		scaleDownPt(scenario.getTransitVehicles(), 0.1);
 		
 		config.planCalcScore().setPerforming_utils_hr(14);
 		
@@ -120,7 +123,12 @@ public class RunEvExample {
 		config.planCalcScore().addActivityParams(
 				new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGIN_INTERACTION)
 						.setScoringThisActivityAtAll(false));
+
+		Scenario scenario = ScenarioUtils.loadScenario(config);
 		
+		
+		scaleDownPt(scenario.getTransitVehicles(), 0.1);
+		checkPlanConsistancy(scenario.getPopulation());
 		
 		Controler controler = new Controler(scenario);
 		//controler.addOverridingModule(new EvModule());
@@ -172,5 +180,35 @@ public class RunEvExample {
 			vc.setStandingRoom((int) Math.ceil(vc.getStandingRoom().intValue() * portion));
 			vt.setPcuEquivalents(vt.getPcuEquivalents() * portion);
 		}
+	}
+	
+	public static void checkPlanConsistancy(Population population) {
+		long t = System.currentTimeMillis();
+		int personDeleted = 0;
+		Map<Id<Person>,Person> persons = new HashMap<>(population.getPersons());
+		for(Entry<Id<Person>, Person> p:persons.entrySet()){
+			if(p.getValue().getSelectedPlan().getPlanElements().size()<2) {
+				population.getPersons().remove(p.getKey());
+				personDeleted++;
+				continue;
+			}
+			Activity beforeAct = null;
+			for(PlanElement pe:p.getValue().getSelectedPlan().getPlanElements()) {
+				if(pe instanceof Activity && beforeAct == null) beforeAct = ((Activity)pe);
+				else if(pe instanceof Activity) {
+					double d = NetworkUtils.getEuclideanDistance(beforeAct.getCoord(), ((Activity)pe).getCoord());
+					if(d < 10) {
+						population.getPersons().remove(p.getKey());
+						personDeleted++;
+						break;
+					}else {
+						beforeAct = ((Activity)pe);
+					}
+				}
+			}
+		}
+		System.out.println("person deleted = " + personDeleted);
+		System.out.println("time in milisec = " +(System.currentTimeMillis() - t));
+		System.out.println();
 	}
 }

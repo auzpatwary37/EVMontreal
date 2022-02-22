@@ -25,11 +25,12 @@
 <!--		!! matsim-examples is currently on a more modern version since I want to modernize some things there. kai, apr'21 !!-->
 		
 		<matsim.version>14.0-PR1512</matsim.version> <!-- 18.05.2021-->
-		<maven.compiler.source>16</maven.compiler.source>
-		<maven.compiler.target>16</maven.compiler.target>
+		<maven.compiler.source>14</maven.compiler.source>
+		<maven.compiler.target>14</maven.compiler.target>
 	
    </properties>
-  <build>
+  
+<build>
     <plugins>
 <!--       <plugin> -->
 <!--         <artifactId>maven-compiler-plugin</artifactId> -->
@@ -45,8 +46,27 @@
     <artifactId>maven-compiler-plugin</artifactId>
     <version>3.8.0</version>
     <configuration>
-        <release>16</release> 
+        <release>14</release> 
     </configuration>
+</plugin>
+
+<plugin>
+  <groupId>org.apache.maven.plugins</groupId>
+  <artifactId>maven-assembly-plugin</artifactId>
+  <executions>
+    <execution>
+      <id>create-my-bundle</id>
+      <phase>package</phase>
+      <goals>
+        <goal>single</goal>
+      </goals>
+      <configuration>
+        <descriptorRefs>
+          <descriptorRef>jar-with-dependencies</descriptorRef>
+        </descriptorRefs>
+      </configuration>
+    </execution>
+  </executions>
 </plugin>
     </plugins>
     

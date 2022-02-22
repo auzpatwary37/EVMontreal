@@ -21,10 +21,12 @@ package urbanEV;
 
 import com.google.common.collect.ImmutableListMultimap;
 import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.events.*;
 import org.matsim.api.core.v01.events.handler.*;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.population.Person;
+import org.matsim.api.core.v01.population.Plan;
 import org.matsim.contrib.ev.charging.*;
 import org.matsim.contrib.ev.fleet.ElectricFleet;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
@@ -69,7 +71,8 @@ public class UrbanVehicleChargingHandler
 	private final ImmutableListMultimap<Id<Link>, Charger> chargersAtLinks;
 
 	private Map<Id<Link>, Map<Id<Person>, Tuple<Id<Vehicle>, Id<Charger>>>> chargingProcedures = new HashMap<>();
-
+	@Inject 
+	Scenario scenario;
 	@Inject
 	UrbanVehicleChargingHandler(ChargingInfrastructure chargingInfrastructure, ElectricFleet electricFleet) {
 		this.chargingInfrastructure = chargingInfrastructure;
@@ -99,6 +102,9 @@ public class UrbanVehicleChargingHandler
 					charger.getLogic().addVehicle(ev, event.getTime());
 					Map<Id<Person>, Tuple<Id<Vehicle>, Id<Charger>>> proceduresOnLink = this.chargingProcedures.get(event.getLinkId());
 					if(proceduresOnLink != null && proceduresOnLink.containsKey(event.getPersonId())){
+//						Plan plan = null;
+//						System.out.println(this.scenario.getPopulation().getPersons().get(event.getPersonId()).getSelectedPlan());
+//						
 						throw new RuntimeException("person " + event.getPersonId() + " tries to charge 2 vehicles at the same time on link " + event.getLinkId() +
 								". this is not supported.");
 					} else if(proceduresOnLink == null) {
