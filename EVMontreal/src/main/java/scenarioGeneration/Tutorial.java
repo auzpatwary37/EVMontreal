@@ -21,6 +21,9 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.network.Node;
 import org.matsim.api.core.v01.population.Activity;
+import org.matsim.api.core.v01.population.Person;
+import org.matsim.api.core.v01.population.PlanElement;
+import org.matsim.api.core.v01.population.Population;
 import org.matsim.api.core.v01.population.PopulationWriter;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.EvModule;
@@ -121,7 +124,7 @@ public class Tutorial {
 		config.plans().setInputFile(planInput);
 
 		Scenario scenario = ScenarioUtils.loadScenario(config);
-
+		checkPlanConsistancy(scenario.getPopulation());
 		Vehicles vs = scenario.getVehicles();
 		VehiclesFactory vf = vs.getFactory();
 
@@ -380,5 +383,35 @@ public class Tutorial {
 		//register EV qsim components
 		controler.configureQSimComponents(components -> components.addNamedComponent(EvModule.EV_COMPONENT));
 		return controler;
+	}
+	
+	public static void checkPlanConsistancy(Population population) {
+		long t = System.currentTimeMillis();
+		int personDeleted = 0;
+		Map<Id<Person>,Person> persons = new HashMap<>(population.getPersons());
+		for(Entry<Id<Person>, Person> p:persons.entrySet()){
+			if(p.getValue().getSelectedPlan().getPlanElements().size()<2) {
+				population.getPersons().remove(p.getKey());
+				personDeleted++;
+				continue;
+			}
+			Activity beforeAct = null;
+			for(PlanElement pe:p.getValue().getSelectedPlan().getPlanElements()) {
+				if(pe instanceof Activity && beforeAct == null) beforeAct = ((Activity)pe);
+				else if(pe instanceof Activity) {
+					double d = NetworkUtils.getEuclideanDistance(beforeAct.getCoord(), ((Activity)pe).getCoord());
+					if(d < 10) {
+						population.getPersons().remove(p.getKey());
+						personDeleted++;
+						break;
+					}else {
+						beforeAct = ((Activity)pe);
+					}
+				}
+			}
+		}
+		System.out.println("person deleted = " + personDeleted);
+		System.out.println("time in milisec = " +(System.currentTimeMillis() - t));
+		System.out.println();
 	}
 }

@@ -59,7 +59,7 @@ import urbanEV.UrbanEVModule;
 import urbanEV.UrbanVehicleChargingHandler;
 
 public class RunEvExample {
-	static final String DEFAULT_CONFIG_FILE = "montreal scenario5\\5_percent\\config.xml";
+	static final String DEFAULT_CONFIG_FILE = "montreal scenario5/5_percent/config.xml";
 	private static final Logger log = Logger.getLogger(RunEvExample.class);
 
 	public static void main(String[] args) throws IOException {
@@ -70,13 +70,13 @@ public class RunEvExample {
 			log.info("config URL: " + configUrl);
 		} else {
 			File localConfigFile = new File(DEFAULT_CONFIG_FILE);
+			System.out.println("Reading config from "+ localConfigFile);
 			if (localConfigFile.exists()) {
 				log.info("Starting simulation run with the local example config file");
 				configUrl = localConfigFile.toURI().toURL();
 			} else {
 				log.info("Starting simulation run with the example config file from GitHub repository");
-				configUrl = new URL("https://raw.githubusercontent.com/matsim-org/matsim/master/contribs/ev/"
-						+ DEFAULT_CONFIG_FILE);
+				configUrl = new URL(DEFAULT_CONFIG_FILE);
 			}
 		}
 		new RunEvExample().run(configUrl);
@@ -128,7 +128,7 @@ public class RunEvExample {
 		
 		
 		scaleDownPt(scenario.getTransitVehicles(), 0.1);
-		checkPlanConsistancy(scenario.getPopulation());
+		
 		
 		Controler controler = new Controler(scenario);
 		//controler.addOverridingModule(new EvModule());
@@ -182,33 +182,5 @@ public class RunEvExample {
 		}
 	}
 	
-	public static void checkPlanConsistancy(Population population) {
-		long t = System.currentTimeMillis();
-		int personDeleted = 0;
-		Map<Id<Person>,Person> persons = new HashMap<>(population.getPersons());
-		for(Entry<Id<Person>, Person> p:persons.entrySet()){
-			if(p.getValue().getSelectedPlan().getPlanElements().size()<2) {
-				population.getPersons().remove(p.getKey());
-				personDeleted++;
-				continue;
-			}
-			Activity beforeAct = null;
-			for(PlanElement pe:p.getValue().getSelectedPlan().getPlanElements()) {
-				if(pe instanceof Activity && beforeAct == null) beforeAct = ((Activity)pe);
-				else if(pe instanceof Activity) {
-					double d = NetworkUtils.getEuclideanDistance(beforeAct.getCoord(), ((Activity)pe).getCoord());
-					if(d < 10) {
-						population.getPersons().remove(p.getKey());
-						personDeleted++;
-						break;
-					}else {
-						beforeAct = ((Activity)pe);
-					}
-				}
-			}
-		}
-		System.out.println("person deleted = " + personDeleted);
-		System.out.println("time in milisec = " +(System.currentTimeMillis() - t));
-		System.out.println();
-	}
+
 }
