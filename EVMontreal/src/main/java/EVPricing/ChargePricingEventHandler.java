@@ -21,18 +21,27 @@ import org.matsim.api.core.v01.events.handler.TransitDriverStartsEventHandler;
 import org.matsim.api.core.v01.events.handler.VehicleEntersTrafficEventHandler;
 import org.matsim.api.core.v01.events.handler.VehicleLeavesTrafficEventHandler;
 import org.matsim.api.core.v01.population.Person;
+import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.charging.ChargingEndEvent;
 import org.matsim.contrib.ev.charging.ChargingEndEventHandler;
+import org.matsim.contrib.ev.charging.ChargingPower;
 import org.matsim.contrib.ev.charging.ChargingStartEvent;
 import org.matsim.contrib.ev.charging.ChargingStartEventHandler;
+import org.matsim.contrib.ev.charging.VariableSpeedCharging;
+import org.matsim.contrib.ev.discharging.AuxEnergyConsumption;
+import org.matsim.contrib.ev.discharging.DriveEnergyConsumption;
 import org.matsim.contrib.ev.fleet.ElectricFleet;
 import org.matsim.contrib.ev.fleet.ElectricFleetSpecification;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
+import org.matsim.contrib.ev.fleet.ElectricVehicleImpl;
+import org.matsim.contrib.ev.fleet.ElectricVehicleSpecification;
 import org.matsim.contrib.ev.infrastructure.Charger;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureSpecification;
 import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.controler.MatsimServices;
 import org.matsim.core.events.MobsimScopeEventHandler;
+import org.matsim.core.mobsim.framework.events.MobsimAfterSimStepEvent;
+import org.matsim.core.mobsim.framework.listeners.MobsimAfterSimStepListener;
 import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleUtils;
 
@@ -50,9 +59,17 @@ import com.google.inject.Inject;
  */
 
 public class ChargePricingEventHandler implements ChargingStartEventHandler, ChargingEndEventHandler, LinkLeaveEventHandler,TransitDriverStartsEventHandler,
-PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTrafficEventHandler,VehicleLeavesTrafficEventHandler, MobsimScopeEventHandler{
+PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTrafficEventHandler,VehicleLeavesTrafficEventHandler, MobsimScopeEventHandler, MobsimAfterSimStepListener{
 	
+	@Inject
+	private DriveEnergyConsumption.Factory driveConsumptionFactory;
 
+	@Inject
+	private AuxEnergyConsumption.Factory auxConsumptionFactory;
+
+	@Inject
+	private ChargingPower.Factory chargingPowerFactory;
+	
 	private ChargingInfrastructureSpecification chargingInfrastructure;
 	
 	@Inject
@@ -120,7 +137,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 //		Double juleCharged= cd.v.getBattery().getSoc()-cd.initialSoc;//warning: unit Conversion
 //		Double cost = pricePerkWhr*juleCharged/3600000;
 //		this.events.processEvent(new PersonMoneyEvent(event.getTime(), pId, cost*-1, this.ChargingCostName, cd.charger.toString()+"___"+chargerType));
-		this.chargePeopleForElectricity(cd);
+		this.chargePeopleForElectricity(cd, event.getTime());
 		this.personLists.remove(pId.toString());
 		}
 
@@ -129,9 +146,8 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	 */
 	@Override
 	public void handleEvent(ChargingStartEvent event) {
-		personLists.put(event.getVehicleId().toString(), new chargingDetails(event.getChargerId(),event.getTime(),this.fleet.getElectricVehicles().get(event.getVehicleId())));		
+		personLists.put(event.getVehicleId().toString(), new chargingDetails(event.getChargerId(),event.getTime(),this.fleet.getElectricVehicles().get(event.getVehicleId()),this.pricingProfies.getChargerPricingProfiles().get(event.getChargerId()).getPricingStepsSize()));
 	}
-
 	@Override
 	public void handleEvent(LinkLeaveEvent event) {
 		if(!this.fleet.getElectricVehicles().containsKey(Id.create(event.getVehicleId().toString(),ElectricVehicle.class)) && !this.transitVehicles.contains(event.getVehicleId())){
@@ -176,29 +192,22 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 			
 		}
 	}
-	
-	void chargePeopleForElectricity(chargingDetails cd) {
+	/**
+	 * 
+	 * @param cd
+	 * @param time
+	 */
+	void chargePeopleForElectricity(chargingDetails cd,double time) {
 		Id<Vehicle> vId = Id.createVehicleId(cd.v.getId().toString());
 		if(!this.vehicleToPersonMapping.get(vId).isEmpty()){
 			int timeId = (int)(cd.startingTime/3600);
+			if(timeId>23)timeId = timeId-24;
 			double[] pricingProfile = this.pricingProfies.getChargerPricingProfiles().get(vId).getPricingProfile().get(timeId);
-			double pricingTimeBeanSize = this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getProfileTimeStepInMin()*60;
 			double cost = 0;
-			double chargerCapacity = this.chargingInfrastructure.getChargerSpecifications().get(cd.charger).getPlugPower();
-			double time = cd.endingTime-cd.startingTime;
-			cd.v.getChargingPower().calcChargingPower(null);
-			double timeIn = 0;
-			double timeOut = pricingTimeBeanSize-1;
-			for(double d:pricingProfile) {
-				if(time>timeIn) {
-					if(time>timeOut) {
-						cost+=pricingTimeBeanSize*chargerCapacity/3600000*d;//Warning: unit conversion
-					}else {
-						cost+=(time-timeIn)*chargerCapacity/3600000*d;//Warning: unit conversion
-					}
-				}
-				timeIn+=pricingTimeBeanSize;
-				timeOut+=pricingTimeBeanSize;
+			double charge = 0;
+			for(int i = 0; i<pricingProfile.length;i++) {
+				cost+=pricingProfile[i]*(cd.chargeDetails[i]-charge)/36e5;
+				charge+=cd.chargeDetails[i];
 			}
 		
 			this.events.processEvent(new PersonMoneyEvent(time, this.personIdForEV.get(cd.v.getId()), cost, this.ChargingCostName,  cd.charger.toString()+"___"+vId.toString()));
@@ -225,12 +234,19 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	public void cleanupAfterMobsim(int iteration) {
 		
 	}
+
+	@Override
+	public void notifyMobsimAfterSimStep(MobsimAfterSimStepEvent e) {
+		if((e.getSimulationTime()+1)%((EvConfigGroup)this.scenario.getConfig().getModules().get("ev")).getChargeTimeStep()==1) {
+			for(chargingDetails cd:this.personLists.values()) {
+				int o = (int)(Math.floor(e.getSimulationTime()-cd.startingTime)/(this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getProfileTimeStepInMin()*60));
+				if(o>=cd.chargeDetails.length)o = cd.chargeDetails.length-1;
+				cd.chargeDetails[o] = cd.v.getBattery().getSoc();
+			}
+		}
+		
+	}
 	
-//	void tutorial(Id<Charger> cId) {
-//		this.pricingProfies.getChargerPricingProfiles().get(cId).getPricingProfile().get(cId)
-//	}
-	
-	// to do here
 }
 
 class chargingDetails{
@@ -240,12 +256,14 @@ class chargingDetails{
 	public double endingTime;
 	public ElectricVehicle v;
 	public double initialSoc = 0;
+	public double[] chargeDetails;
 	
-	public chargingDetails(Id<Charger> chargerId, double startingTime, ElectricVehicle v) {
+	public chargingDetails(Id<Charger> chargerId, double startingTime, ElectricVehicle v, int pricingStepSize) {
 		
 		this.charger = chargerId;
 		this.startingTime =startingTime;
-		this.v = v;
+		this.v =  v;
 		this.initialSoc = v.getBattery().getSoc();
+		chargeDetails = new double[pricingStepSize];
 	}
 }

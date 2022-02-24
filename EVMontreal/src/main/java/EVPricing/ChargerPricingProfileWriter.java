@@ -1,13 +1,18 @@
 package EVPricing;
 
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.util.Map.Entry;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerConfigurationException;
+import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.TransformerFactoryConfigurationError;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
@@ -51,10 +56,13 @@ public class ChargerPricingProfileWriter {
 				
 				Element profile=document.createElement("PricingProfile");
 				for(Entry<Integer, double[]> e:pp.getValue().getPricingProfile().entrySet()) {
-					Element volume=document.createElement("Hourly Profile");
+					Element volume=document.createElement("HourlyProfile");
 					volume.setAttribute("Hour", Integer.toString(e.getKey()));
 					String s = "";
 					String sep = "";
+					if(e.getValue()==null) {
+						System.out.println("debug!!!");
+					}
 					for(double d:e.getValue()) {
 						s = s+sep+d;
 						sep = ",";
@@ -85,8 +93,8 @@ public class ChargerPricingProfileWriter {
 
 		}catch(Exception e) {
 			System.out.println("Error while writing charger pricing file... Please check!!!");
-			System.out.println(e.getStackTrace());
+			System.out.println(e);
 		}
-
+		
 	}
 }

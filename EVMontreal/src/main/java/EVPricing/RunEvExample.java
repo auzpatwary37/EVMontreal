@@ -40,6 +40,7 @@ import org.matsim.api.core.v01.population.Population;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.EvModule;
 import org.matsim.contrib.ev.infrastructure.Charger;
+import org.matsim.contrib.ev.routing.EvNetworkRoutingProvider;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
@@ -48,6 +49,7 @@ import org.matsim.core.config.groups.QSimConfigGroup.VehiclesSource;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
+import org.matsim.core.mobsim.qsim.AbstractQSimModule;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.vehicles.VehicleCapacity;
@@ -86,7 +88,7 @@ public class RunEvExample {
 		Config config = ConfigUtils.loadConfig(configUrl, new EvConfigGroup(), new UrbanEVConfigGroup());
 		config.plans().setInputFile("plan.xml");
 		((EvConfigGroup)config.getModules().get("ev")).setTimeProfiles(true);
-		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(true);
+		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(false);
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(500);
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaximumChargingProceduresPerAgent(2);
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.25);
@@ -147,23 +149,24 @@ public class RunEvExample {
 		
 		
 		
-		ChargerPricingProfiles pricingProfiles = new ChargerPricingProfiles(zones,new HashMap<Id<Charger>,Charger>(),.13,15);
+		ChargerPricingProfiles pricingProfiles = new ChargerPricingProfileReader().readChargerPricingProfiles("montreal scenario5/5_percent/Output/pricingProfiles.xml");
 
 		
 		controler.addOverridingModule(new AbstractModule() {
 			@Override
 			public void install() {
 				bind(ChargerPricingProfiles.class).toInstance(pricingProfiles);
-//				addRoutingModuleBinding(TransportMode.car).toProvider(new EvNetworkRoutingProvider(TransportMode.car));
-//				installQSimModule(new AbstractQSimModule() {
-//					@Override
-//					protected void configureQSim() {
-//						bind(VehicleChargingHandler.class).asEagerSingleton();
-//						bind(ChargePricingEventHandler.class).asEagerSingleton();
-//						addMobsimScopeEventHandlerBinding().to(VehicleChargingHandler.class);
-//						addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
-//					}
-//				});
+				addRoutingModuleBinding(TransportMode.car).toProvider(new EvNetworkRoutingProvider(TransportMode.car));
+				installQSimModule(new AbstractQSimModule() {
+					@Override
+					protected void configureQSim() {
+						//bind(VehicleChargingHandler.class).asEagerSingleton();
+						bind(ChargePricingEventHandler.class).asEagerSingleton();
+						//addMobsimScopeEventHandlerBinding().to(VehicleChargingHandler.class);
+						addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
+					}
+					
+				});
 			}
 		});
 		

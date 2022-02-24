@@ -11,6 +11,11 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.TransformerConfigurationException;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactoryConfigurationError;
+
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import org.matsim.api.core.v01.Coord;
@@ -65,6 +70,10 @@ import org.matsim.vehicles.VehiclesFactory;
 import com.google.common.collect.ImmutableList;
 
 import EVPricing.ChargePricingEventHandler;
+import EVPricing.ChargerPricingProfile;
+import EVPricing.ChargerPricingProfileReader;
+import EVPricing.ChargerPricingProfileWriter;
+import EVPricing.ChargerPricingProfiles;
 import urbanEV.EVUtils;
 import urbanEV.UrbanEVConfigGroup;
 import urbanEV.UrbanEVModule;
@@ -79,7 +88,7 @@ import urbanEV.UrbanVehicleChargingHandler;
  *
  */
 public class Tutorial {
-	public static void main(String[] args) {
+	public static void main(String[] args){
 
 		//Inputs
 		double evPercentage = 0.1; // Percentage of cars to take as EV
@@ -97,6 +106,7 @@ public class Tutorial {
 		String evVehicleOutput = "Output/evehicle.xml";// ev vehicle file write location
 		String configOut = "Output/config.xml"; // Config out file write location. The charger file, vehicle file, plan file, ev vehicle file locations are already set in the config as the out location.
 		String resultOut = "Output";
+		String pricingProfileOutputLoc = "Output/pricingProfiles.xml";
 
 		double BatteryCapMin = 30; // Min Battery capacity
 		double BatteryCapMax = 50;// Max Battery Capacity
@@ -162,6 +172,8 @@ public class Tutorial {
 		
 		//______________________________________________________________________
 		//Reading the charger csv file
+		
+		Map<Id<Charger>,Coord> chargerCoord = new HashMap<>();
 
 		String chargerFileHeader = "charger_id,wkt_geom,Fuel Type,Station Na,Street Add,Intersecti,City,State,ZIP,Plus4,Station Ph,Status Cod,Expected D,Groups Wit,Access Day,Cards Acce,BD Blends,NG Fill Ty,NG PSI,EV Level1,EV Level2,EV DC Fast,EV Other I,power,num_plug,EV Network,EV Netwo_1,Geocode St,Latitude,Longitude,Date Last,ID,Updated At,Owner Type,Federal Ag,Federal _1,Open Date,Hydrogen S,NG Vehicle,LPG Primar,E85 Blende,EV Connect,Country,Intersec_1,Access D_1,BD Blend_1,Groups W_1,Hydrogen I,Access Cod,Access Det,Federal _2,Facility T,CNG Dispen,CNG On-Sit,CNG Total,CNG Storag,LNG On-Sit,E85 Other,EV Pricing,EV Prici_1,LPG Nozzle,Hydrogen P,Hydrogen_1,CNG Fill T,CNG PSI,CNG Vehicl,LNG Vehicl,EV On-Site,Restricted,join_ID,join_fromID,join_toID,join_length,join_freespeed,join_capacity,join_lanes,join_visWidth,join_type,distance";
 
@@ -209,6 +221,7 @@ public class Tutorial {
 
 			for(Entry<String, Integer> d:plugCount.entrySet()) {
 				if (d.getValue() != 0) {
+					
 					ChargerSpecification c = ImmutableChargerSpecification.newBuilder()
 							.id(Id.create(baseChargerId + "_" + d.getKey(), Charger.class))
 							.linkId(linkId)
@@ -219,6 +232,7 @@ public class Tutorial {
 
 					csp.addChargerSpecification(c);
 					chargerLinkIds.add(linkId);
+					chargerCoord.put(c.getId(), coord);
 				}
 			}
 
@@ -300,15 +314,123 @@ public class Tutorial {
 						.build();
 	
 				csp.addChargerSpecification(c);
+				chargerCoord.put(c.getId(),d.getValue());
 				}
 			}
 		}
 
-
+		//Pricing scheme generator
+		
+		double pricingSchemeTimeSlotinMin = 30;
+		
+		Coord coord = new Coord(311903.,5049020.);
+		Map<String,Coord> zones = new HashMap<>();
+		
+		zones.put("zone1", coord);
+		
+		Map<String,double[]> offPeakPricing = new HashMap<>(); 
+		
+		double[] nonLinear = null;
+		
+		//Level 1 off peak hour
+		nonLinear = new double[3];
+		nonLinear[0] = .11;
+		nonLinear[1] = .22;
+		nonLinear[2] = .30;
+		
+		offPeakPricing.put("Level 1", nonLinear);
+		
+		//Level 2 off peak hour
+		nonLinear = new double[3];
+		nonLinear[0] = .15;
+		nonLinear[1] = .25;
+		nonLinear[2] = .35;
+		
+		offPeakPricing.put("Level 2", nonLinear);
+		
+		//Fast off peak hour
+		nonLinear = new double[3];
+		nonLinear[0] = .20;
+		nonLinear[1] = .30;
+		nonLinear[2] = .50;
+		
+		offPeakPricing.put("Fast", nonLinear);
+		
+		//home off peak hour
+		nonLinear = new double[3];
+		nonLinear[0] = .095;
+		nonLinear[1] = .095;
+		nonLinear[2] = .095;
+		
+		offPeakPricing.put("home", nonLinear);
+		
+		
+		Map<String,double[]> PeakPricing = new HashMap<>(); 
+		
+		
+		
+		//Level 1 peak hour
+		nonLinear = new double[3];
+		nonLinear[0] = .15;
+		nonLinear[1] = .25;
+		nonLinear[2] = .35;
+		
+		PeakPricing.put("Level 1", nonLinear);
+		
+		//Level 2 peak hour
+		nonLinear = new double[3];
+		nonLinear[0] = .20;
+		nonLinear[1] = .30;
+		nonLinear[2] = .40;
+		
+		PeakPricing.put("Level 2", nonLinear);
+		
+		//Fast peak hour
+		nonLinear = new double[3];
+		nonLinear[0] = .30;
+		nonLinear[1] = .40;
+		nonLinear[2] = .60;
+		
+		PeakPricing.put("Fast", nonLinear);
+		
+		//home peak hour
+		nonLinear = new double[3];
+		nonLinear[0] = .095;
+		nonLinear[1] = .095;
+		nonLinear[2] = .095;
+		
+		PeakPricing.put("home", nonLinear);
+		
+		int[] peakTime = new int[] {7,8,9,10,11,12,13,14,15,16,17,18,19,20};
+		int[] offPeakTime = new int[] {0,1,2,3,4,5,6,21,22,23};
+		
+		ChargerPricingProfiles cpp = new ChargerPricingProfiles(zones);
+		
+		
+		Map<String,Map<Integer,double[]>> zonalHourlyPricing = new HashMap<>();
+		for(String k:zones.keySet()) {
+			zonalHourlyPricing.put(k,new HashMap<>());
+		}
+		csp.getChargerSpecifications().entrySet().stream().forEach(c->{
+			ChargerPricingProfile pp = new ChargerPricingProfile(c.getKey(), cpp.getZoneId(chargerCoord.get(c.getKey())), 
+					pricingSchemeTimeSlotinMin);
+			for(int i: peakTime) {
+				pp.addHourlyPricingProfile(i, PeakPricing.get(c.getValue().getChargerType()));
+			}
+			for(int i: offPeakTime) {
+				pp.addHourlyPricingProfile(i, offPeakPricing.get(c.getValue().getChargerType()));
+			}
+			cpp.addChargerPricingProfile(pp);
+		});
+			
+		new ChargerPricingProfileWriter(cpp).write(pricingProfileOutputLoc);
+		
+		ChargerPricingProfiles ppf = new ChargerPricingProfileReader().readChargerPricingProfiles(pricingProfileOutputLoc);
+		
 		new ChargerWriter(csp.getChargerSpecifications().values().stream()).write(chargerOutput);
 		new PopulationWriter(scenario.getPopulation()).write(planOutput);
 		new MatsimVehicleWriter(vs).writeFile(vehicleOutput);
-
+		
 
 		new ElectricFleetWriter(sp.getVehicleSpecifications().values().stream()).write(evVehicleOutput);
 

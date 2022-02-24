@@ -107,6 +107,8 @@ public class ChargerPricingProfile{
 	public Map<String, Object> getAttributes() {
 		return attributes;
 	}
-	
-	
+	public int getPricingStepsSize() {
+		return this.pricingProfile.get(0).length;
+	}
+
 }
