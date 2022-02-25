@@ -422,10 +422,12 @@ public class Tutorial {
 			}
 			cpp.addChargerPricingProfile(pp);
 		});
-			
+		//__________________________Finished pricing scheme generation___________________________________	
+		
+		
 		new ChargerPricingProfileWriter(cpp).write(pricingProfileOutputLoc);
 		
-		ChargerPricingProfiles ppf = new ChargerPricingProfileReader().readChargerPricingProfiles(pricingProfileOutputLoc);
+		//ChargerPricingProfiles ppf = new ChargerPricingProfileReader().readChargerPricingProfiles(pricingProfileOutputLoc);
 		
 		new ChargerWriter(csp.getChargerSpecifications().values().stream()).write(chargerOutput);
 		new PopulationWriter(scenario.getPopulation()).write(planOutput);

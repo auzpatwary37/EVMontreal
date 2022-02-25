@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
@@ -61,19 +62,10 @@ import com.google.inject.Inject;
 public class ChargePricingEventHandler implements ChargingStartEventHandler, ChargingEndEventHandler, LinkLeaveEventHandler,TransitDriverStartsEventHandler,
 PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTrafficEventHandler,VehicleLeavesTrafficEventHandler, MobsimScopeEventHandler, MobsimAfterSimStepListener{
 	
-	@Inject
-	private DriveEnergyConsumption.Factory driveConsumptionFactory;
 
-	@Inject
-	private AuxEnergyConsumption.Factory auxConsumptionFactory;
-
-	@Inject
-	private ChargingPower.Factory chargingPowerFactory;
 	
 	private ChargingInfrastructureSpecification chargingInfrastructure;
 	
-	@Inject
-	private ElectricFleetSpecification electricFleetSpecification;
 	
 	@Inject
 	private ChargerPricingProfiles pricingProfies;
@@ -95,7 +87,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	
 	public double gasMoneyCostPer_m = 2.0E-4;
 	
-	private Map<String,chargingDetails> personLists = new HashMap<>();// the price has to be per kW
+	private Map<String,chargingDetails> personLists = new ConcurrentHashMap<>();// the price has to be per kW
 	private Map<String,Double> price = new HashMap<>();//Charger type to price 
 	//private Map<String,Set<Id<Person>>> vehicleToPersonMapping = new HashMap<>();
 	
@@ -202,7 +194,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		if(!this.vehicleToPersonMapping.get(vId).isEmpty()){
 			int timeId = (int)(cd.startingTime/3600);
 			if(timeId>23)timeId = timeId-24;
-			double[] pricingProfile = this.pricingProfies.getChargerPricingProfiles().get(vId).getPricingProfile().get(timeId);
+			double[] pricingProfile = this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getPricingProfile().get(timeId);
 			double cost = 0;
 			double charge = 0;
 			for(int i = 0; i<pricingProfile.length;i++) {
@@ -237,7 +229,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 
 	@Override
 	public void notifyMobsimAfterSimStep(MobsimAfterSimStepEvent e) {
-		if((e.getSimulationTime()+1)%((EvConfigGroup)this.scenario.getConfig().getModules().get("ev")).getChargeTimeStep()==1) {
+		if((e.getSimulationTime()+1)%((EvConfigGroup)this.scenario.getConfig().getModules().get("ev")).getChargeTimeStep()==0) {
 			for(chargingDetails cd:this.personLists.values()) {
 				int o = (int)(Math.floor(e.getSimulationTime()-cd.startingTime)/(this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getProfileTimeStepInMin()*60));
 				if(o>=cd.chargeDetails.length)o = cd.chargeDetails.length-1;

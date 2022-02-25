@@ -39,6 +39,7 @@ import org.matsim.api.core.v01.population.PlanElement;
 import org.matsim.api.core.v01.population.Population;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.EvModule;
+import org.matsim.contrib.ev.charging.ChargingHandler;
 import org.matsim.contrib.ev.infrastructure.Charger;
 import org.matsim.contrib.ev.routing.EvNetworkRoutingProvider;
 import org.matsim.core.config.Config;
@@ -136,16 +137,7 @@ public class RunEvExample {
 		//controler.addOverridingModule(new EvModule());
 		controler.addOverridingModule(new UrbanEVModule());
 		//controler.addOverridingModule(new EVPriceModule());
-		Coord coord = new Coord(311903.,5049020.);
-		Map<String,Coord> zones = new HashMap<>();
-		
-		zones.put("zone1", coord);
-		
-		double[] nonLinear = new double[4];
-		nonLinear[0] = .1;
-		nonLinear[1] = .12;
-		nonLinear[2] = .15;
-		nonLinear[3] = .2;
+
 		
 		
 		
@@ -164,6 +156,7 @@ public class RunEvExample {
 						bind(ChargePricingEventHandler.class).asEagerSingleton();
 						//addMobsimScopeEventHandlerBinding().to(VehicleChargingHandler.class);
 						addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
+						this.addQSimComponentBinding(EvModule.EV_COMPONENT).to(ChargePricingEventHandler.class);
 					}
 					
 				});
