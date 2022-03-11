@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -94,6 +95,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import com.sun.istack.Nullable;
 
+import EVPricing.ChargerPricingProfiles;
 import one.util.streamex.StreamEx;
 
 class UrbanEVTripsPlanner implements MobsimInitializedListener {
@@ -141,6 +143,9 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 
 	@Inject
 	Config config;
+	
+	@Inject 
+	private ChargerPricingProfiles chargerPricingProfiles;
 
 	private QSim qsim;
 
@@ -419,7 +424,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 				personContainer2s.add(personContainer2);
 				return;
 			}
-			selectedCharger = selectChargerNearToLink(actWhileCharging.getLinkId(), electricVehicleSpecification, modeNetwork);
+			selectedCharger = selectChargerNearToLink(mobsimagent.getId(),actWhileCharging.getLinkId(), electricVehicleSpecification, modeNetwork);
 
 			if(selectedCharger == null){
 
@@ -580,7 +585,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 
 	//TODO possibly put behind interface
 	@Nullable
-	private ChargerSpecification selectChargerNearToLink(Id<Link> linkId, ElectricVehicleSpecification vehicleSpecification, Network network) {
+	private ChargerSpecification selectChargerNearToLink(Id<Person>pId, Id<Link> linkId, ElectricVehicleSpecification vehicleSpecification, Network network) {
 
 		UrbanEVConfigGroup configGroup = (UrbanEVConfigGroup) config.getModules().get(UrbanEVConfigGroup.GROUP_NAME);
 		double maxDistanceToAct = configGroup.getMaxDistanceBetweenActAndCharger_m();
@@ -589,6 +594,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 				.values()
 				.stream()
 				.filter(charger -> vehicleSpecification.getChargerTypes().contains(charger.getChargerType()))
+				.filter(c->this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().contains(pId))
 				.collect(Collectors.toList());
 
 		StraightLineKnnFinder<Link, ChargerSpecification> straightLineKnnFinder = new StraightLineKnnFinder<>(
@@ -605,7 +611,10 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 //			log.warn("Charger out of range. Inefficient charging " + NetworkUtils.getEuclideanDistance(network.getLinks().get(linkId).getToNode().getCoord(), network.getLinks().get(nearestChargers.get(0).getLinkId()).getToNode().getCoord()));
 //		}
 		else{
-			return nearestChargers.get(0);
+			int rand = new Random().nextInt(nearestChargers.size());//These two lines applies random charger selection. Delete these two lines and uncomment the commented line to get back to the original version. 
+			return nearestChargers.get(rand);
+			//return nearestChargers.get(0);
+			
 		}
 	}
 
@@ -694,13 +703,15 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 
 		int firstEvLegIndex = modifiablePlan.getPlanElements().indexOf(evLegs.get(0));
 		Id<Link> homeLink = EditPlans.findRealActBefore(mobsimAgent,firstEvLegIndex).getLinkId();
+		Id<Person> person =  mobsimAgent.getId();
 		boolean isHomeTrip = EditPlans.findRealActAfter(mobsimAgent,modifiablePlan.getPlanElements().indexOf(evLegs.get(evLegs.size()-1))).getLinkId().equals(homeLink);
 		boolean hasHomeCharger = chargingInfrastructureSpecification.getChargerSpecifications().values().stream()
 				.filter(chargerSpecification -> ev.getChargerTypes().contains(chargerSpecification.getChargerType()))
+				.filter(chargerSpecification->this.chargerPricingProfiles.getChargerPricingProfiles().get(chargerSpecification.getId())
+						.getPersonsAccecibleTo().contains(person) ||this.chargerPricingProfiles.getChargerPricingProfiles().get(chargerSpecification.getId())
+						.getPersonsAccecibleTo().isEmpty())// Delete this line to go back to the original
 				.map(chargerSpecification -> chargerSpecification.getLinkId())
 				.anyMatch(linkId -> linkId.equals(homeLink));
-
-
 		return isHomeTrip && hasHomeCharger;
 	}
 	
@@ -708,8 +719,12 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 		
 		int firstEvLegIndex = modifiablePlan.getPlanElements().indexOf(evLegs.get(0));
 		Id<Link> homeLink = EditPlans.findRealActBefore(mobsimAgent,firstEvLegIndex).getLinkId();
+		Id<Person> person =  mobsimAgent.getId();
 		boolean hasHomeCharger = chargingInfrastructureSpecification.getChargerSpecifications().values().stream()
 				.filter(chargerSpecification -> ev.getChargerTypes().contains(chargerSpecification.getChargerType()))
+				.filter(chargerSpecification->this.chargerPricingProfiles.getChargerPricingProfiles().get(chargerSpecification.getId())
+						.getPersonsAccecibleTo().contains(person) ||this.chargerPricingProfiles.getChargerPricingProfiles().get(chargerSpecification.getId())
+						.getPersonsAccecibleTo().isEmpty())// Delete this line to go back to the original
 				.map(chargerSpecification -> chargerSpecification.getLinkId())
 				.anyMatch(linkId -> linkId.equals(homeLink));
 		return hasHomeCharger;

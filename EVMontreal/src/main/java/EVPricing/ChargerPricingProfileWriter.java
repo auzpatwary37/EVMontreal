@@ -18,6 +18,7 @@ import javax.xml.transform.stream.StreamResult;
 
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.population.Person;
 import org.matsim.contrib.ev.infrastructure.Charger;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -53,13 +54,19 @@ public class ChargerPricingProfileWriter {
 				pricingProfile.setAttribute("chargerId", pp.getKey().toString());
 				pricingProfile.setAttribute("zoneId", pp.getValue().getZoneId());
 				pricingProfile.setAttribute("profileTimeStepInMin", Double.toString(pp.getValue().getProfileTimeStepInMin()));
-				
+				String personIds = "";
+				String sep = "";
+				for(Id<Person> pId:pp.getValue().getPersonsAccecibleTo()) {
+					personIds=personIds+sep+pId.toString();
+					sep = ",";
+				}
+				pricingProfile.setAttribute("personAccesibleTo", personIds);
 				Element profile=document.createElement("PricingProfile");
 				for(Entry<Integer, double[]> e:pp.getValue().getPricingProfile().entrySet()) {
 					Element volume=document.createElement("HourlyProfile");
 					volume.setAttribute("Hour", Integer.toString(e.getKey()));
 					String s = "";
-					String sep = "";
+					sep = "";
 					if(e.getValue()==null) {
 						System.out.println("debug!!!");
 					}
@@ -68,6 +75,7 @@ public class ChargerPricingProfileWriter {
 						sep = ",";
 					}
 					volume.setAttribute("profile", s);
+					volume.setAttribute("chargerSwitch", Boolean.toString(pp.getValue().getChargerSwitch().get(e.getKey())));
 					profile.appendChild(volume);
 				}
 				pricingProfile.appendChild(profile);

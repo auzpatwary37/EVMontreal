@@ -1,9 +1,12 @@
 package EVPricing;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.population.Person;
 import org.matsim.contrib.ev.infrastructure.Charger;
 
 public class ChargerPricingProfile{
@@ -13,7 +16,8 @@ public class ChargerPricingProfile{
 	private Map<Integer,double[]> pricingProfile = new HashMap<>();
 	private double profileTimeStepInMin = 15;
 	private Map<String,Object> attributes = new HashMap<>();
-	
+	private Map<Integer,Boolean> chargerSwitch = new HashMap<>();//Assumed turned on : true by default
+	private Set<Id<Person>> accessibleTo = new HashSet<>();// if empty, we assume everyone can use it; if not empty only the person in the set can use it
 	/**
 	 * 
 	 * @param chargerId
@@ -26,7 +30,24 @@ public class ChargerPricingProfile{
 		for(int i=0;i<24;i++) {//this is to create a flat one day price profile 
 			double[] p = new double[2];// two steps
 			pricingProfile.put(i,p);
+			chargerSwitch.put(i, true);
 		}
+	}
+	
+	public void addPerson(Id<Person> pId) {
+		this.accessibleTo.add(pId);
+	}
+	
+	public Set<Id<Person>> getPersonsAccecibleTo(){
+		return this.accessibleTo;
+	}
+	
+	public Map<Integer,Boolean> getChargerSwitch(){
+		return this.chargerSwitch;
+	}	
+	
+	public void setSwitch(int hour, Boolean ifTurnedOn) {
+		this.chargerSwitch.put(hour, ifTurnedOn);
 	}
 	
 	public void addHourlyPricingProfile(int hour, double[] pricingProfile) {
@@ -46,6 +67,7 @@ public class ChargerPricingProfile{
 		for(int i=0;i<24;i++) {//this is to create a flat one day price profile 
 			
 			pricingProfile.put(i,nonLinearPrice);
+			chargerSwitch.put(i, true);
 		}
 	}
 	
@@ -64,6 +86,7 @@ public class ChargerPricingProfile{
 			p[0] = price;
 			p[1] = price;
 			pricingProfile.put(i,p);
+			chargerSwitch.put(i, true);
 		}
 	}
 	

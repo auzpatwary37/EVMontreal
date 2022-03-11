@@ -32,12 +32,16 @@ public class ChargerPricingProfileReader  extends DefaultHandler{
 		if(qName.equalsIgnoreCase("ChargerPricingProfile")) {
 			this.currentChargerId = Id.create(attributes.getValue("chargerId"), Charger.class);
 			this.profiles.put(currentChargerId, new ChargerPricingProfile(this.currentChargerId,attributes.getValue("zoneId"),Double.parseDouble(attributes.getValue("profileTimeStepInMin"))));
+			for(String pId:attributes.getValue("personAccesibleTo").split(",")) {
+				this.profiles.get(currentChargerId).addPerson(Id.createPersonId(pId));
+			}
 		}
 		if(qName.equalsIgnoreCase("HourlyProfile")) {
 			String[] pricingProfile = attributes.getValue("profile").split(",");
 			double[] pp = new double[pricingProfile.length];
 			for(int i=0;i<pricingProfile.length;i++)pp[i] = Double.parseDouble(pricingProfile[i]);
 			this.profiles.get(currentChargerId).addHourlyPricingProfile(Integer.parseInt(attributes.getValue("Hour")), pp);
+			this.profiles.get(currentChargerId).setSwitch(Integer.parseInt(attributes.getValue("Hour")), Boolean.parseBoolean(attributes.getValue("chargerSwitch")));
 		}
 	}
 	

@@ -154,7 +154,7 @@ public class Tutorial {
 		
 
 		ChargingInfrastructureSpecification csp = new ChargingInfrastructureSpecificationImpl();// Create container for charger specification
-		Set<Id<Link>> chargerLinkIds = new HashSet<>();
+		Map<Id<Link>,ChargerSpecification> chargerLinkIds = new HashMap<>();
 		Network net = NetworkUtils.readNetwork(networkInput); // read network
 		
 		Map<Id<Link>, ? extends Link>linkSet = new HashMap<>(net.getLinks());
@@ -231,7 +231,7 @@ public class Tutorial {
 							.build();
 
 					csp.addChargerSpecification(c);
-					chargerLinkIds.add(linkId);
+					chargerLinkIds.put(linkId,c);
 					chargerCoord.put(c.getId(), coord);
 				}
 			}
@@ -283,7 +283,7 @@ public class Tutorial {
 					.forEach(a->actLinkIds.add(((Activity)a).getLinkId()));
 					boolean haveAccessToCharger = false;
 					for(Id<Link> lIds:actLinkIds) {
-						if(chargerLinkIds.contains(lIds)) {
+						if(chargerLinkIds.containsKey(lIds)) {
 							haveAccessToCharger = true;
 							break;
 						}
@@ -300,11 +300,11 @@ public class Tutorial {
 				}
 			}
 		});
-		
+		Map<Id<Charger>,Set<Id<Person>>> personsToChargerAssignment = new HashMap<>();
 		if(assignChargersToEveryone) {
 			for(Entry<String, Coord> d:homeChargerLocations.entrySet()) {
 				Id<Link> linkId = NetworkUtils.getNearestRightEntryLink(net, d.getValue()).getId();
-				if(!chargerLinkIds.contains(linkId)) {
+				if(!chargerLinkIds.containsKey(linkId)) {
 				ChargerSpecification c = ImmutableChargerSpecification.newBuilder()
 						.id(Id.create(d.getKey()+"_home", Charger.class))
 						.linkId(linkId)
@@ -312,9 +312,17 @@ public class Tutorial {
 						.plugCount(1)
 						.plugPower(1000 * 11.5)
 						.build();
-	
+				Set<Id<Person>> pSet= new HashSet<>();
+				pSet.add(Id.createPersonId(d.getKey()));
+				personsToChargerAssignment.put(c.getId(),pSet);
 				csp.addChargerSpecification(c);
 				chargerCoord.put(c.getId(),d.getValue());
+				chargerLinkIds.put(linkId, c);
+				}else{
+					Id<Charger> chargerId = chargerLinkIds.get(linkId).getId();
+					if(personsToChargerAssignment.get(chargerId)!=null) {
+						personsToChargerAssignment.get(chargerId).add(Id.createPersonId(d.getKey()));
+					}
 				}
 			}
 		}
@@ -420,6 +428,11 @@ public class Tutorial {
 			for(int i: offPeakTime) {
 				pp.addHourlyPricingProfile(i, offPeakPricing.get(c.getValue().getChargerType()));
 			}
+			if(personsToChargerAssignment.get(pp.getChargerId())!=null) {
+			personsToChargerAssignment.get(pp.getChargerId()).forEach(e->{
+				pp.addPerson(e);
+			});
+			}
 			cpp.addChargerPricingProfile(pp);
 		});
 		//__________________________Finished pricing scheme generation___________________________________	
@@ -427,7 +440,7 @@ public class Tutorial {
 		
 		new ChargerPricingProfileWriter(cpp).write(pricingProfileOutputLoc);
 		
-		//ChargerPricingProfiles ppf = new ChargerPricingProfileReader().readChargerPricingProfiles(pricingProfileOutputLoc);
+	//	ChargerPricingProfiles ppf = new ChargerPricingProfileReader().readChargerPricingProfiles(pricingProfileOutputLoc);
 		
 		new ChargerWriter(csp.getChargerSpecifications().values().stream()).write(chargerOutput);
 		new PopulationWriter(scenario.getPopulation()).write(planOutput);
