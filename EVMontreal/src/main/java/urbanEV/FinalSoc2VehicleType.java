@@ -1,5 +1,6 @@
 package urbanEV;
 
+import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
@@ -19,12 +20,13 @@ import javax.inject.Provider;
 class FinalSoc2VehicleType implements MobsimBeforeCleanupListener {
     ElectricFleet electricFleet;
     Vehicles vehicles;
+    ElectricFleetSpecification spec;
 
 
-    FinalSoc2VehicleType(ElectricFleet electricFleet, Vehicles vehicles){
+    FinalSoc2VehicleType(ElectricFleet electricFleet, Vehicles vehicles, ElectricFleetSpecification spec){
         this.electricFleet = electricFleet;
         this.vehicles = vehicles;
-
+        this.spec = spec;
     }
 
     @Override
@@ -33,6 +35,13 @@ class FinalSoc2VehicleType implements MobsimBeforeCleanupListener {
             Id<VehicleType> typeId = Id.create(electricVehicle.getVehicleType(), VehicleType.class);
             //assume the vehicle type to be existing and throw NullPointer if not
             EVUtils.setInitialEnergy(vehicles.getVehicleTypes().get(typeId).getEngineInformation(), EvUnits.J_to_kWh(electricVehicle.getBattery().getSoc()));
+            spec.replaceVehicleSpecification(ImmutableElectricVehicleSpecification.newBuilder()
+							.id(electricVehicle.getId())
+							.batteryCapacity(electricVehicle.getBattery().getCapacity())
+							.initialSoc(electricVehicle.getBattery().getSoc())
+							.chargerTypes(electricVehicle.getChargerTypes())
+							.vehicleType(typeId.toString())
+							.build());
         }
     }
 }
@@ -42,7 +51,8 @@ class FinalSoc2VehicleTypeProvider implements Provider<MobsimListener> {
     ElectricFleet electricFleet;
     @Inject
     Scenario scenario;
-
+    @Inject
+    ElectricFleetSpecification spec;
 
 
     @Override
@@ -52,6 +62,6 @@ class FinalSoc2VehicleTypeProvider implements Provider<MobsimListener> {
                     "QSimConfigGroup.VehiclesSource.fromVehiclesData and specify one vehicle type per mode per agent! ");
         }
 
-        return new FinalSoc2VehicleType(electricFleet, scenario.getVehicles());
+        return new FinalSoc2VehicleType(electricFleet, scenario.getVehicles(),spec);
     }
 }

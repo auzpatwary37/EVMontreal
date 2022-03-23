@@ -442,6 +442,12 @@ public class Tutorial {
 		
 	//	ChargerPricingProfiles ppf = new ChargerPricingProfileReader().readChargerPricingProfiles(pricingProfileOutputLoc);
 		
+		for(Id<Charger> cId:csp.getChargerSpecifications().keySet()) {
+			if(cpp.getChargerPricingProfiles().get(cId)==null) {
+				System.out.println();
+			}
+		}
+		
 		new ChargerWriter(csp.getChargerSpecifications().values().stream()).write(chargerOutput);
 		new PopulationWriter(scenario.getPopulation()).write(planOutput);
 		new MatsimVehicleWriter(vs).writeFile(vehicleOutput);

@@ -191,7 +191,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 			double cost = 0;
 			double charge = 0;
 			for(int i = 0; i<pricingProfile.length;i++) {
-				System.out.println((cd.chargeDetails[i]-charge)*2.78e-7);
+				//System.out.println((cd.chargeDetails[i]-charge)*2.78e-7);
 				cost+=pricingProfile[i]*(cd.chargeDetails[i]-charge)*2.78e-7;
 				charge=cd.chargeDetails[i];
 			}
