@@ -708,8 +708,8 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 		boolean hasHomeCharger = chargingInfrastructureSpecification.getChargerSpecifications().values().stream()
 				.filter(chargerSpecification -> ev.getChargerTypes().contains(chargerSpecification.getChargerType()))
 				.filter(chargerSpecification->this.chargerPricingProfiles.getChargerPricingProfiles().get(chargerSpecification.getId())
-						.getPersonsAccecibleTo().contains(person) ||this.chargerPricingProfiles.getChargerPricingProfiles().get(chargerSpecification.getId())
-						.getPersonsAccecibleTo().isEmpty())// Delete this line to go back to the original
+						.getPersonsAccecibleTo().isEmpty()||this.chargerPricingProfiles.getChargerPricingProfiles().get(chargerSpecification.getId())
+						.getPersonsAccecibleTo().contains(person))// Delete this line to go back to the original
 				.map(chargerSpecification -> chargerSpecification.getLinkId())
 				.anyMatch(linkId -> linkId.equals(homeLink));
 		return isHomeTrip && hasHomeCharger;

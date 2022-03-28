@@ -62,7 +62,7 @@ import urbanEV.UrbanEVModule;
 import urbanEV.UrbanVehicleChargingHandler;
 
 public class RunEvExample {
-	static final String DEFAULT_CONFIG_FILE = "montreal scenario5/5_percent/config.xml";
+	static final String DEFAULT_CONFIG_FILE = "C:\\Users\\arsha\\git\\EVMontreal-2\\EVMontreal\\Montreal_Scenario_New\\config.xml";
 	private static final Logger log = Logger.getLogger(RunEvExample.class);
 
 	public static void main(String[] args) throws IOException {
@@ -87,10 +87,10 @@ public class RunEvExample {
 
 	public void run(URL configUrl) {
 		Config config = ConfigUtils.loadConfig(configUrl, new EvConfigGroup(), new UrbanEVConfigGroup());
-		config.plans().setInputFile("plan.xml");
+		config.plans().setInputFile("C:\\Users\\arsha\\git\\EVMontreal-2\\EVMontreal\\Montreal_Scenario_New\\plan.xml");
 		((EvConfigGroup)config.getModules().get("ev")).setTimeProfiles(true);
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(false);
-		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(500);
+		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(1000);
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaximumChargingProceduresPerAgent(2);
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.25);
 		
@@ -99,7 +99,7 @@ public class RunEvExample {
 //	    config.addModule(urbanEVConfigGroup);
 		
 	    config.controler().setLastIteration(100);
-		config.controler().setOutputDirectory("EV_5Percent_100Iter_1");
+		config.controler().setOutputDirectory("EV_1Percent_100Iter_1");
 		config.controler()
 				.setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
 		config.qsim().setFlowCapFactor(0.1);
@@ -141,7 +141,7 @@ public class RunEvExample {
 		
 		
 		
-		ChargerPricingProfiles pricingProfiles = new ChargerPricingProfileReader().readChargerPricingProfiles("montreal scenario5/5_percent/Output/pricingProfiles.xml");
+		ChargerPricingProfiles pricingProfiles = new ChargerPricingProfileReader().readChargerPricingProfiles("C:\\Users\\arsha\\git\\EVMontreal-2\\EVMontreal\\Montreal_Scenario_New\\pricingProfiles.xml");
 
 		
 		controler.addOverridingModule(new AbstractModule() {
