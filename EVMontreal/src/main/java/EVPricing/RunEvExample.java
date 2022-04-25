@@ -90,7 +90,7 @@ public class RunEvExample {
 		config.plans().setInputFile("C:\\Users\\arsha\\git\\EVMontreal-2\\EVMontreal\\Montreal_Scenario_New\\plan.xml");
 		((EvConfigGroup)config.getModules().get("ev")).setTimeProfiles(true);
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(false);
-		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(1000);
+		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(500);
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaximumChargingProceduresPerAgent(2);
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.25);
 		
@@ -98,12 +98,12 @@ public class RunEvExample {
 //	    UrbanEVConfigGroup urbanEVConfigGroup = new UrbanEVConfigGroup();
 //	    config.addModule(urbanEVConfigGroup);
 		
-	    config.controler().setLastIteration(100);
+	    config.controler().setLastIteration(50);
 		config.controler().setOutputDirectory("EV_1Percent_100Iter_1");
 		config.controler()
 				.setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
-		config.qsim().setFlowCapFactor(0.1);
-		config.qsim().setStorageCapFactor(0.1);
+//		config.qsim().setFlowCapFactor(0.1);
+//		config.qsim().setStorageCapFactor(0.1);
 		config.global().setNumberOfThreads(14);
 		config.qsim().setNumberOfThreads(10);
 		//config.qsim().setVehiclesSource(VehiclesSource.defaultVehicle);

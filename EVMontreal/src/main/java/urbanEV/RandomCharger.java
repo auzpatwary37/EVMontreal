@@ -48,7 +48,7 @@ public class RandomCharger {
 			}
 			
 		}
-		new ChargerWriter(csp.getChargerSpecifications().values().stream()).write("randomlocation.xml");
+		new ChargerWriter(csp.getChargerSpecifications().values().stream()).write("Montreal_Scenario_New\\charger.xml");
 		
 		double pricingSchemeTimeSlotinMin = 30;
 		
@@ -94,7 +94,7 @@ public class RandomCharger {
 			}
 			cpp.addChargerPricingProfile(pp);
 		}
-		new ChargerPricingProfileWriter(cpp).write("Montreal_Scenario_New\\SFpricingprofile.xml");
+		new ChargerPricingProfileWriter(cpp).write("Montreal_Scenario_New\\pricingProfiles.xml");
 	}
 
 }

@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import javax.inject.Provider;
@@ -68,6 +70,7 @@ import org.matsim.contrib.util.StraightLineKnnFinder;
 import org.matsim.core.config.Config;
 import org.matsim.core.controler.IterationCounter;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
+import org.matsim.core.gbl.MatsimRandom;
 import org.matsim.core.mobsim.framework.MobsimAgent;
 import org.matsim.core.mobsim.framework.events.MobsimInitializedEvent;
 import org.matsim.core.mobsim.framework.listeners.MobsimInitializedListener;
@@ -95,6 +98,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import com.sun.istack.Nullable;
 
+import EVPricing.ChargerPricingProfile;
 import EVPricing.ChargerPricingProfiles;
 import one.util.streamex.StreamEx;
 
@@ -147,6 +151,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 	@Inject 
 	private ChargerPricingProfiles chargerPricingProfiles;
 
+
 	private QSim qsim;
 
 	private static final Logger log = Logger.getLogger(UrbanEVTripsPlanner.class);
@@ -162,7 +167,13 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 				.mapToEntry(p -> p.getSelectedPlan(), p -> getUsedEV(p.getSelectedPlan()))
 				.filterValues(evSet -> !evSet.isEmpty())
 				.collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
-
+//		Map<Plan, Set<Id<Vehicle>>> selectedEVPlans = new HashMap<>();
+//		scenario.getPopulation().getPersons().values().parallelStream().forEach(p->{
+//			Plan pl = p.getSelectedPlan();
+//			Set<Id<Vehicle>> usedEV = getUsedEV(p.getSelectedPlan());
+//			if(!usedEV.isEmpty())selectedEVPlans.put(pl, usedEV);
+//		});
+		
 		this.qsim = (QSim) e.getQueueSimulation();
 		processPlans(selectedEVPlans);
 		CSVPrinter csvPrinter;
@@ -199,6 +210,14 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 				.map(leg -> VehicleUtils.getVehicleId(plan.getPerson(), leg.getMode()))
 				.filter(vehicleId -> isEV(vehicleId))
 				.collect(toSet());
+//		Set<Id<Vehicle>> vs = new HashSet<>();
+//		TripStructureUtils.getLegs(plan).stream().forEach(l->{
+//			if(l.getMode().equals("car")&&l.getMode().equals("car_passenger")) {
+//				Id<Vehicle> v = VehicleUtils.getVehicleId(plan.getPerson(), l.getMode());
+//				if(isEV(v))vs.add(v);
+//			}
+//		});
+//		return vs;
 	}
 
 	private boolean isEV(Id<Vehicle> vehicleId) {
@@ -237,7 +256,12 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 						.get(getWrappedElectricVehicleId(ev));
 				Leg legWithCriticalSOC;
 				ElectricVehicle pseudoVehicle = ElectricVehicleImpl.create(electricVehicleSpecification, driveConsumptionFactory, auxConsumptionFactory, chargingPowerFactory);;
+			
 				List <Leg> evCarLegs = TripStructureUtils.getLegs(modifiablePlan).stream().filter(leg -> leg.getMode().equals(TransportMode.car)).collect(toList());
+//				List <Leg> evCarLegs = new ArrayList<>();
+//				TripStructureUtils.getLegs(modifiablePlan).stream().forEach(l->{
+//					if(l.getMode().equals(TransportMode.car))evCarLegs.add(l);
+//					});
 				boolean pluginBeforeStart = configGroup.getPluginBeforeStartingThePlan();
 
 				if(pluginBeforeStart && hasHomeCharger(mobsimagent, modifiablePlan, evCarLegs, pseudoVehicle)){ //TODO potentially check for activity duration and/or SoC
@@ -260,14 +284,16 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 				
 
 				do {
-					double newSoC = EVUtils.getInitialEnergy(vehicles.getVehicles().get(ev).getType().getEngineInformation())* EvUnits.J_PER_kWh; //TODO is this correct if vehicle was plugged in before start (sse above) ?
-					pseudoVehicle.getBattery().setSoc(newSoC);
+					//double newSoC = EVUtils.getInitialEnergy(vehicles.getVehicles().get(ev).getType().getEngineInformation())* EvUnits.J_PER_kWh; //TODO is this correct if vehicle was plugged in before start (sse above) ?
+					//pseudoVehicle.getBattery().setSoc(newSoC);
 					double capacityThreshold = pseudoVehicle.getBattery().getCapacity() * (configGroup.getCriticalRelativeSOC());
 					legWithCriticalSOC = getCriticalOrLastEvLeg(modifiablePlan, pseudoVehicle, ev);
 					String mode = legWithCriticalSOC.getMode();
 					List <Leg> evLegs = TripStructureUtils.getLegs(modifiablePlan).stream().filter(leg -> leg.getMode().equals(mode)).collect(toList());
-					
-
+//					List <Leg> evLegs = new ArrayList<>();
+//					TripStructureUtils.getLegs(modifiablePlan).stream().forEach(l->{
+//						if(l.getMode().equals(mode))evLegs.add(l);
+//					});
 					if (legWithCriticalSOC != null) {
 
 						if (evLegs.get(0).equals(legWithCriticalSOC)) {
@@ -319,7 +345,10 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 	
 	private boolean isConsistant(Plan plan) {
 		List<Activity> acts = new ArrayList<>();
-		plan.getPlanElements().stream().filter(pe-> pe instanceof Activity).forEach(a->acts.add(((Activity)a)));
+//		plan.getPlanElements().stream().filter(pe-> pe instanceof Activity).forEach(a->acts.add(((Activity)a)));
+		plan.getPlanElements().stream().forEach(a->{
+			if(a instanceof Activity)acts.add(((Activity)a));
+			});
 		int charging = 0;
 		for(Activity a:acts) {
 			if(a.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER))charging++;
@@ -387,6 +416,20 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 					}else {
 						chargerSpecification = a.get();
 					}
+//					List<ChargerSpecification> chargers = new ArrayList<>();
+//					chargingInfrastructureSpecification.getChargerSpecifications().values().stream().forEach(c->{
+//						if(c.getLinkId().equals(((Activity) planElement).getLinkId()) && pseudoVehicle.getChargerTypes().contains(c.getChargerType())){
+//							chargers.add(c);
+//						}
+//					});
+//					
+//					if(chargers.isEmpty()) {
+//						throw new NoSuchElementException();
+//					}else {
+//						chargerSpecification = chargers.get(MatsimRandom.getRandom().nextInt(chargers.size()));
+//					}
+					
+					
 					pseudoVehicle.getBattery().changeSoc(pseudoVehicle.getChargingPower().calcChargingPower(chargerSpecification) * chargingDuration);
 				}
 			} else throw new IllegalArgumentException();
@@ -410,6 +453,10 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 
 		String routingMode = TripStructureUtils.getRoutingMode(leg);
 		List <Leg> evLegs = TripStructureUtils.getLegs(modifiablePlan).stream().filter(evleg -> evleg.getMode().equals(routingMode)).collect(toList());
+//		List <Leg> evLegs = new ArrayList<>();
+//		TripStructureUtils.getLegs(modifiablePlan).stream().forEach(l->{
+//			if(l.getMode().equals(routingMode))evLegs.add(l);
+//		});
 		int legIndex = modifiablePlan.getPlanElements().indexOf(leg);
 		Preconditions.checkState(legIndex > -1, "could not locate leg in plan");
 		Activity actWhileCharging;
@@ -590,13 +637,26 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 		UrbanEVConfigGroup configGroup = (UrbanEVConfigGroup) config.getModules().get(UrbanEVConfigGroup.GROUP_NAME);
 		double maxDistanceToAct = configGroup.getMaxDistanceBetweenActAndCharger_m();
 
-		List<ChargerSpecification> chargerList = chargingInfrastructureSpecification.getChargerSpecifications()
-				.values()
-				.stream()
-				.filter(charger -> vehicleSpecification.getChargerTypes().contains(charger.getChargerType()))
-				.filter(c->this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().contains(pId))
-				.collect(Collectors.toList());
+//		List<ChargerSpecification> chargerList = chargingInfrastructureSpecification.getChargerSpecifications()
+//				.values()
+//				.stream()
+//				.filter(charger -> vehicleSpecification.getChargerTypes().contains(charger.getChargerType()))
+//				.filter(c->this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().isEmpty()||this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().contains(pId))
+//				.collect(Collectors.toList());
 
+		List<ChargerSpecification> chargerList = new ArrayList<>();
+		chargingInfrastructureSpecification.getChargerSpecifications()
+		.values()
+		.stream().forEach(c->{
+			if(vehicleSpecification.getChargerTypes().contains(c.getChargerType()) ) {
+				ChargerPricingProfile cpp = this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId());
+				
+				if(cpp.getPersonsAccecibleTo().isEmpty()||cpp.getPersonsAccecibleTo().contains(pId)) {
+					chargerList.add(c);
+				}
+			}
+		});
+		
 		StraightLineKnnFinder<Link, ChargerSpecification> straightLineKnnFinder = new StraightLineKnnFinder<>(
 				1, l -> l.getFromNode().getCoord(), s -> network.getLinks().get(s.getLinkId()).getToNode().getCoord()); //TODO get closest X chargers and choose randomly?
 		List<ChargerSpecification> nearestChargers = straightLineKnnFinder.findNearest(network.getLinks().get(linkId),chargerList.stream());
@@ -611,7 +671,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 //			log.warn("Charger out of range. Inefficient charging " + NetworkUtils.getEuclideanDistance(network.getLinks().get(linkId).getToNode().getCoord(), network.getLinks().get(nearestChargers.get(0).getLinkId()).getToNode().getCoord()));
 //		}
 		else{
-			int rand = new Random().nextInt(nearestChargers.size());//These two lines applies random charger selection. Delete these two lines and uncomment the commented line to get back to the original version. 
+			int rand = MatsimRandom.getRandom().nextInt(nearestChargers.size());//These two lines applies random charger selection. Delete these two lines and uncomment the commented line to get back to the original version. 
 			return nearestChargers.get(rand);
 			//return nearestChargers.get(0);
 			
@@ -708,11 +768,23 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 		boolean hasHomeCharger = chargingInfrastructureSpecification.getChargerSpecifications().values().stream()
 				.filter(chargerSpecification -> ev.getChargerTypes().contains(chargerSpecification.getChargerType()))
 				.filter(chargerSpecification->this.chargerPricingProfiles.getChargerPricingProfiles().get(chargerSpecification.getId())
-						.getPersonsAccecibleTo().isEmpty()||this.chargerPricingProfiles.getChargerPricingProfiles().get(chargerSpecification.getId())
-						.getPersonsAccecibleTo().contains(person))// Delete this line to go back to the original
+						.getPersonsAccecibleTo().contains(person) ||this.chargerPricingProfiles.getChargerPricingProfiles().get(chargerSpecification.getId())
+						.getPersonsAccecibleTo().isEmpty())// Delete this line to go back to the original
 				.map(chargerSpecification -> chargerSpecification.getLinkId())
 				.anyMatch(linkId -> linkId.equals(homeLink));
+		
+//		for(ChargerSpecification c:chargingInfrastructureSpecification.getChargerSpecifications().values()){
+//			if(ev.getChargerTypes().contains(c.getChargerType())&& 
+//					(this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId())
+//							.getPersonsAccecibleTo().contains(person) ||this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId())
+//							.getPersonsAccecibleTo().isEmpty()) && c.getLinkId().equals(homeLink)){
+//			return isHomeTrip;
+//		}
+//		}
+		  
+		
 		return isHomeTrip && hasHomeCharger;
+	//	return false;
 	}
 	
 	private boolean hasHomeCharger(MobsimAgent mobsimAgent, Plan modifiablePlan, List<Leg> evLegs, ElectricVehicle ev){
@@ -727,7 +799,17 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 						.getPersonsAccecibleTo().isEmpty())// Delete this line to go back to the original
 				.map(chargerSpecification -> chargerSpecification.getLinkId())
 				.anyMatch(linkId -> linkId.equals(homeLink));
+		
+//		for(ChargerSpecification c:chargingInfrastructureSpecification.getChargerSpecifications().values()){
+//			if(ev.getChargerTypes().contains(c.getChargerType())&& 
+//					(this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId())
+//							.getPersonsAccecibleTo().contains(person) ||this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId())
+//							.getPersonsAccecibleTo().isEmpty()) && c.getLinkId().equals(homeLink)){
+//			return true;
+//		}
+//		}
 		return hasHomeCharger;
+		//return false;
 	}
 	private void planPluginTripFromHomeToCharger(Plan plan, String routingMode, ElectricVehicleSpecification electricVehicleSpecification,Activity actWhileCharging, Link chargingLink, TripRouter tripRouter) {
 		PopulationFactory factory = scenario.getPopulation().getFactory();

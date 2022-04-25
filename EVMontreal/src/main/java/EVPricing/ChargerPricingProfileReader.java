@@ -33,7 +33,9 @@ public class ChargerPricingProfileReader  extends DefaultHandler{
 			this.currentChargerId = Id.create(attributes.getValue("chargerId"), Charger.class);
 			this.profiles.put(currentChargerId, new ChargerPricingProfile(this.currentChargerId,attributes.getValue("zoneId"),Double.parseDouble(attributes.getValue("profileTimeStepInMin"))));
 			for(String pId:attributes.getValue("personAccesibleTo").split(",")) {
+				if(!pId.equals("")) {
 				this.profiles.get(currentChargerId).addPerson(Id.createPersonId(pId));
+				}
 			}
 		}
 		if(qName.equalsIgnoreCase("HourlyProfile")) {

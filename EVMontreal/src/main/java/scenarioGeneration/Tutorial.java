@@ -91,7 +91,7 @@ public class Tutorial {
 	public static void main(String[] args){
 
 		//Inputs
-		double evPercentage = 0.1; // Percentage of cars to take as EV
+		double evPercentage = 0.3; // Percentage of cars to take as EV
 		boolean assignChargersToEveryone = true;
 
 		String configIn = "config_default.xml";// input MATSim Montreal Config without ev
@@ -108,12 +108,12 @@ public class Tutorial {
 		String resultOut = "Output";
 		String pricingProfileOutputLoc = "Output/pricingProfiles.xml";
 
-		double BatteryCapMin = 30; // Min Battery capacity
-		double BatteryCapMax = 50;// Max Battery Capacity
+		double BatteryCapMin = 0.5; // Min Battery capacity
+		double BatteryCapMax = 1.5;// Max Battery Capacity
 		//put the min and max same to make capacity non random
 
-		double socMIn = 20; // Min initial soc level.
-		double chargeAtStartOfDayAboveSocMin = 5;
+		double socMIn = 0.3; // Min initial soc level.
+		double chargeAtStartOfDayAboveSocMin = 0.1;
 
 		//ChargerTypes and power
 
