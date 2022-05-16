@@ -1,5 +1,6 @@
 package scenarioGeneration;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
@@ -114,6 +115,9 @@ public class Tutorial {
 
 		double socMIn = 20; // Min initial soc level.
 		double chargeAtStartOfDayAboveSocMin = 5;
+		boolean multipleZone = true;// set this to false for one zone and true for multiple zones
+		String zoneFile = "montreal scenario5/5_percent/zones.csv";// Modify zones details in this file (zoneId,X,Y,PricingMultiplier) do not change the header in the file, just the values 
+	
 
 		//ChargerTypes and power
 
@@ -330,11 +334,48 @@ public class Tutorial {
 		//Pricing scheme generator
 		
 		double pricingSchemeTimeSlotinMin = 30;
-		
-		Coord coord = new Coord(311903.,5049020.);
 		Map<String,Coord> zones = new HashMap<>();
+		Map<String,Double> zoneMultiplier = new HashMap<>();
 		
-		zones.put("zone1", coord);
+		if(multipleZone && new File(zoneFile).exists()) {
+			String zoneFileHeader = "zoneId,X,Y,PricingMultiplier";
+
+			String[] headers1 = zoneFileHeader.split(",");
+
+			Reader in2;
+			Iterable<CSVRecord> records2 = null;
+			try {
+				in2 = new FileReader(zoneFile);
+
+				records2 = CSVFormat.DEFAULT
+						.withHeader(headers1)
+						.withFirstRecordAsHeader()
+						.parse(in2);
+			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+
+
+			catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+
+			for (CSVRecord record : records2) {
+
+				Coord coord = new Coord(Double.parseDouble(record.get("X")),Double.parseDouble(record.get("Y")));
+				
+				String zoneId = record.get("zoneId");
+				zones.put(zoneId, coord);
+				zoneMultiplier.put(zoneId, Double.parseDouble(record.get("PricingMultiplier")));
+			}
+		}else {
+		
+			Coord coord = new Coord(311903.,5049020.);
+			zones.put("zone1", coord);
+			zoneMultiplier.put("zone1",1.);
+		}
 		
 		Map<String,double[]> offPeakPricing = new HashMap<>(); 
 		
@@ -415,18 +456,21 @@ public class Tutorial {
 		ChargerPricingProfiles cpp = new ChargerPricingProfiles(zones);
 		
 		
-		Map<String,Map<Integer,double[]>> zonalHourlyPricing = new HashMap<>();
-		for(String k:zones.keySet()) {
-			zonalHourlyPricing.put(k,new HashMap<>());
-		}
+//		Map<String,Map<Integer,double[]>> zonalHourlyPricing = new HashMap<>();
+//		for(String k:zones.keySet()) {
+//			zonalHourlyPricing.put(k,new HashMap<>());
+//		}
 		csp.getChargerSpecifications().entrySet().stream().forEach(c->{
-			ChargerPricingProfile pp = new ChargerPricingProfile(c.getKey(), cpp.getZoneId(chargerCoord.get(c.getKey())), 
+			String zoneId = cpp.getZoneId(chargerCoord.get(c.getKey()));
+			ChargerPricingProfile pp = new ChargerPricingProfile(c.getKey(), zoneId, 
 					pricingSchemeTimeSlotinMin);
 			for(int i: peakTime) {
-				pp.addHourlyPricingProfile(i, PeakPricing.get(c.getValue().getChargerType()));
+				double[] pprofile = PeakPricing.get(c.getValue().getChargerType()).clone();
+				pp.addHourlyPricingProfile(i,applyMultiplier(pprofile,zoneMultiplier.get(zoneId)));
 			}
 			for(int i: offPeakTime) {
-				pp.addHourlyPricingProfile(i, offPeakPricing.get(c.getValue().getChargerType()));
+				
+				pp.addHourlyPricingProfile(i, applyMultiplier(offPeakPricing.get(c.getValue().getChargerType()),zoneMultiplier.get(zoneId)));
 			}
 			if(personsToChargerAssignment.get(pp.getChargerId())!=null) {
 			personsToChargerAssignment.get(pp.getChargerId()).forEach(e->{
@@ -527,7 +571,13 @@ public class Tutorial {
 		controler.configureQSimComponents(components -> components.addNamedComponent(EvModule.EV_COMPONENT));
 		return controler;
 	}
-	
+	public static double[] applyMultiplier(double[] o,double m) {
+		double[] D = new double[o.length];
+		for(int i = 0; i<o.length;i++) {
+			D[i] = o[i]*m;
+		}
+		return D;
+	}
 	public static void checkPlanConsistancy(Population population) {
 		long t = System.currentTimeMillis();
 		int personDeleted = 0;
@@ -557,4 +607,5 @@ public class Tutorial {
 		System.out.println("time in milisec = " +(System.currentTimeMillis() - t));
 		System.out.println();
 	}
+	
 }
