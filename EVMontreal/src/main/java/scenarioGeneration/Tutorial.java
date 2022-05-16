@@ -116,7 +116,7 @@ public class Tutorial {
 		double socMIn = 20; // Min initial soc level.
 		double chargeAtStartOfDayAboveSocMin = 5;
 		boolean multipleZone = true;// set this to false for one zone and true for multiple zones
-		String zoneFile = "montreal scenario5/5_percent/zones.csv";// Modify zones details in this file (zoneId,X,Y,PricingMultiplier) do not change the header in the file, just the values 
+		String zoneFile = "zones.csv";// Modify zones details in this file (zoneId,X,Y,PricingMultiplier) do not change the header in the file, just the values 
 	
 
 		//ChargerTypes and power

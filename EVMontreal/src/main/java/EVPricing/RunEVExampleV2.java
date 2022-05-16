@@ -60,7 +60,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--household"}, description = {"Optional Path to household file to load."}, defaultValue = "montreal_households.xml.gz")
   private String householdFileLoc;
   
-  @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "0.5")
+  @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "0.05")
   private Double scale;
   
   @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/")
@@ -77,6 +77,9 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   
   @Option(names = {"--evpricing"}, description = {"Charger pricing file location"}, defaultValue = "pricingProfiles.xml")
   private String pricingEVFile;
+  
+  @Option(names = {"--distanceForCharger"}, description = {"Maximum search radius for charger around activity"}, defaultValue = "500.")
+  private Double chargerDist;
   
   public static void main(String[] args) {
     (new CommandLine(new RunEVExampleV2()))
@@ -111,7 +114,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
  
 	((EvConfigGroup)config.getModules().get("ev")).setTimeProfiles(true);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(false);
-	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(500);
+	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(chargerDist);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaximumChargingProceduresPerAgent(2);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.25);
 	((EvConfigGroup)config.getModules().get("ev")).setChargersFile(this.chargerFile);
@@ -124,8 +127,8 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	
 	config.controler()
 			.setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
-	config.qsim().setFlowCapFactor(0.1);
-	config.qsim().setStorageCapFactor(0.1);
+	config.qsim().setFlowCapFactor(scale);
+	config.qsim().setStorageCapFactor(scale);
 	config.global().setNumberOfThreads(14);
 	config.qsim().setNumberOfThreads(10);
 	//config.qsim().setVehiclesSource(VehiclesSource.defaultVehicle);
@@ -152,7 +155,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	Scenario scenario = ScenarioUtils.loadScenario(config);
 	
 	
-	scaleDownPt(scenario.getTransitVehicles(), 0.1);
+	scaleDownPt(scenario.getTransitVehicles(), scale);
 	
 	
 	Controler controler = new Controler(scenario);
