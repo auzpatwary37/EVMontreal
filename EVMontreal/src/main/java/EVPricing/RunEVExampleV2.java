@@ -75,7 +75,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--evehicle"}, description = {"Electric vehicle file"}, defaultValue = "evehicles.xml")
   private String evehicleFile;
   
-  @Option(names = {"--evpricing"}, description = {"Result output directory"}, defaultValue = "pricingProfiles.xml")
+  @Option(names = {"--evpricing"}, description = {"Charger pricing file location"}, defaultValue = "pricingProfiles.xml")
   private String pricingEVFile;
   
   public static void main(String[] args) {
