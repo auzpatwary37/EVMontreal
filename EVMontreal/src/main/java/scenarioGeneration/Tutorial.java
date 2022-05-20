@@ -381,35 +381,35 @@ public class Tutorial {
 		
 		double[] nonLinear = null;
 		
-		//Level 1 off peak hour
+//Level 1 off peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = .11;
-		nonLinear[1] = .22;
-		nonLinear[2] = .30;
+		nonLinear[0] = 2.60;
+		nonLinear[1] = 2.60;
+		nonLinear[2] = 5.20;
 		
 		offPeakPricing.put("Level 1", nonLinear);
 		
 		//Level 2 off peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = .15;
-		nonLinear[1] = .25;
-		nonLinear[2] = .35;
+		nonLinear[0] = 3.40;
+		nonLinear[1] = 3.40;
+		nonLinear[2] = 6.80;
 		
 		offPeakPricing.put("Level 2", nonLinear);
 		
 		//Fast off peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = .20;
-		nonLinear[1] = .30;
-		nonLinear[2] = .50;
+		nonLinear[0] = 5.70;
+		nonLinear[1] = 11.4;
+		nonLinear[2] = 11.4;
 		
 		offPeakPricing.put("Fast", nonLinear);
 		
 		//home off peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = .095;
-		nonLinear[1] = .095;
-		nonLinear[2] = .095;
+		nonLinear[0] = 1.00;
+		nonLinear[1] = 1.00;
+		nonLinear[2] = 1.00;
 		
 		offPeakPricing.put("home", nonLinear);
 		
@@ -418,35 +418,33 @@ public class Tutorial {
 		
 		
 		
-		//Level 1 peak hour
+		//Level 1 peak hour 1.5 times
 		nonLinear = new double[3];
-		nonLinear[0] = .15;
-		nonLinear[1] = .25;
-		nonLinear[2] = .35;
+		nonLinear[0] = 3.9;
+		nonLinear[1] = 3.9;
+		nonLinear[2] = 7.8;
 		
 		PeakPricing.put("Level 1", nonLinear);
 		
 		//Level 2 peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = .20;
-		nonLinear[1] = .30;
-		nonLinear[2] = .40;
+		nonLinear[0] = 5.10;
+		nonLinear[1] = 5.10;
+		nonLinear[2] = 10.2;
 		
 		PeakPricing.put("Level 2", nonLinear);
 		
 		//Fast peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = .30;
-		nonLinear[1] = .40;
-		nonLinear[2] = .60;
-		
-		PeakPricing.put("Fast", nonLinear);
+		nonLinear[0] = 8.55;
+		nonLinear[1] = 17.10;
+		nonLinear[2] = 17.10;
 		
 		//home peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = .095;
-		nonLinear[1] = .095;
-		nonLinear[2] = .095;
+		nonLinear[0] = 1.5;
+		nonLinear[1] = 1.5;
+		nonLinear[2] = 1.5;
 		
 		PeakPricing.put("home", nonLinear);
 		
