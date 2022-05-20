@@ -1,10 +1,16 @@
 package EVPricing;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
+import org.matsim.api.core.v01.population.Activity;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.EvModule;
 import org.matsim.contrib.ev.routing.EvNetworkRoutingProvider;
@@ -13,6 +19,7 @@ import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
 import org.matsim.core.config.groups.PlansCalcRouteConfigGroup;
 import org.matsim.core.config.groups.StrategyConfigGroup;
+import org.matsim.core.config.groups.PlanCalcScoreConfigGroup.ActivityParams;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
@@ -157,7 +164,51 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	
 	scaleDownPt(scenario.getTransitVehicles(), scale);
 	
-	
+	 Map<String,Double> actDuration = new HashMap<>();
+	    Map<String,Integer> actNum = new HashMap<>();
+	    Set<String> actList = new HashSet<>();
+	    scenario.getPopulation().getPersons().values().stream().forEach(p->{
+	    	p.getSelectedPlan().getPlanElements().stream().filter(f-> f instanceof Activity).forEach(pe->{
+	    		Activity act = ((Activity)pe);
+	    		Double actDur = 0.;
+	    		if(act.getEndTime().isDefined() && act.getStartTime().isDefined()) {
+	    			actDur = act.getEndTime().seconds() - act.getStartTime().seconds();
+	    		}
+	    		double ad = actDur;
+	    		if(actDur != 0.) {
+	    			actDuration.compute(act.getType(), (k,v)->v==null?ad:ad+v);
+	    			actNum.compute(act.getType(), (k,v)->v==null?1:v+1);
+	    		}else {
+	    			
+	    		}
+	    		
+	    	});
+	    });
+	    
+	    for(Entry<String, Double> a:actDuration.entrySet()){
+	    	a.setValue(a.getValue()/actNum.get(a.getKey()));
+	    	if(config.planCalcScore().getActivityParams(a.getKey())!=null) {
+	    		config.planCalcScore().getActivityParams(a.getKey()).setTypicalDuration(a.getValue());
+	    		config.planCalcScore().getActivityParams(a.getKey()).setMinimalDuration(a.getValue()*.25);
+	    		config.planCalcScore().getActivityParams(a.getKey()).setScoringThisActivityAtAll(true);
+	    	}else {
+	    		ActivityParams param = new ActivityParams();
+	    		param.setTypicalDuration(a.getValue());
+	    		param.setMinimalDuration(a.getValue()*.25);
+	    		param.setScoringThisActivityAtAll(true);
+	    		config.planCalcScore().addActivityParams(param);
+	    	}
+	    }
+	    for(String actType:actList) {
+	    	if(config.planCalcScore().getActivityParams(actType)==null) {
+	    		ActivityParams param = new ActivityParams();
+	    		param.setTypicalDuration(8*3600);
+	    		param.setMinimalDuration(8*3600*.25);
+	    		config.planCalcScore().addActivityParams(param);
+	    		param.setScoringThisActivityAtAll(true);
+	    		System.out.println("No start and end time was found for activity = "+actType+ " in the base population!! Inserting 8 hour as the typical duration.");
+	    	}
+	    }
 	Controler controler = new Controler(scenario);
 	//controler.addOverridingModule(new EvModule());
 	controler.addOverridingModule(new UrbanEVModule());
