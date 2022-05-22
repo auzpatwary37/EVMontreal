@@ -655,7 +655,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 //		});
 		
 		StraightLineKnnFinder<Link, ChargerSpecification> straightLineKnnFinder = new StraightLineKnnFinder<>(
-				1, l -> l.getFromNode().getCoord(), s -> network.getLinks().get(s.getLinkId()).getToNode().getCoord()); //TODO get closest X chargers and choose randomly?
+				6, l -> l.getFromNode().getCoord(), s -> network.getLinks().get(s.getLinkId()).getToNode().getCoord()); //TODO get closest X chargers and choose randomly?
 		List<ChargerSpecification> nearestChargers = straightLineKnnFinder.findNearest(network.getLinks().get(linkId),chargerList.stream());
 		if (nearestChargers.isEmpty()) {
 			throw new RuntimeException("no charger could be found for vehicle type " + vehicleSpecification.getVehicleType());
