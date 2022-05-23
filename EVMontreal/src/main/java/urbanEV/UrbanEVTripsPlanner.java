@@ -640,7 +640,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 				.values()
 				.stream()
 				.filter(charger -> vehicleSpecification.getChargerTypes().contains(charger.getChargerType()))
-				.filter(c->this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().contains(pId))
+				.filter(c->this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().isEmpty()||this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().contains(pId))
 				.collect(Collectors.toList());
 
 //		List<ChargerSpecification> chargerList = new ArrayList<>();
