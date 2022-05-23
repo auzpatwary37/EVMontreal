@@ -140,7 +140,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	config.qsim().setNumberOfThreads(10);
 	//config.qsim().setVehiclesSource(VehiclesSource.defaultVehicle);
 	
-	config.planCalcScore().getActivityParams().forEach(actParam->actParam.setScoringThisActivityAtAll(true));
+//	config.planCalcScore().getActivityParams().forEach(actParam->actParam.setScoringThisActivityAtAll(true));
 	
 	config.planCalcScore().setPerforming_utils_hr(14);
 	
