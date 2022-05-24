@@ -439,7 +439,7 @@ public class Tutorial {
 		nonLinear[0] = 8.55;
 		nonLinear[1] = 17.10;
 		nonLinear[2] = 17.10;
-		
+		PeakPricing.put("Fast", nonLinear);
 		//home peak hour
 		nonLinear = new double[3];
 		nonLinear[0] = 1.5;
