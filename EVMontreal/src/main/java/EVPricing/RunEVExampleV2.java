@@ -24,6 +24,7 @@ import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
 import org.matsim.core.mobsim.qsim.AbstractQSimModule;
+import org.matsim.core.replanning.strategies.DefaultPlanStrategiesModule.DefaultStrategy;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.vehicles.VehicleCapacity;
 import org.matsim.vehicles.VehicleType;
@@ -113,6 +114,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
     addStrategy(config, "SubtourModeChoice", null, 0.1D, 0 * this.maxIterations);
     addStrategy(config, "ReRoute", null, 0.5D, 0 * this.maxIterations);
     addStrategy(config, "ChangeExpBeta", null, 0.85D, this.maxIterations);
+    addStrategy(config, DefaultStrategy.TimeAllocationMutator_ReRoute, null, 0.25D, this.maxIterations);
     config.controler().setOutputDirectory(this.output);
     config.controler().setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
     config.qsim().setFlowCapFactor(this.scale.doubleValue() * 1.2D);
