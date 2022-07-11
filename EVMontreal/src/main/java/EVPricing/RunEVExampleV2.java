@@ -122,7 +122,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
     
  
 	((EvConfigGroup)config.getModules().get("ev")).setTimeProfiles(true);
-	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(false);
+	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(true);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(chargerDist);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaximumChargingProceduresPerAgent(2);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.25);

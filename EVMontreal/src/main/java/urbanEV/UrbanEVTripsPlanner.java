@@ -263,10 +263,10 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 //					});
 				boolean pluginBeforeStart = configGroup.getPluginBeforeStartingThePlan();
 
-				if(pluginBeforeStart && hasHomeCharger(mobsimagent, modifiablePlan, evCarLegs, pseudoVehicle)){ //TODO potentially check for activity duration and/or SoC
+				if(pluginBeforeStart && hasHomeCharger(mobsimagent, modifiablePlan, evCarLegs, pseudoVehicle) && modifiablePlan.getPlanElements().indexOf(evCarLegs.get(0))==1){ //TODO potentially check for activity duration and/or SoC
 
 					Leg firstEvLeg = evCarLegs.get(0);
-//					Activity originalActWhileCharging = EditPlans.findRealActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(firstEvLeg));
+//					Activity originalActWhileCharging = EditPlans.findRealActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(firstEvLeg));//
 //					Activity lastAct = EditPlans.findRealActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(firstEvLeg));
 					Activity actWhileCharging = (Activity) modifiablePlan.getPlanElements().get(0);
 					actWhileCharging =  EditPlans.findRealActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(firstEvLeg));// comment this line out TODO: figure out this line 
@@ -305,13 +305,14 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 						else if (evLegs.get(evLegs.size()-1).equals(legWithCriticalSOC) && isHomeChargingTrip(mobsimagent, modifiablePlan, evLegs, pseudoVehicle) && pseudoVehicle.getBattery().getSoc() > 0) {
 
 							//trip leads to location of the first activity in the plan and there is a charger and so we can charge at home do not search for opportunity charge before
-							Activity originalActWhileCharging = EditPlans.findRealActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC));
+							Activity actBefore = EditPlans.findRealActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC));
 							Activity lastAct = EditPlans.findRealActAfter(mobsimagent, modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC));
+							
 							Network modeNetwork = this.singleModeNetworksCache.getSingleModeNetworksCache().get(legWithCriticalSOC.getMode());
 							Link chargingLink = modeNetwork.getLinks().get(lastAct.getLinkId());
 							String routingMode = TripStructureUtils.getRoutingMode(legWithCriticalSOC);
 
-							planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, originalActWhileCharging, lastAct, chargingLink, tripRouter);
+							planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, actBefore, lastAct, chargingLink, tripRouter);
 							log.info(mobsimagent.getId() + " is charging at home.");
 							PersonContainer2 personContainer2 = new PersonContainer2(mobsimagent.getId(), "is charging at home.");
 							personContainer2s.add(personContainer2);
@@ -378,7 +379,11 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 		modesWithVehicles.addAll(scenario.getConfig().plansCalcRoute().getNetworkModes());
 
 		Leg lastLegWithVehicle = null;
-
+		//TODO: The current logic will go through each leg and discharge the ev for that leg; and then will check if the soc is lower than capacity threshold.
+		//This does not ensure that the remaining soc is enough for completing the next leg, resulting in some en route dead evs. 
+		//This should be fixed/ 
+		//double socAfterLeg = pseudoVehicle.getBattery().getSoc();
+		
 		for (PlanElement planElement : modifiablePlan.getPlanElements()) {
 			if (planElement instanceof Leg) {
 
@@ -532,7 +537,17 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 			System.out.println("Plan is not consistant!!! Debug!!!");
 		}
 	}
-
+/**
+ * 
+ * @param plan
+ * @param routingMode is the mode of the ev
+ * @param electricVehicleSpecification
+ * @param origin the location of the activity before the ev leg
+ * @param destination the location of the activity after the ev leg
+ * @param chargingLink 
+ * @param tripRouter
+ * @param now is the time the origin activity finishes
+ */
 	private void planPlugoutTrip(Plan plan, String routingMode, ElectricVehicleSpecification electricVehicleSpecification, Activity origin, Activity destination, Link chargingLink, TripRouter tripRouter, double now) {
 		Facility fromFacility = FacilitiesUtils.toFacility(origin, scenario.getActivityFacilities());
 		Facility chargerFacility = new LinkWrapperFacility(chargingLink);
@@ -549,12 +564,12 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 				now, plan.getPerson());
 		Leg accessLeg = (Leg) routedSegment.get(0);
 		now = TripRouter.calcEndOfPlanElement(now, accessLeg, config);
-		TripStructureUtils.setRoutingMode(accessLeg, routingMode);
+		TripStructureUtils.setRoutingMode(accessLeg, routingMode);//TODO: Should not the routing mode here be walk???
 		trip.add(accessLeg);
 
 		//add plugout act
 		Activity plugOutAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
-				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
+				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);// this is how to plan a plugout activity
 		trip.add(plugOutAct);
 		now = TripRouter.calcEndOfPlanElement(now, plugOutAct, config);
 
@@ -582,7 +597,16 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 			destination.setEndTime(PopulationUtils.decideOnActivityEndTime(destination, now, config).seconds());
 		}
 	}
-
+/**
+ * 
+ * @param plan
+ * @param routingMode mode for the EV leg
+ * @param electricVehicleSpecification
+ * @param actBeforeCharging 
+ * @param actWhileCharging activity after running
+ * @param chargingLink
+ * @param tripRouter
+ */
 	private void planPluginTrip(Plan plan, String routingMode, ElectricVehicleSpecification electricVehicleSpecification, Activity actBeforeCharging, Activity actWhileCharging, Link chargingLink, TripRouter tripRouter) {
 		Facility fromFacility = FacilitiesUtils.toFacility(actBeforeCharging, scenario.getActivityFacilities());
 		Facility chargerFacility = new LinkWrapperFacility(chargingLink);
@@ -615,7 +639,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 		//add walk leg to destination
 		routedSegment = tripRouter.calcRoute(TransportMode.walk, chargerFacility, toFacility, now, plan.getPerson());
 		Leg egress = (Leg) routedSegment.get(0);
-		TripStructureUtils.setRoutingMode(egress, routingMode);
+		TripStructureUtils.setRoutingMode(egress, routingMode);// should not it be walk???
 		trip.add(egress);
 		now = TripRouter.calcEndOfPlanElement(now, egress, config);
 
@@ -657,19 +681,20 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 		StraightLineKnnFinder<Link, ChargerSpecification> straightLineKnnFinder = new StraightLineKnnFinder<>(
 				6, l -> l.getFromNode().getCoord(), s -> network.getLinks().get(s.getLinkId()).getToNode().getCoord()); //TODO get closest X chargers and choose randomly?
 		List<ChargerSpecification> nearestChargers = straightLineKnnFinder.findNearest(network.getLinks().get(linkId),chargerList.stream());
-		if (nearestChargers.isEmpty()) {
+		List<ChargerSpecification>nearestChargersWithinLimit = nearestChargers.stream().filter(c->NetworkUtils.getEuclideanDistance(network.getLinks().get(linkId).getCoord(), network.getLinks().get(c.getLinkId()).getCoord())<maxDistanceToAct).collect(Collectors.toList()); 
+		if (nearestChargersWithinLimit.isEmpty()) {
 			throw new RuntimeException("no charger could be found for vehicle type " + vehicleSpecification.getVehicleType());
 		}
-		double distanceFromActToCharger = NetworkUtils.getEuclideanDistance(network.getLinks().get(linkId).getToNode().getCoord(), network.getLinks().get(nearestChargers.get(0).getLinkId()).getToNode().getCoord());
-		if (distanceFromActToCharger >= maxDistanceToAct) {
-			return null;
-		}
+		//double distanceFromActToCharger = NetworkUtils.getEuclideanDistance(network.getLinks().get(linkId).getToNode().getCoord(), network.getLinks().get(nearestChargers.get(0).getLinkId()).getToNode().getCoord());
+//		if (distanceFromActToCharger >= maxDistanceToAct) {
+//			return null;
+//		}
 //			//throw new RuntimeException("There are no chargers within 1000m");
 //			log.warn("Charger out of range. Inefficient charging " + NetworkUtils.getEuclideanDistance(network.getLinks().get(linkId).getToNode().getCoord(), network.getLinks().get(nearestChargers.get(0).getLinkId()).getToNode().getCoord()));
 //		}
 		else{
-			int rand = MatsimRandom.getRandom().nextInt(nearestChargers.size());//These two lines applies random charger selection. Delete these two lines and uncomment the commented line to get back to the original version. 
-			return nearestChargers.get(rand);
+			int rand = MatsimRandom.getRandom().nextInt(nearestChargersWithinLimit.size());//These two lines applies random charger selection. Delete these two lines and uncomment the commented line to get back to the original version. 
+			return nearestChargersWithinLimit.get(rand);
 			//return nearestChargers.get(0);
 			
 		}
@@ -808,6 +833,15 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 		return hasHomeCharger;
 		//return false;
 	}
+	/**
+	 * 
+	 * @param plan 
+	 * @param routingMode EV leg mode
+	 * @param electricVehicleSpecification
+	 * @param actWhileCharging the activity both before and after the plugin
+	 * @param chargingLink
+	 * @param tripRouter
+	 */
 	private void planPluginTripFromHomeToCharger(Plan plan, String routingMode, ElectricVehicleSpecification electricVehicleSpecification,Activity actWhileCharging, Link chargingLink, TripRouter tripRouter) {
 		PopulationFactory factory = scenario.getPopulation().getFactory();
 		Facility fromFacility = FacilitiesUtils.toFacility(actWhileCharging, scenario.getActivityFacilities());
@@ -821,9 +855,9 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 		TripRouter.calcEndOfPlanElement(now, newFirstAct, config);
 		plan.getPlanElements().add(0, newFirstAct);
 
-
+		
 		//add leg to charger
-		List<? extends PlanElement> routeToCharger = tripRouter.calcRoute(TransportMode.car, fromFacility, chargerFacility, now, plan.getPerson());
+		List<? extends PlanElement> routeToCharger = tripRouter.calcRoute(TransportMode.car, fromFacility, chargerFacility, now, plan.getPerson());// Should be routing mode
 		//set the vehicle id
 		for (Leg leg : TripStructureUtils.getLegs(routeToCharger)) {
 			if(leg.getMode().equals(routingMode)){
@@ -835,7 +869,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 
 		//add plugin act
 		Activity pluginAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
-				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);
+				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);//This is how to add a aplugin activity
 		plan.getPlanElements().add(2, pluginAct);
 		TripRouter.insertTrip(plan, newFirstAct,routeToCharger,pluginAct);
 		//add walk leg to destination
