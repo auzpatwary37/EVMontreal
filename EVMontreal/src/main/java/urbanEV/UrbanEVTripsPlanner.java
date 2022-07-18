@@ -104,7 +104,7 @@ import one.util.streamex.StreamEx;
 class UrbanEVTripsPlanner implements MobsimInitializedListener {
 
 	@Inject
-	private Provider<TripRouter> tripRouterProvider;
+	protected Provider<TripRouter> tripRouterProvider;
 
 	@Inject
 	Scenario scenario;
@@ -113,22 +113,22 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 	Vehicles vehicles;
 
 	@Inject
-	private SingleModeNetworksCache singleModeNetworksCache;
+	protected SingleModeNetworksCache singleModeNetworksCache;
 
 	@Inject
 	private ElectricFleetSpecification electricFleetSpecification;
 
 	@Inject
-	private ChargingInfrastructureSpecification chargingInfrastructureSpecification;
+	protected ChargingInfrastructureSpecification chargingInfrastructureSpecification;
 
 	@Inject
-	private DriveEnergyConsumption.Factory driveConsumptionFactory;
+	protected DriveEnergyConsumption.Factory driveConsumptionFactory;
 
 	@Inject
-	private AuxEnergyConsumption.Factory auxConsumptionFactory;
+	protected AuxEnergyConsumption.Factory auxConsumptionFactory;
 
 	@Inject
-	private ChargingPower.Factory chargingPowerFactory;
+	protected ChargingPower.Factory chargingPowerFactory;
 
 	@Inject
 	private ChargingLogic.Factory chargingLogicFactory;
@@ -151,10 +151,10 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 	private ChargerPricingProfiles chargerPricingProfiles;
 
 
-	private QSim qsim;
+	protected QSim qsim;
 
-	private static final Logger log = Logger.getLogger(UrbanEVTripsPlanner.class);
-	private static List<PersonContainer2> personContainer2s = new ArrayList<>();
+	protected static final Logger log = Logger.getLogger(UrbanEVTripsPlanner.class);
+	protected static List<PersonContainer2> personContainer2s = new ArrayList<>();
 
 	@Override
 	public void notifyMobsimInitialized(MobsimInitializedEvent e) {
@@ -204,7 +204,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 	 * @param plan
 	 * @return
 	 */
-	private Set<Id<Vehicle>> getUsedEV(Plan plan) {
+	protected Set<Id<Vehicle>> getUsedEV(Plan plan) {
 		return TripStructureUtils.getLegs(plan).stream().filter(leg->leg.getMode().equals("car")||leg.getMode().equals("car_passenger"))
 				.map(leg -> VehicleUtils.getVehicleId(plan.getPerson(), leg.getMode()))
 				.filter(vehicleId -> isEV(vehicleId))
@@ -219,11 +219,11 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 //		return vs;
 	}
 
-	private boolean isEV(Id<Vehicle> vehicleId) {
+	protected boolean isEV(Id<Vehicle> vehicleId) {
 		return this.electricFleetSpecification.getVehicleSpecifications().containsKey(getWrappedElectricVehicleId(vehicleId));
 	}
 
-	private void processPlans(Map<Plan, Set<Id<Vehicle>>> selectedEVPlans) {
+	protected void processPlans(Map<Plan, Set<Id<Vehicle>>> selectedEVPlans) {
 
 
 		UrbanEVConfigGroup configGroup = (UrbanEVConfigGroup) config.getModules().get(UrbanEVConfigGroup.GROUP_NAME);
@@ -343,7 +343,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 	}
 	
 	
-	private boolean isConsistant(Plan plan) {
+	protected boolean isConsistant(Plan plan) {
 		List<Activity> acts = new ArrayList<>();
 //		plan.getPlanElements().stream().filter(pe-> pe instanceof Activity).forEach(a->acts.add(((Activity)a)));
 		plan.getPlanElements().stream().forEach(a->{
@@ -367,7 +367,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 	 * @param originalVehicleId
 	 * @return
 	 */
-	private Leg getCriticalOrLastEvLeg(Plan modifiablePlan, ElectricVehicle pseudoVehicle, Id<Vehicle> originalVehicleId) {
+	protected Leg getCriticalOrLastEvLeg(Plan modifiablePlan, ElectricVehicle pseudoVehicle, Id<Vehicle> originalVehicleId) {
 		UrbanEVConfigGroup configGroup = (UrbanEVConfigGroup) config.getModules().get(UrbanEVConfigGroup.GROUP_NAME);
 
 
@@ -450,9 +450,9 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 	 * @param mobsimagent
 	 * @param modifiablePlan
 	 * @param electricVehicleSpecification
-	 * @param leg
+	 * @param leg the critical Leg
 	 */
-	private void replanPrecedentAndCurrentEVLegs(MobsimAgent mobsimagent, Plan modifiablePlan, ElectricVehicleSpecification electricVehicleSpecification, Leg leg) {
+	protected void replanPrecedentAndCurrentEVLegs(MobsimAgent mobsimagent, Plan modifiablePlan, ElectricVehicleSpecification electricVehicleSpecification, Leg leg) {
 		Network modeNetwork = this.singleModeNetworksCache.getSingleModeNetworksCache().get(leg.getMode());
 
 		String routingMode = TripStructureUtils.getRoutingMode(leg);
@@ -548,7 +548,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
  * @param tripRouter
  * @param now is the time the origin activity finishes
  */
-	private void planPlugoutTrip(Plan plan, String routingMode, ElectricVehicleSpecification electricVehicleSpecification, Activity origin, Activity destination, Link chargingLink, TripRouter tripRouter, double now) {
+	protected void planPlugoutTrip(Plan plan, String routingMode, ElectricVehicleSpecification electricVehicleSpecification, Activity origin, Activity destination, Link chargingLink, TripRouter tripRouter, double now) {
 		Facility fromFacility = FacilitiesUtils.toFacility(origin, scenario.getActivityFacilities());
 		Facility chargerFacility = new LinkWrapperFacility(chargingLink);
 		Facility toFacility = FacilitiesUtils.toFacility(destination, scenario.getActivityFacilities());
@@ -607,7 +607,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
  * @param chargingLink
  * @param tripRouter
  */
-	private void planPluginTrip(Plan plan, String routingMode, ElectricVehicleSpecification electricVehicleSpecification, Activity actBeforeCharging, Activity actWhileCharging, Link chargingLink, TripRouter tripRouter) {
+	protected void planPluginTrip(Plan plan, String routingMode, ElectricVehicleSpecification electricVehicleSpecification, Activity actBeforeCharging, Activity actWhileCharging, Link chargingLink, TripRouter tripRouter) {
 		Facility fromFacility = FacilitiesUtils.toFacility(actBeforeCharging, scenario.getActivityFacilities());
 		Facility chargerFacility = new LinkWrapperFacility(chargingLink);
 		Facility toFacility = FacilitiesUtils.toFacility(actWhileCharging, scenario.getActivityFacilities());
@@ -655,7 +655,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 
 	//TODO possibly put behind interface
 	@Nullable
-	private ChargerSpecification selectChargerNearToLink(Id<Person>pId, Id<Link> linkId, ElectricVehicleSpecification vehicleSpecification, Network network) {
+	protected ChargerSpecification selectChargerNearToLink(Id<Person>pId, Id<Link> linkId, ElectricVehicleSpecification vehicleSpecification, Network network) {
 
 		UrbanEVConfigGroup configGroup = (UrbanEVConfigGroup) config.getModules().get(UrbanEVConfigGroup.GROUP_NAME);
 		double maxDistanceToAct = configGroup.getMaxDistanceBetweenActAndCharger_m();
@@ -706,7 +706,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 	 * @param ev
 	 * @param leg
 	 */
-	private void emulateVehicleDischarging(ElectricVehicle ev, Leg leg) {
+	protected void emulateVehicleDischarging(ElectricVehicle ev, Leg leg) {
 		//retrieve mode specific network
 		Network network = this.singleModeNetworksCache.getSingleModeNetworksCache().get(leg.getMode());
 		//retrieve routin mode specific travel time
@@ -739,7 +739,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 
 //	the following methods are modified versions of EditPlans.findRealActBefore() and EditPlans.findRealActAfter()
 
-	private Activity findRealOrChargingActBefore(MobsimAgent agent, int index) {
+	protected Activity findRealOrChargingActBefore(MobsimAgent agent, int index) {
 		Plan plan = WithinDayAgentUtils.getModifiablePlan(agent);
 		List<PlanElement> planElements = plan.getPlanElements();
 
@@ -757,13 +757,13 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 		return prevAct;
 	}
 
-	private Activity findRealOrChargingActAfter(MobsimAgent agent, int index) {
+	protected Activity findRealOrChargingActAfter(MobsimAgent agent, int index) {
 		Plan plan = WithinDayAgentUtils.getModifiablePlan(agent);
 		List<PlanElement> planElements = plan.getPlanElements();
 		return (Activity) planElements.get(findIndexOfRealActAfter(agent, index));
 	}
 
-	private int findIndexOfRealActAfter(MobsimAgent agent, int index) {
+	protected int findIndexOfRealActAfter(MobsimAgent agent, int index) {
 		Plan plan = WithinDayAgentUtils.getModifiablePlan(agent);
 		List<PlanElement> planElements = plan.getPlanElements();
 
@@ -781,7 +781,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 		return theIndex;
 	}
 
-	private Boolean isHomeChargingTrip(MobsimAgent mobsimAgent, Plan modifiablePlan, List<Leg> evLegs, ElectricVehicle ev) {
+	protected Boolean isHomeChargingTrip(MobsimAgent mobsimAgent, Plan modifiablePlan, List<Leg> evLegs, ElectricVehicle ev) {
 
 		int firstEvLegIndex = modifiablePlan.getPlanElements().indexOf(evLegs.get(0));
 		Id<Link> homeLink = EditPlans.findRealActBefore(mobsimAgent,firstEvLegIndex).getLinkId();
@@ -809,7 +809,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 	//	return false;
 	}
 	
-	private boolean hasHomeCharger(MobsimAgent mobsimAgent, Plan modifiablePlan, List<Leg> evLegs, ElectricVehicle ev){
+	protected boolean hasHomeCharger(MobsimAgent mobsimAgent, Plan modifiablePlan, List<Leg> evLegs, ElectricVehicle ev){
 		
 		int firstEvLegIndex = modifiablePlan.getPlanElements().indexOf(evLegs.get(0));
 		Id<Link> homeLink = EditPlans.findRealActBefore(mobsimAgent,firstEvLegIndex).getLinkId();
@@ -842,7 +842,7 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 	 * @param chargingLink
 	 * @param tripRouter
 	 */
-	private void planPluginTripFromHomeToCharger(Plan plan, String routingMode, ElectricVehicleSpecification electricVehicleSpecification,Activity actWhileCharging, Link chargingLink, TripRouter tripRouter) {
+	protected void planPluginTripFromHomeToCharger(Plan plan, String routingMode, ElectricVehicleSpecification electricVehicleSpecification,Activity actWhileCharging, Link chargingLink, TripRouter tripRouter) {
 		PopulationFactory factory = scenario.getPopulation().getFactory();
 		Facility fromFacility = FacilitiesUtils.toFacility(actWhileCharging, scenario.getActivityFacilities());
 		Facility chargerFacility = new LinkWrapperFacility(chargingLink);
