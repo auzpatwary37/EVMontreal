@@ -45,6 +45,7 @@ import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.inject.Singleton;
 
+
 import urbanEV.analysis.ActsWhileChargingAnalyzer;
 import urbanEV.analysis.ChargerToXY;
 
@@ -64,14 +65,14 @@ public class UrbanEVModule extends AbstractModule {
 	public void install() {
 		UrbanEVConfigGroup configGroup = (UrbanEVConfigGroup) config.getModules().get(UrbanEVConfigGroup.GROUP_NAME);
 		//if(configGroup == null) throw new IllegalArgumentException("no config group of type " + UrbanEVConfigGroup.GROUP_NAME + " was specified in the config");
-
-
+		
 		//standard EV stuff except for ElectricFleetModule
 		install(new ElectricFleetModule());
 		install(new ChargingInfrastructureModule());
 		install(new ChargingModule());
 		install(new DischargingModule());
 		install(new EvStatsModule());
+		addPlanStrategyBinding(UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName).toProvider(EvTripPlanningStrategyProvider.class);
 		
 
 		//bind custom EVFleet stuff
@@ -116,7 +117,8 @@ public class UrbanEVModule extends AbstractModule {
 //		});
 
 		//bind urban ev planning stuff
-		addMobsimListenerBinding().to(UrbanEVTripsPlanner.class);
+//		addMobsimListenerBinding().to(UrbanEVTripsPlanner.class);
+		bind(UrbanEVTripPlanningStrategyModule.class).asEagerSingleton();
 		//TODO find a better solution for this
 		Collection<String> whileChargingActTypes = configGroup.getWhileChargingActivityTypes().isEmpty() ? config.planCalcScore().getActivityTypes() : configGroup.getWhileChargingActivityTypes();
 		bind(ActivityWhileChargingFinder.class).toInstance(new ActivityWhileChargingFinder(whileChargingActTypes, configGroup.getMinWhileChargingActivityDuration_s()));

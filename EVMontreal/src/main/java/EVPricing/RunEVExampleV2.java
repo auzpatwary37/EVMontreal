@@ -34,6 +34,7 @@ import picocli.CommandLine;
 import picocli.CommandLine.Option;
 import urbanEV.UrbanEVConfigGroup;
 import urbanEV.UrbanEVModule;
+import urbanEV.UrbanEVTripPlanningStrategyModule;
 import urbanEV.UrbanVehicleChargingHandler;
 
 public final class RunEVExampleV2 implements Callable<Integer> {
@@ -112,7 +113,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
     config.controler().setLastIteration(this.maxIterations);
     config.controler().setFirstIteration(this.minIterations);
     addStrategy(config, "SubtourModeChoice", null, 0.1D, 0 * this.maxIterations);
-    addStrategy(config, "ReRoute", null, 0.5D, 0 * this.maxIterations);
+    addStrategy(config, UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName, null, 0.5D, 0 * this.maxIterations);
     addStrategy(config, "ChangeExpBeta", null, 0.85D, this.maxIterations);
     addStrategy(config, DefaultStrategy.TimeAllocationMutator_ReRoute, null, 0.25D, this.maxIterations);
     config.controler().setOutputDirectory(this.output);
