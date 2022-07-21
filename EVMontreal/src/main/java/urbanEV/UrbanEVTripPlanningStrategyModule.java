@@ -114,9 +114,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	@Inject 
 	private ChargerPricingProfiles chargerPricingProfiles;
 
-	UrbanEVConfigGroup configGroup = (UrbanEVConfigGroup) config.getModules().get(UrbanEVConfigGroup.GROUP_NAME);
-
-
+	
 	protected static final Logger log = Logger.getLogger(UrbanEVTripPlanningStrategyModule.class);
 	protected static List<PersonContainer2> personContainer2s = new ArrayList<>();
 
@@ -167,6 +165,8 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		TripRouter tripRouter = tripRouterProvider.get();
 		Set<String> modesWithVehicles = new HashSet<>(scenario.getConfig().qsim().getMainModes());
 		modesWithVehicles.addAll(scenario.getConfig().plansCalcRoute().getNetworkModes());
+		UrbanEVConfigGroup configGroup = (UrbanEVConfigGroup) config.getModules().get(UrbanEVConfigGroup.GROUP_NAME);
+
 
 		//	for(Id<Vehicle> ev: pl.getValue()) {
 		for (Id<Vehicle> ev : evs) {

@@ -96,8 +96,8 @@ public class Tutorial {
 		boolean assignChargersToEveryone = true;
 
 		String configIn = "config_with_calibrated_parameters.xml";// input MATSim Montreal Config without ev
-		String planInput = "prepared_population.xml.gz";// Population file without EV
-		String networkInput = "montreal_network.xml.gz";// Input Network File
+		String planInput = "newData/output_plans.xml.gz";// Population file without EV
+		String networkInput = "newData/montreal_network.xml.gz";// Input Network File
 		String chargerFileInput = "cleaned_station.csv";//Charger file with exactly same headers as given to me by Arsham but in .csv format. Save the excel as csv and input its file location
 
 		String planOutput = "Output/plan.xml"; // Saving location of the EV included population

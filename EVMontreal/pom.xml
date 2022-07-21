@@ -9,7 +9,7 @@
         <geotools.version>24-SNAPSHOT</geotools.version>
         
         		<!--release:-->
-		<matsim.version>14.0-SNAPSHOT</matsim.version>
+		<matsim.version>14.0-PR1512</matsim.version>
 
 <!--		in IDE for a possible 13.1-->
 <!--		<matsim.version>13.1-SNAPSHOT</matsim.version>-->
