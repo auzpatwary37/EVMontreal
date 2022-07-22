@@ -280,7 +280,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	}
 	}
 
-	public int generateRandom(int start, int end, List<Integer> excludeRows) {
+	public static int generateRandom(int start, int end, List<Integer> excludeRows) {
 	    
 	    int range = end - start + 1;
 	    Random rand = MatsimRandom.getRandom();
@@ -310,16 +310,16 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		//find suitable non-stage activity before SOC threshold passover
 		actWhileChargingList = activityWhileChargingFinder.findActivitiesWhileChargingBeforeLeg(modifiablePlan, (Leg) modifiablePlan.getPlanElements().get(legIndexCounter));
 		List<Integer> allreadyChecked = new ArrayList<>();
-		actWhileChargingList = actWhileChargingList.stream().filter(a->a.getAttributes().getAttribute(ifBrokenActivity)!=null).collect(Collectors.toList());
+		if(actWhileChargingList!=null)actWhileChargingList = actWhileChargingList.stream().filter(a->a.getAttributes().getAttribute(ifBrokenActivity)!=null).collect(Collectors.toList());
 		do {
 
-			if (actWhileChargingList == null){
+			if (actWhileChargingList == null || actWhileChargingList.isEmpty()){
 				log.warn(modifiablePlan.getPerson().getId() + " can't find a suitable activity prior the critical leg!");
 				PersonContainer2 personContainer2 = new PersonContainer2(modifiablePlan.getPerson().getId(), "can't find a suitable activity prior the critical leg!");
 				personContainer2s.add(personContainer2);
 				return;
 			}
-			int ind = generateRandom(0,actWhileChargingList.size(),allreadyChecked);
+			int ind = generateRandom(0,actWhileChargingList.size()-1,allreadyChecked);
 			allreadyChecked.add(ind);
 			selectedCharger = selectChargerNearToLink(modifiablePlan.getPerson().getId(),actWhileChargingList.get(ind).getLinkId(), electricVehicleSpecification, modeNetwork);
 			
@@ -918,6 +918,8 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			destination.setEndTime(PopulationUtils.decideOnActivityEndTime(destination, now, config).seconds());
 		}
 	}
+	
+	
 
 }
 
