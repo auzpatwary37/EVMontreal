@@ -196,6 +196,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	    		config.planCalcScore().getActivityParams(a.getKey()).setScoringThisActivityAtAll(true);
 	    	}else {
 	    		ActivityParams param = new ActivityParams();
+	    		param.setActivityType(a.getKey());
 	    		param.setTypicalDuration(a.getValue());
 	    		param.setMinimalDuration(a.getValue()*.25);
 	    		param.setScoringThisActivityAtAll(true);
@@ -205,6 +206,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	    for(String actType:actList) {
 	    	if(config.planCalcScore().getActivityParams(actType)==null) {
 	    		ActivityParams param = new ActivityParams();
+	    		param.setActivityType(actType);
 	    		param.setTypicalDuration(8*3600);
 	    		param.setMinimalDuration(8*3600*.25);
 	    		config.planCalcScore().addActivityParams(param);
@@ -212,6 +214,27 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	    		System.out.println("No start and end time was found for activity = "+actType+ " in the base population!! Inserting 8 hour as the typical duration.");
 	    	}
 	    }
+	  
+	    //Add the plugin and plugout activities 
+	    
+	    if(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)==null) {
+	    	ActivityParams param = new ActivityParams();
+    		param.setActivityType(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);
+    		param.setTypicalDuration(5*60);
+    		param.setMinimalDuration(1*60);
+    		config.planCalcScore().addActivityParams(param);
+    		param.setScoringThisActivityAtAll(false);
+	    }
+	    
+	    if(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER)==null) {
+	    	ActivityParams param = new ActivityParams();
+    		param.setActivityType(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
+    		param.setTypicalDuration(5*60);
+    		param.setMinimalDuration(1*60);
+    		config.planCalcScore().addActivityParams(param);
+    		param.setScoringThisActivityAtAll(false);
+	    }
+	    
 	Controler controler = new Controler(scenario);
 	//controler.addOverridingModule(new EvModule());
 	controler.addOverridingModule(new UrbanEVModule());

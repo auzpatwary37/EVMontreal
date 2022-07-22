@@ -120,12 +120,14 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 	@Override
 	public void prepareReplanning(ReplanningContext replanningContext) {
-
+		plans = new HashSet<>();
 	}
 	@Inject
 	UrbanEVTripPlanningStrategyModule(){
 		
 	}
+	
+	Set<Plan> plans = new HashSet<>();
 	
 	/**
 	 * retrieve all used EV in the given plan
@@ -159,6 +161,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	@Override
 	public void handlePlan(Plan plan) {
 		// TODO Auto-generated method stub
+		this.plans.add(plan);
+	}
+	
+	private void execute(Plan plan) {
 		Set<Id<Vehicle>> evs = getUsedEV(plan);
 		if(!evs.isEmpty()) {
 		Plan modifiablePlan = plan;
@@ -266,7 +272,6 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		}
 	}
 	}
-
 
 	/**
 	 * @param mobsimagent
@@ -407,7 +412,8 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		List<ChargerSpecification> nearestChargers = straightLineKnnFinder.findNearest(network.getLinks().get(linkId),chargerList.stream());
 		List<ChargerSpecification>nearestChargersWithinLimit = nearestChargers.stream().filter(c->NetworkUtils.getEuclideanDistance(network.getLinks().get(linkId).getCoord(), network.getLinks().get(c.getLinkId()).getCoord())<maxDistanceToAct).collect(Collectors.toList()); 
 		if (nearestChargersWithinLimit.isEmpty()) {
-			throw new RuntimeException("no charger could be found for vehicle type " + vehicleSpecification.getVehicleType());
+			//throw new RuntimeException("no charger could be found for vehicle type " + vehicleSpecification.getVehicleType());
+			return null;
 		}
 		//double distanceFromActToCharger = NetworkUtils.getEuclideanDistance(network.getLinks().get(linkId).getToNode().getCoord(), network.getLinks().get(nearestChargers.get(0).getLinkId()).getToNode().getCoord());
 		//		if (distanceFromActToCharger >= maxDistanceToAct) {
@@ -456,8 +462,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		trip.addAll(routedSegment);
 
 		//add plugin act
-		Activity pluginAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
-				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);
+		Activity pluginAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER, chargingLink.getCoord());
+		pluginAct.setLinkId(chargingLink.getId());
+		pluginAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER).getTypicalDuration().seconds());
+		
 		trip.add(pluginAct);
 
 		now = TripRouter.calcEndOfPlanElement(now, pluginAct, config);
@@ -481,7 +489,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	@Override
 	public void finishReplanning() {
 		// TODO Auto-generated method stub
-
+		this.plans.parallelStream().forEach(p->this.execute(p));
 	}
 
 	protected Activity findRealOrChargingActBefore(Plan plan, int index) {
@@ -676,8 +684,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 
 		//add plugin act
-		Activity pluginAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
-				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);//This is how to add a aplugin activity
+		
+		Activity pluginAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER, chargingLink.getCoord());
+		pluginAct.setLinkId(chargingLink.getId());
+		pluginAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER).getTypicalDuration().seconds());
 		plan.getPlanElements().add(2, pluginAct);
 		TripRouter.insertTrip(plan, newFirstAct,routeToCharger,pluginAct);
 		//add walk leg to destination
@@ -773,8 +783,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		trip.add(accessLeg);
 
 		//add plugout act
-		Activity plugOutAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
-				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);// this is how to plan a plugout activity
+		Activity plugOutAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER, chargingLink.getCoord());
+		plugOutAct.setLinkId(chargingLink.getId());
+		plugOutAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER).getTypicalDuration().seconds());
+		
 		trip.add(plugOutAct);
 		now = TripRouter.calcEndOfPlanElement(now, plugOutAct, config);
 

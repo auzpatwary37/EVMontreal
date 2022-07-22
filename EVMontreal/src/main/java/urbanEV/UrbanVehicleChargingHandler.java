@@ -57,10 +57,10 @@ public class UrbanVehicleChargingHandler
 		implements ActivityStartEventHandler, ActivityEndEventHandler, PersonLeavesVehicleEventHandler,
 		ChargingEndEventHandler, ChargingStartEventHandler, MobsimScopeEventHandler {
 
-	static final String PLUGIN_IDENTIFIER = " plugin";
+	public static final String PLUGIN_IDENTIFIER = " plugin";
 	public static final String PLUGIN_INTERACTION = PlanCalcScoreConfigGroup.createStageActivityType(
 			PLUGIN_IDENTIFIER);
-	static final String PLUGOUT_IDENTIFIER = " plugout";
+	public static final String PLUGOUT_IDENTIFIER = " plugout";
 	public static final String PLUGOUT_INTERACTION = PlanCalcScoreConfigGroup.createStageActivityType(
 			PLUGOUT_IDENTIFIER);
 	private final Map<Id<Person>, Id<Vehicle>> lastVehicleUsed = new HashMap<>();
