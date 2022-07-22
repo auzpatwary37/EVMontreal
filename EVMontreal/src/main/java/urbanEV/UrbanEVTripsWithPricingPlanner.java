@@ -49,13 +49,7 @@ public class UrbanEVTripsWithPricingPlanner extends UrbanEVTripsPlanner{
 	@Override
 	protected void processPlans(Map<Plan, Set<Id<Vehicle>>> selectedEVPlans) {
 		super.processPlans(selectedEVPlans);
-		for (Plan plan : selectedEVPlans.keySet()) {
-			MobsimAgent mobsimagent = qsim.getAgents().get(plan.getPerson().getId());
-			Plan modifiablePlan = WithinDayAgentUtils.getModifiablePlan(mobsimagent);
-			if(plan.getPerson().getAttributes().getAttribute(savedEVPlansKey)==null)plan.getPerson().getAttributes()
-			.putAttribute(savedEVPlansKey, new HashMap<Plan,Double>());
-			((Map<Plan,Double>)plan.getPerson().getAttributes().getAttribute(savedEVPlansKey)).put(modifiablePlan, 0.);
-		}
+		
 	}
 	public int generateRandom(int start, int end, List<Integer> excludeRows) {
 	    
