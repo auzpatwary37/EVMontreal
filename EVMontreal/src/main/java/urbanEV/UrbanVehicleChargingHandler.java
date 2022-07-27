@@ -53,6 +53,8 @@ import org.matsim.vehicles.Vehicle;
 
 import com.google.common.collect.ImmutableListMultimap;
 
+import binding.ChargingWithQueueingLogic;
+
 
 /**
  * This is an events based approach to trigger vehicle charging. Vehicles will be charged as soon as a person begins a PLUGIN_INTERACTION activity.
@@ -160,6 +162,7 @@ public class UrbanVehicleChargingHandler
 		this.chargingProcedures.clear();
 		vehiclesAtChargers.clear();
 		lastVehicleUsed.clear();
+		this.chargingInfrastructure.getChargers().entrySet().forEach(c->((ChargingWithQueueingLogic)c.getValue().getLogic()).reset(i));
 	}
 	
 	@Override
