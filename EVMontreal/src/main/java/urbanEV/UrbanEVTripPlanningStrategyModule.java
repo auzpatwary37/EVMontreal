@@ -54,6 +54,7 @@ import org.matsim.core.router.StageActivityTypeIdentifier;
 import org.matsim.core.router.TripRouter;
 import org.matsim.core.router.TripStructureUtils;
 import org.matsim.core.router.util.TravelTime;
+import org.matsim.facilities.ActivityFacility;
 import org.matsim.facilities.FacilitiesUtils;
 import org.matsim.facilities.Facility;
 import org.matsim.vehicles.Vehicle;
@@ -168,12 +169,15 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	@Override
 	public void handlePlan(Plan plan) {
 		// TODO Auto-generated method stub
+		Set<Id<Vehicle>> evs = getUsedEV(plan);
+		if(!evs.isEmpty()) {
 		this.plans.add(plan);
+		}
 	}
 	
 	private void execute(Plan plan) {
 		Set<Id<Vehicle>> evs = getUsedEV(plan);
-		if(!evs.isEmpty()) {
+		
 		Plan modifiablePlan = plan;
 		TripRouter tripRouter = tripRouterProvider.get();
 		Set<String> modesWithVehicles = new HashSet<>(scenario.getConfig().qsim().getMainModes());
@@ -277,9 +281,45 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		if(!isConsistant(modifiablePlan)) {
 			System.out.println("Plan is not consistant!!! Debug!!!");
 		}
+	
 	}
+	
+	private void checkPlanConsistancy(Plan plan) {
+		Leg previousLeg = null;
+		boolean lastActplugInIdentifier = false;
+		boolean lastActplugOutIdentifier = false;
+		
+		for(PlanElement pe:plan.getPlanElements()) {
+			if(pe instanceof Activity) {
+				Activity a = (Activity)pe;
+				if(a.getType().equals(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER))lastActplugInIdentifier = true;
+				else lastActplugInIdentifier = false;
+				if(a.getType().equals(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))lastActplugOutIdentifier = true;
+				else lastActplugOutIdentifier = false;
+			}else {
+				Leg l = (Leg)pe;
+				
+				if(lastActplugInIdentifier==true) {
+					String modeBefore = TripStructureUtils.getRoutingMode(previousLeg);
+					String modeAfter = TripStructureUtils.getRoutingMode(l);
+					if(!modeAfter.equals(TransportMode.walk)||!modeBefore.equals(TransportMode.car)) {
+						log.debug("Inconsistant plan, debug here~!!!!");
+					}
+				}
+				
+				if(lastActplugOutIdentifier==true) {
+					String modeBefore = TripStructureUtils.getRoutingMode(previousLeg);
+					String modeAfter = TripStructureUtils.getRoutingMode(l);
+					if(!modeBefore.equals(TransportMode.walk)||!modeAfter.equals(TransportMode.car)) {
+						log.debug("Inconsistant plan, debug here~!!!!");
+					}
+				}
+				
+				previousLeg = l;
+			}
+		}
 	}
-
+	
 	public static int generateRandom(int start, int end, List<Integer> excludeRows) {
 	    
 	    int range = end - start + 1;
@@ -381,7 +421,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				Activity actBeforeBreak = scenario.getPopulation().getFactory().createActivityFromCoord(actWhileCharging.getType(), actWhileCharging.getCoord());
 				actBeforeBreak.setLinkId(actWhileCharging.getLinkId());
 				actBeforeBreak.setFacilityId(actWhileCharging.getFacilityId());
-				
+				ActivityFacility fac;
+				if((fac = scenario.getActivityFacilities().getFacilities().get(actBeforeBreak.getFacilityId())).getCoord()==null) {
+					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
+				}
 				actBeforeBreak.setEndTime(beforeActEndTime);
 				
 				actBeforeBreak.getAttributes().putAttribute(ifBrokenActivity, true);
@@ -390,6 +433,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				actAfterBreak.setFacilityId(actWhileCharging.getFacilityId());
 				actAfterBreak.setEndTime(actWhileCharging.getEndTime().seconds());
 				actAfterBreak.getAttributes().putAttribute(ifBrokenActivity, true);
+				
+				if((fac = scenario.getActivityFacilities().getFacilities().get(actAfterBreak.getFacilityId())).getCoord()==null) {
+					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
+				}
 				Leg legDummy = scenario.getPopulation().getFactory().createLeg(TransportMode.walk);
 				modifiablePlan.getPlanElements().add(ind,actBeforeBreak);
 				modifiablePlan.getPlanElements().add(ind+1,legDummy);
@@ -402,13 +449,19 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				actBeforeBreak.setEndTime(actBreakTime);
 				actBeforeBreak.setLinkId(actWhileCharging.getLinkId());
 				actBeforeBreak.setFacilityId(actWhileCharging.getFacilityId());
-				
+				ActivityFacility fac;
+				if((fac = scenario.getActivityFacilities().getFacilities().get(actBeforeBreak.getFacilityId())).getCoord()==null) {
+					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
+				}
 				actBeforeBreak.getAttributes().putAttribute(ifBrokenActivity, true);
 				Activity actAfterBreak = scenario.getPopulation().getFactory().createActivityFromCoord(actWhileCharging.getType(), actWhileCharging.getCoord());
 				actAfterBreak.setLinkId(actWhileCharging.getLinkId());
 				actAfterBreak.setFacilityId(actWhileCharging.getFacilityId());
 				actAfterBreak.setEndTime(actWhileCharging.getEndTime().seconds());
 				actAfterBreak.getAttributes().putAttribute(ifBrokenActivity, true);
+				if((fac = scenario.getActivityFacilities().getFacilities().get(actAfterBreak.getFacilityId())).getCoord()==null) {
+					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
+				}
 				Leg legDummy = scenario.getPopulation().getFactory().createLeg(routingMode);
 				modifiablePlan.getPlanElements().add(ind,actBeforeBreak);
 				modifiablePlan.getPlanElements().add(ind+1,legDummy);
@@ -466,6 +519,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		if(!isConsistant(modifiablePlan)) {
 			System.out.println("Plan is not consistant!!! Debug!!!");
 		}
+		this.checkPlanConsistancy(modifiablePlan);
 
 	}
 
@@ -566,7 +620,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		trip.addAll(routedSegment);
 
 		//add plugin act
-		Activity pluginAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER, chargingLink.getCoord());
+		
+		Activity pluginAct =PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
+				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);
+//		Activity pluginAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER, chargingLink.getCoord());
 		pluginAct.setLinkId(chargingLink.getId());
 		pluginAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER).getTypicalDuration().seconds());
 		
@@ -592,8 +649,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 	@Override
 	public void finishReplanning() {
+		long t = System.currentTimeMillis();
 		// TODO Auto-generated method stub
 		this.plans.parallelStream().forEach(p->this.execute(p));
+		log.info("total time for replanning"+this.plans.size()+"plans = "+(System.currentTimeMillis()-t));
 	}
 
 	protected Activity findRealOrChargingActBefore(Plan plan, int index) {
@@ -789,7 +848,9 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 		//add plugin act
 		
-		Activity pluginAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER, chargingLink.getCoord());
+		//Activity pluginAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER, chargingLink.getCoord());
+		Activity pluginAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
+				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);//This is how to add a aplugin activity
 		pluginAct.setLinkId(chargingLink.getId());
 		pluginAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER).getTypicalDuration().seconds());
 		plan.getPlanElements().add(2, pluginAct);
@@ -800,7 +861,8 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		int indexRouteFromChargerToAct = plan.getPlanElements().indexOf(pluginAct) + 1;
 		plan.getPlanElements().add(indexRouteFromChargerToAct, routeFromChargerToAct.get(0));
 		plan.getPlanElements().add(indexRouteFromChargerToAct+1, actWhileCharging);
-
+		Leg egress = (Leg) routeFromChargerToAct.get(0);
+		TripStructureUtils.setRoutingMode(egress, routingMode);
 	}
 
 	protected Boolean isHomeChargingTrip(Plan modifiablePlan, List<Leg> evLegs, ElectricVehicle ev) {
@@ -887,7 +949,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		trip.add(accessLeg);
 
 		//add plugout act
-		Activity plugOutAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER, chargingLink.getCoord());
+		
+		Activity plugOutAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
+				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);// this is how to plan a plugout activity
+		//Activity plugOutAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER, chargingLink.getCoord());
 		plugOutAct.setLinkId(chargingLink.getId());
 		plugOutAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER).getTypicalDuration().seconds());
 		

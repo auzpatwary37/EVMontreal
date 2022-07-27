@@ -19,27 +19,39 @@
 
 package urbanEV;
 
-import com.google.common.collect.ImmutableListMultimap;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import javax.inject.Inject;
+
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
-import org.matsim.api.core.v01.events.*;
-import org.matsim.api.core.v01.events.handler.*;
+import org.matsim.api.core.v01.events.ActivityEndEvent;
+import org.matsim.api.core.v01.events.ActivityStartEvent;
+import org.matsim.api.core.v01.events.PersonLeavesVehicleEvent;
+import org.matsim.api.core.v01.events.handler.ActivityEndEventHandler;
+import org.matsim.api.core.v01.events.handler.ActivityStartEventHandler;
+import org.matsim.api.core.v01.events.handler.PersonLeavesVehicleEventHandler;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Plan;
-import org.matsim.contrib.ev.charging.*;
+import org.matsim.contrib.ev.charging.ChargingEndEvent;
+import org.matsim.contrib.ev.charging.ChargingEndEventHandler;
+import org.matsim.contrib.ev.charging.ChargingStartEvent;
+import org.matsim.contrib.ev.charging.ChargingStartEventHandler;
+import org.matsim.contrib.ev.charging.VehicleChargingHandler;
 import org.matsim.contrib.ev.fleet.ElectricFleet;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
 import org.matsim.contrib.ev.infrastructure.Charger;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructure;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructures;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
-import org.matsim.core.events.MobsimScopeEventHandler;
 import org.matsim.core.utils.collections.Tuple;
 import org.matsim.vehicles.Vehicle;
 
-import javax.inject.Inject;
-import java.util.*;
+import com.google.common.collect.ImmutableListMultimap;
 
 
 /**
@@ -55,7 +67,7 @@ import java.util.*;
  */
 public class UrbanVehicleChargingHandler
 		implements ActivityStartEventHandler, ActivityEndEventHandler, PersonLeavesVehicleEventHandler,
-		ChargingEndEventHandler, ChargingStartEventHandler, MobsimScopeEventHandler {
+		ChargingEndEventHandler, ChargingStartEventHandler {
 
 	public static final String PLUGIN_IDENTIFIER = " plugin";
 	public static final String PLUGIN_INTERACTION = PlanCalcScoreConfigGroup.createStageActivityType(
@@ -63,14 +75,16 @@ public class UrbanVehicleChargingHandler
 	public static final String PLUGOUT_IDENTIFIER = " plugout";
 	public static final String PLUGOUT_INTERACTION = PlanCalcScoreConfigGroup.createStageActivityType(
 			PLUGOUT_IDENTIFIER);
-	private final Map<Id<Person>, Id<Vehicle>> lastVehicleUsed = new HashMap<>();
-	private final Map<Id<ElectricVehicle>, Id<Charger>> vehiclesAtChargers = new HashMap<>();
+	private final Map<Id<Person>, Id<Vehicle>> lastVehicleUsed = new ConcurrentHashMap<>();
+	private final Map<Id<ElectricVehicle>, Id<Charger>> vehiclesAtChargers = new ConcurrentHashMap<>();
 
 	private final ChargingInfrastructure chargingInfrastructure;
 	private final ElectricFleet electricFleet;
 	private final ImmutableListMultimap<Id<Link>, Charger> chargersAtLinks;
 
-	private Map<Id<Link>, Map<Id<Person>, Tuple<Id<Vehicle>, Id<Charger>>>> chargingProcedures = new HashMap<>();
+	
+	
+	private Map<Id<Link>, Map<Id<Person>, chargingInfo>> chargingProcedures = new HashMap<>();
 	@Inject 
 	Scenario scenario;
 	@Inject
@@ -94,23 +108,27 @@ public class UrbanVehicleChargingHandler
 				if (electricFleet.getElectricVehicles().containsKey(evId)) {
 					ElectricVehicle ev = electricFleet.getElectricVehicles().get(evId);
 					List<Charger> chargers = chargersAtLinks.get(event.getLinkId());
+					
 					Charger charger = chargers.stream()
 							.filter(ch -> ev.getChargerTypes().contains(ch.getChargerType()))
 
 							.findAny()
 							.get();
 					charger.getLogic().addVehicle(ev, event.getTime());
-					Map<Id<Person>, Tuple<Id<Vehicle>, Id<Charger>>> proceduresOnLink = this.chargingProcedures.get(event.getLinkId());
+					
+					Map<Id<Person>, chargingInfo> proceduresOnLink = this.chargingProcedures.get(event.getLinkId());
+					
 					if(proceduresOnLink != null && proceduresOnLink.containsKey(event.getPersonId())){
 //						Plan plan = null;
 //						System.out.println(this.scenario.getPopulation().getPersons().get(event.getPersonId()).getSelectedPlan());
-//						
+						Person person = scenario.getPopulation().getPersons().get(event.getPersonId());
+						Plan plan = scenario.getPopulation().getPersons().get(event.getPersonId()).getSelectedPlan();
 						throw new RuntimeException("person " + event.getPersonId() + " tries to charge 2 vehicles at the same time on link " + event.getLinkId() +
 								". this is not supported.");
 					} else if(proceduresOnLink == null) {
 						proceduresOnLink = new HashMap<>();
 					}
-					proceduresOnLink.put(event.getPersonId(), new Tuple<>(vehicleId, charger.getId()));
+					proceduresOnLink.put(event.getPersonId(), new chargingInfo(event.getTime(), event.getPersonId(), charger.getLink().getId(), charger.getId(),evId));
 					this.chargingProcedures.put(event.getLinkId(), proceduresOnLink);
 				} else {
 					throw new IllegalStateException("can not plug in non-registered ev " + evId + " of person " + event.getPersonId());
@@ -124,11 +142,11 @@ public class UrbanVehicleChargingHandler
 	@Override
 	public void handleEvent(ActivityEndEvent event) {
 		if (event.getActType().endsWith(PLUGOUT_INTERACTION)) {
-			Tuple<Id<Vehicle>, Id<Charger>> tuple = chargingProcedures.get(event.getLinkId()).remove(event.getPersonId());
+			chargingInfo tuple = chargingProcedures.get(event.getLinkId()).remove(event.getPersonId());
 			if (tuple != null) {
-				Id<ElectricVehicle> evId = Id.create(tuple.getFirst(), ElectricVehicle.class);
+				Id<ElectricVehicle> evId = tuple.vehicleId;
 				if(vehiclesAtChargers.remove(evId) != null){ //if null, vehicle is fully charged and de-plugged already (see handleEvent(ChargingEndedEvent) )
-					Id<Charger> chargerId = tuple.getSecond();
+					Id<Charger> chargerId = tuple.chargerId;
 					Charger c = chargingInfrastructure.getChargers().get(chargerId);
 					c.getLogic().removeVehicle(electricFleet.getElectricVehicles().get(evId), event.getTime());
 				}
@@ -137,7 +155,13 @@ public class UrbanVehicleChargingHandler
 			}
 		}
 	}
-
+	@Override
+	public void reset(int i) {
+		this.chargingProcedures.clear();
+		vehiclesAtChargers.clear();
+		lastVehicleUsed.clear();
+	}
+	
 	@Override
 	public void handleEvent(PersonLeavesVehicleEvent event) {
 		lastVehicleUsed.put(event.getPersonId(), event.getVehicleId());
@@ -154,6 +178,23 @@ public class UrbanVehicleChargingHandler
 		vehiclesAtChargers.put(event.getVehicleId(), event.getChargerId());
 		//Charging has started
 	}
+	
 
+}
 
+class chargingInfo {
+	final Id<Person> personId;
+	final Id<Link> linkId;
+	final Id<Charger> chargerId;
+	final Id<ElectricVehicle>vehicleId;
+	final double plugInTime;
+	double plugOutTime;
+	public chargingInfo(double plugInTime, Id<Person> personId, Id<Link> linkId, Id<Charger> chargerId, Id<ElectricVehicle> vehicleId) {
+		this.personId = personId;
+		this.linkId = linkId;
+		this.chargerId = chargerId;
+		this.vehicleId = vehicleId;
+		this.plugInTime = plugInTime;
+		
+	}
 }

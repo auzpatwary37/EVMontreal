@@ -26,15 +26,7 @@ import java.util.Set;
 
 import org.matsim.contrib.ev.EvModule;
 import org.matsim.contrib.ev.charging.ChargingModule;
-import org.matsim.contrib.ev.charging.ChargingPower;
-import org.matsim.contrib.ev.discharging.AuxEnergyConsumption;
 import org.matsim.contrib.ev.discharging.DischargingModule;
-import org.matsim.contrib.ev.discharging.DriveEnergyConsumption;
-import org.matsim.contrib.ev.fleet.ElectricFleet;
-import org.matsim.contrib.ev.fleet.ElectricFleetModule;
-import org.matsim.contrib.ev.fleet.ElectricFleetSpecification;
-import org.matsim.contrib.ev.fleet.ElectricFleets;
-import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureModule;
 import org.matsim.contrib.ev.stats.EvStatsModule;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.groups.QSimConfigGroup;
@@ -42,10 +34,10 @@ import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.mobsim.qsim.AbstractQSimModule;
 
 import com.google.inject.Inject;
-import com.google.inject.Provider;
 import com.google.inject.Singleton;
 
-
+import binding.ChargingInfrastructureModule;
+import binding.ElectricFleetModule;
 import urbanEV.analysis.ActsWhileChargingAnalyzer;
 import urbanEV.analysis.ChargerToXY;
 
@@ -74,7 +66,8 @@ public class UrbanEVModule extends AbstractModule {
 		install(new EvStatsModule());
 		addPlanStrategyBinding(UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName).toProvider(EvTripPlanningStrategyProvider.class);
 		
-
+		bind(UrbanVehicleChargingHandler.class);
+		addEventHandlerBinding().to(UrbanVehicleChargingHandler.class);
 		//bind custom EVFleet stuff
 //		bind(MATSimVehicleWrappingEVSpecificationProvider.class).in(Singleton.class);
 //		bind(ElectricFleetSpecification.class).toProvider(MATSimVehicleWrappingEVSpecificationProvider.class);
@@ -83,8 +76,7 @@ public class UrbanEVModule extends AbstractModule {
 			@Override
 			protected void configureQSim() {
 				//this is responsible for charging vehicles according to person activity start and end events..
-				bind(UrbanVehicleChargingHandler.class);
-				addMobsimScopeEventHandlerBinding().to(UrbanVehicleChargingHandler.class);
+				
 
 				//if we use agent-specific vehicle types (with specific initial energies), we transfer the final SOCs of every iteration to the vehicle type and thus to the next iter
 				if(config.qsim().getVehiclesSource().equals(QSimConfigGroup.VehiclesSource.fromVehiclesData)){

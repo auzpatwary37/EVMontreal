@@ -4,10 +4,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.commons.collections.list.SynchronizedList;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.matsim.api.core.v01.Id;
@@ -42,10 +45,10 @@ public class ActsWhileChargingAnalyzer implements ActivityStartEventHandler, Act
     @Inject
     Scenario scenario;
 
-   private Map<Id<Person>, List<String>> actsPerPersons = new HashMap<>();
-   private Map<Id<Charger>, Id<Link>> chargersAtLinks = new HashMap<>();
-   static List<Container> containers = new ArrayList<>();
-   static List<PersonContainer> personContainers = new ArrayList<>();
+   private Map<Id<Person>, List<String>> actsPerPersons = new ConcurrentHashMap<>();
+   private Map<Id<Charger>, Id<Link>> chargersAtLinks = new ConcurrentHashMap<>();
+   static Map<Id<Person>,Container> containers = new ConcurrentHashMap<>();
+   static Map<Id<Person>,List<PersonContainer>> personContainers = new ConcurrentHashMap<>();
 
     /*
      *This class collects the activities while charging. Therefore it listens to the ActivityStartEvents and ChargingStartEvent.
@@ -59,16 +62,13 @@ public class ActsWhileChargingAnalyzer implements ActivityStartEventHandler, Act
         for (Id<Person> personId : scenario.getPopulation().getPersons().keySet()) {
             List<String> acts = new ArrayList<>();
             Container container = new Container(personId,acts);
-            containers.add(container);
+            containers.put(personId,container);
 
         }
         for (Id<Charger> chargerId : chargingInfrastructureSpecification.getChargerSpecifications().keySet()) {
 
-            Id<Link> chargerLink = chargingInfrastructureSpecification.getChargerSpecifications().values().stream()
-                                    .filter(chargerSpecification -> chargerSpecification.getId().equals(chargerId))
-                                    .map(chargerSpecification -> chargerSpecification.getLinkId())
-                                    .findAny()
-                                    .get();
+            Id<Link> chargerLink = chargingInfrastructureSpecification.getChargerSpecifications().get(chargerId).getLinkId();
+                                    
             chargersAtLinks.put(chargerId, chargerLink);
         }
     }
@@ -81,24 +81,18 @@ public class ActsWhileChargingAnalyzer implements ActivityStartEventHandler, Act
     @Override
     public void handleEvent(ActivityStartEvent event) {
         if (!TripStructureUtils.isStageActivityType(event.getActType())) {
-
-            containers.stream()
-                    .filter(container -> container.personId.equals(event.getPersonId()))
-                    .findAny()
-                    .get()
-                    .acts.add(event.getActType());
+        	
+            containers.get(event.getPersonId()).acts.add(event.getActType());
 
         }
         else if (event.getActType().contains(UrbanVehicleChargingHandler.PLUGIN_INTERACTION)){
             String chargingActAndTime = event.getActType()+ event.getTime();
-            containers.stream()
-                    .filter(container -> container.personId.equals(event.getPersonId()))
-                    .findAny()
-                    .get()
-                    .acts.add(chargingActAndTime);
+            containers.get(event.getPersonId()).acts.add(chargingActAndTime);
 
+            
             PersonContainer personContainer = new PersonContainer(event.getPersonId().toString(), chargingActAndTime , event.getTime(), null);
-            personContainers.add(personContainer);
+            if(!personContainers.containsKey(event.getPersonId()))personContainers.put(event.getPersonId(),Collections.synchronizedList(new ArrayList<>()));
+            personContainers.get(event.getPersonId()).add(personContainer);
         }
 
     }
@@ -107,9 +101,9 @@ public class ActsWhileChargingAnalyzer implements ActivityStartEventHandler, Act
     public void handleEvent(ChargingStartEvent event) {
 
        Id<Person> personsId = Id.createPersonId(event.getVehicleId().toString());
-
-        for (PersonContainer personContainer : personContainers) {
-            if (personContainer.personId.equals(personsId.toString())){
+       
+        for (PersonContainer personContainer : this.personContainers.get(personsId)) {
+            if (personContainer.time==event.getTime()){
                 personContainer.setChargerId(event.getChargerId());
             }
         }
@@ -121,7 +115,7 @@ public class ActsWhileChargingAnalyzer implements ActivityStartEventHandler, Act
 
         personContainers.clear();
         actsPerPersons.clear();
-
+        this.containers.entrySet().forEach(e->e.getValue().acts.clear());
     }
 
     @Override
@@ -132,17 +126,16 @@ public class ActsWhileChargingAnalyzer implements ActivityStartEventHandler, Act
             csvPrinter = new CSVPrinter(Files.newBufferedWriter(Paths.get(controlerIO.getIterationFilename(iterationCounter.getIterationNumber(), "actsPerCharger.csv"))), CSVFormat.DEFAULT.withDelimiter(';').
                     withHeader("PersonID", "ChargerId", "Activity type", "Time"));
 
-            for (PersonContainer personContainer : personContainers) {
-                Id<Person> personId = Id.createPersonId(personContainer.personId);
+            for (Entry<Id<Person>, List<PersonContainer>> personContainer : personContainers.entrySet()) {
+                Id<Person> personId = personContainer.getKey();
                 Person person = scenario.getPopulation().getPersons().get(personId);
 
-                List<String> plan = containers.stream()
-                        .filter(container -> container.personId.equals(personId))
-                        .findAny()
-                        .get()
+                List<String> plan = containers.get(personId)
                         .acts;
-                if(plan.get(plan.indexOf(personContainer.chargingAct)) != plan.get(plan.size()-1) ) {
-                    csvPrinter.printRecord(personContainer.personId, personContainer.chargerId, plan.get(plan.indexOf(personContainer.chargingAct) + 1), Time.writeTime(personContainer.time));
+                for(PersonContainer d:personContainer.getValue()) {
+                if(this.containers.get(personId).acts.indexOf(d.chargingAct)!=this.containers.get(personId).acts.size()-1) {
+                    csvPrinter.printRecord(personId, d.chargerId, plan.get(plan.indexOf(d.chargingAct) + 1), Time.writeTime(d.time));
+                }
                 }
 
             }

@@ -112,10 +112,11 @@ public final class RunEVExampleV2 implements Callable<Integer> {
     config.qsim().setNumberOfThreads(10);
     config.controler().setLastIteration(this.maxIterations);
     config.controler().setFirstIteration(this.minIterations);
-    addStrategy(config, "SubtourModeChoice", null, 0.1D, 0 * this.maxIterations);
-    addStrategy(config, UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName, null, 0.5D, 0 * this.maxIterations);
-    addStrategy(config, "ChangeExpBeta", null, 0.85D, this.maxIterations);
-    addStrategy(config, DefaultStrategy.TimeAllocationMutator_ReRoute, null, 0.25D, this.maxIterations);
+    addStrategy(config, "SubtourModeChoice", null, 0.1D, (int)0.65 * this.maxIterations);
+    addStrategy(config, UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName, null, 0.85D, (int).75 * this.maxIterations);
+    addStrategy(config, "ChangeExpBeta", null, 0.25D, this.maxIterations);
+    addStrategy(config, DefaultStrategy.TimeAllocationMutator_ReRoute, null, 0.05D, (int)0.7*this.maxIterations);
+    addStrategy(config, DefaultStrategy.ReRoute, null, 0.05D, (int)0.8*this.maxIterations);
     config.controler().setOutputDirectory(this.output);
     config.controler().setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
     config.qsim().setFlowCapFactor(this.scale.doubleValue() * 1.2D);
@@ -164,6 +165,9 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 
 	Scenario scenario = ScenarioUtils.loadScenario(config);
 	
+	scenario.getActivityFacilities().getFacilities().entrySet().forEach(f->{
+		if(f.getValue().getCoord()==null)f.getValue().setCoord(scenario.getNetwork().getLinks().get(f.getValue().getLinkId()).getCoord());
+	});
 	
 	scaleDownPt(scenario.getTransitVehicles(), scale);
 	
