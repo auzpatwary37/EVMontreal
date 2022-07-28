@@ -313,7 +313,8 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 						break;
 					}
 
-					else if (evLegs.get(evLegs.size()-1).equals(legWithCriticalSOC) && isHomeChargingTrip(modifiablePlan, evLegs, pseudoVehicle) && pseudoVehicle.getBattery().getSoc() > 0) {
+					else if (evLegs.get(evLegs.size()-1).equals(legWithCriticalSOC) && isHomeChargingTrip(modifiablePlan, evLegs, pseudoVehicle) && pseudoVehicle.getBattery().getSoc() > 0 && 
+							!((Activity)modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC)-1)).getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER)) {
 
 						//trip leads to location of the first activity in the plan and there is a charger and so we can charge at home do not search for opportunity charge before
 						Activity actBefore = EditPlansReplan.findRealActBefore(plan, modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC));
@@ -604,7 +605,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				//multiCharge++;
 			}
 			else if(a.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))charging--;
-			if(charging>1) {
+			if(charging>1 || charging<0) {
 				return false;
 			}
 		}

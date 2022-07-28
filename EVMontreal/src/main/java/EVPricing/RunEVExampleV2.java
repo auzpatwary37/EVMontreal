@@ -112,7 +112,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
     config.qsim().setNumberOfThreads(10);
     config.controler().setLastIteration(this.maxIterations);
     config.controler().setFirstIteration(this.minIterations);
-    addStrategy(config, "SubtourModeChoice", null, 0.1D, (int)0.65 * this.maxIterations);
+    //addStrategy(config, "SubtourModeChoice", null, 0.1D, (int)0.65 * this.maxIterations);
     addStrategy(config, UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName, null, 0.85D, (int).75 * this.maxIterations);
     addStrategy(config, "ChangeExpBeta", null, 0.25D, this.maxIterations);
     addStrategy(config, DefaultStrategy.TimeAllocationMutator_ReRoute, null, 0.05D, (int)0.7*this.maxIterations);
