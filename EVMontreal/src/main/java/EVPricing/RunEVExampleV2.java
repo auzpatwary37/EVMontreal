@@ -261,6 +261,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 					//bind(VehicleChargingHandler.class).asEagerSingleton();
 					bind(ChargePricingEventHandler.class).asEagerSingleton();
 					//addMobsimScopeEventHandlerBinding().to(VehicleChargingHandler.class);
+					
 					addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
 					this.addQSimComponentBinding(EvModule.EV_COMPONENT).to(ChargePricingEventHandler.class);
 				}

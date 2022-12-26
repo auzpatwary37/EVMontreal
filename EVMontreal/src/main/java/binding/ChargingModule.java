@@ -51,13 +51,16 @@ public class ChargingModule extends AbstractModule {
 		});
 
 		bind(ChargingPower.Factory.class).toInstance(ev -> new FixedSpeedCharging(ev, 1));
-
+		
 		installQSimModule(new AbstractQSimModule() {
 			@Override
 			protected void configureQSim() {
 				this.bind(ChargingHandler.class).asEagerSingleton();
+				this.bind(EVOutOfBatteryChecker.class).asEagerSingleton();
 				this.addQSimComponentBinding(EvModule.EV_COMPONENT).to(ChargingHandler.class);
+				this.addQSimComponentBinding(EvModule.EV_COMPONENT+"dis").to(EVOutOfBatteryChecker.class);
 			}
 		});
+		//this.addEventHandlerBinding().to(EVOutOfBatteryChecker.class);
 	}
 }

@@ -472,10 +472,12 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 					}
 				}
 			}
+			//TODO: fix the issue, the required 
 			reqCharge = (pseudoVehicle.getBattery().getCapacity() - pseudoVehicle.getBattery().getSoc())*this.factorOfSafety;
-			if(reqCharge<0)reqCharge = pseudoVehicle.getBattery().getCapacity();
+			if(reqCharge<=0)reqCharge = pseudoVehicle.getBattery().getCapacity();
 			double chargeTime = reqCharge/pseudoVehicle.getChargingPower().calcChargingPower(selectedCharger);
 			double randomChargeTime = chargeTime + MatsimRandom.getRandom().nextGaussian()*chargeTime*cov;//
+			if(randomChargeTime<600)randomChargeTime =600; 
 			double actBreakTime = 0;
 			TripRouter tripRouter = tripRouterProvider.get();
 			int ind = modifiablePlan.getPlanElements().indexOf(actWhileCharging);
@@ -917,10 +919,11 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			if(leg.getMode().equals(routingMode)){
 				NetworkRoute route = ((NetworkRoute) leg.getRoute());
 				if(route.getVehicleId() == null) route.setVehicleId(Id.createVehicleId(electricVehicleSpecification.getId()));
+				now = TripRouter.calcEndOfPlanElement(now, leg, config);
 			}
 		}
 
-
+		
 		//add plugin act
 		
 		//Activity pluginAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER, chargingLink.getCoord());
@@ -928,6 +931,8 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);//This is how to add a aplugin activity
 		pluginAct.setLinkId(chargingLink.getId());
 		pluginAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER).getTypicalDuration().seconds());
+		now = TripRouter.calcEndOfPlanElement(now, pluginAct, config);
+		pluginAct.setStartTime(now);
 		plan.getPlanElements().add(2, pluginAct);
 		TripRouter.insertTrip(plan, newFirstAct,routeToCharger,pluginAct);
 		//add walk leg to destination
@@ -935,7 +940,9 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				PlanRouter.calcEndOfActivity(newFirstAct, plan, config), plan.getPerson());
 		int indexRouteFromChargerToAct = plan.getPlanElements().indexOf(pluginAct) + 1;
 		plan.getPlanElements().add(indexRouteFromChargerToAct, routeFromChargerToAct.get(0));
+		now = TripRouter.calcEndOfPlanElement(now, routeFromChargerToAct.get(0), config);
 		plan.getPlanElements().add(indexRouteFromChargerToAct+1, actWhileCharging);
+		actWhileCharging.setStartTime(now);
 		Leg egress = (Leg) routeFromChargerToAct.get(0);
 		TripStructureUtils.setRoutingMode(egress, routingMode);
 	}
