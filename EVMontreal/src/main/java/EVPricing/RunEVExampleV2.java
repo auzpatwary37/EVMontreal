@@ -90,6 +90,9 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--distanceForCharger"}, description = {"Maximum search radius for charger around activity"}, defaultValue = "500.")
   private Double chargerDist;
   
+  @Option(names = {"--thread"}, description = {"No of thread"}, defaultValue = "1")
+  private int thread;
+  
   public static void main(String[] args) {
     (new CommandLine(new RunEVExampleV2()))
       .setStopAtUnmatched(false)
@@ -108,8 +111,8 @@ public final class RunEVExampleV2 implements Callable<Integer> {
     config.transit().setTransitScheduleFile(this.tsFileLoc);
     config.transit().setVehiclesFile(this.tvFileLoc);
     config.vehicles().setVehiclesFile(this.vehicleFile);
-    config.global().setNumberOfThreads(11);
-    config.qsim().setNumberOfThreads(10);
+    config.global().setNumberOfThreads(thread);
+    config.qsim().setNumberOfThreads(thread);
     config.controler().setLastIteration(this.maxIterations);
     config.controler().setFirstIteration(this.minIterations);
     //addStrategy(config, "SubtourModeChoice", null, 0.1D, (int)0.65 * this.maxIterations);
@@ -262,7 +265,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 					bind(ChargePricingEventHandler.class).asEagerSingleton();
 					//addMobsimScopeEventHandlerBinding().to(VehicleChargingHandler.class);
 					
-					addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
+					//addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
 					this.addQSimComponentBinding(EvModule.EV_COMPONENT).to(ChargePricingEventHandler.class);
 				}
 				

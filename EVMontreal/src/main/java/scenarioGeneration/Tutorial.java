@@ -94,6 +94,7 @@ public class Tutorial {
 		//Inputs
 		double evPercentage = 0.1; // Percentage of cars to take as EV
 		boolean assignChargersToEveryone = true;
+		double homeChargerPercentage = 0.5;
 
 		String configIn = "config_with_calibrated_parameters.xml";// input MATSim Montreal Config without ev
 		String planInput = "newData/output_plans.xml.gz";// Population file without EV
@@ -306,29 +307,34 @@ public class Tutorial {
 		});
 		Map<Id<Charger>,Set<Id<Person>>> personsToChargerAssignment = new HashMap<>();
 		if(assignChargersToEveryone) {
+			
 			for(Entry<String, Coord> d:homeChargerLocations.entrySet()) {
 				Id<Link> linkId = NetworkUtils.getNearestRightEntryLink(net, d.getValue()).getId();
-				if(!chargerLinkIds.containsKey(linkId)) {
-				ChargerSpecification c = ImmutableChargerSpecification.newBuilder()
-						.id(Id.create(d.getKey()+"_home", Charger.class))
-						.linkId(linkId)
-						.chargerType("home")
-						.plugCount(1)
-						.plugPower(1000 * 11.5)
-						.build();
-				Set<Id<Person>> pSet= new HashSet<>();
-				pSet.add(Id.createPersonId(d.getKey()));
-				personsToChargerAssignment.put(c.getId(),pSet);
-				csp.addChargerSpecification(c);
-				chargerCoord.put(c.getId(),d.getValue());
-				chargerLinkIds.put(linkId, c);
-				}else{
-					Id<Charger> chargerId = chargerLinkIds.get(linkId).getId();
-					if(personsToChargerAssignment.get(chargerId)!=null) {
-						personsToChargerAssignment.get(chargerId).add(Id.createPersonId(d.getKey()));
+				double m = Math.random();
+				
+				if(!chargerLinkIds.containsKey(linkId)&& m<homeChargerPercentage) {
+						
+					ChargerSpecification c = ImmutableChargerSpecification.newBuilder()
+							.id(Id.create(d.getKey()+"_home", Charger.class))
+							.linkId(linkId)
+							.chargerType("home")
+							.plugCount(1)
+							.plugPower(1000 * 11.5)
+							.build();
+					Set<Id<Person>> pSet= new HashSet<>();
+					pSet.add(Id.createPersonId(d.getKey()));
+					personsToChargerAssignment.put(c.getId(),pSet);
+					csp.addChargerSpecification(c);
+					chargerCoord.put(c.getId(),d.getValue());
+					chargerLinkIds.put(linkId, c);
+					}else{
+						Id<Charger> chargerId = chargerLinkIds.get(linkId).getId();
+						if(personsToChargerAssignment.get(chargerId)!=null) {
+							personsToChargerAssignment.get(chargerId).add(Id.createPersonId(d.getKey()));
+						}
 					}
-				}
 			}
+			
 		}
 
 		//Pricing scheme generator

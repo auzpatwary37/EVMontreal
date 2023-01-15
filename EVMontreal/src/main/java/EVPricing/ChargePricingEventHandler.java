@@ -1,5 +1,9 @@
 package EVPricing;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -40,6 +44,7 @@ import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleUtils;
 
 import com.google.inject.Inject;
+
 
 /**
  * 
@@ -84,6 +89,8 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	private Map<String,Double> price = new HashMap<>();//Charger type to price 
 	//private Map<String,Set<Id<Person>>> vehicleToPersonMapping = new HashMap<>();
 	
+	private FileWriter fw;
+	
 	@Inject
 	ChargePricingEventHandler(final MatsimServices controler,ChargingInfrastructureSpecification chargingInfrastructure, ElectricFleet data) {
 		this.scenario = controler.getScenario();
@@ -102,6 +109,14 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 				}
 			});
 		});
+		
+		try {
+			fw = new FileWriter(new File(controler.getControlerIO().getIterationFilename(controler.getIterationNumber(), "charging.csv")));
+			fw.append("pId,chargerId,startingTime,EndingTime,duration,charge,cost\n");
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 	
 	@Override
@@ -109,6 +124,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		this.vehicleToPersonMapping.clear();
 		this.vehicleToDistance.clear();
 		this.personLists.clear();
+		
 	}
 
 	@Override
@@ -145,7 +161,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	public void handleEvent(PersonEntersVehicleEvent event) {
 		if(!this.transitVehicles.contains(event.getVehicleId())) {
 			if(!this.vehicleToPersonMapping.containsKey(event.getVehicleId()))this.vehicleToPersonMapping.put(event.getVehicleId(), new HashSet<>());
-			if(!this.fleet.getElectricVehicles().keySet().contains(Id.create(event.getVehicleId().toString(),ElectricVehicle.class)))this.chargePeopleForGasoline(event.getVehicleId(), event.getTime());
+			if(!this.fleet.getElectricVehicles().keySet().contains(Id.create(event.getVehicleId().toString(),ElectricVehicle.class))) {this.chargePeopleForGasoline(event.getVehicleId(), event.getTime());}
 			this.vehicleToPersonMapping.get(event.getVehicleId()).add(event.getPersonId());
 			
 			// if the vehicle did not have anyone
@@ -159,7 +175,10 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		// TODO Auto-generated method stub
 		if(!this.transitVehicles.contains(event.getVehicleId())) {
 			if(!this.fleet.getElectricVehicles().keySet().contains(Id.create(event.getVehicleId().toString(),ElectricVehicle.class))
-					&& this.vehicleToDistance.containsKey(event.getVehicleId()))this.chargePeopleForGasoline(event.getVehicleId(), event.getTime());
+					&& this.vehicleToDistance.containsKey(event.getVehicleId())) {
+				this.chargePeopleForGasoline(event.getVehicleId(), event.getTime());
+			
+			}
 			this.vehicleToPersonMapping.get(event.getVehicleId()).remove(event.getPersonId());
 		}
 	}
@@ -184,7 +203,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	 */
 	void chargePeopleForElectricity(chargingDetails cd,double time) {
 		Id<Vehicle> vId = Id.createVehicleId(cd.v.getId().toString());
-		if(!this.vehicleToPersonMapping.get(vId).isEmpty()){
+		
 			int timeId = (int)(cd.startingTime/3600);
 			if(timeId>23)timeId = timeId-24;
 			double[] pricingProfile = this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getPricingProfile().get(timeId);
@@ -195,9 +214,22 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 				cost+=pricingProfile[i]*(cd.chargeDetails[i]-charge)*2.78e-7;
 				charge=cd.chargeDetails[i];
 			}
-		
+			writeDetails(cd,cost,vId);
+			if((cd.endingTime-cd.startingTime)<599){
+				System.out.println("Error");
+			}
 			this.events.processEvent(new PersonMoneyEvent(time, this.personIdForEV.get(cd.v.getId()), cost, this.ChargingCostName,  cd.charger.toString()+"___"+vId.toString()));
-
+			Person person = scenario.getPopulation().getPersons().get(this.personIdForEV.get(cd.v.getId()));
+			System.out.println();
+	}
+	
+	public synchronized void writeDetails(chargingDetails cd, double cost, Id<Vehicle>vId) {
+		try {
+			fw.append(this.vehicleToPersonMapping.get(vId).toString()+","+cd.toString()+","+cost+"\n");
+			fw.flush();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
 
@@ -233,9 +265,16 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		
 	}
 	
+	
+	
 }
 
 class chargingDetails{
+	public static String arrayToString(double[] a) {
+		String b = "";
+		for(double d:a)b=b+Double.toString(d);
+		return b;
+	}
 
 	public final Id<Charger> charger;
 	public final double startingTime;
@@ -251,5 +290,9 @@ class chargingDetails{
 		this.v =  v;
 		this.initialSoc = v.getBattery().getSoc();
 		chargeDetails = new double[pricingStepSize];
+	}
+	@Override
+	public String toString() {
+		return this.charger+","+this.startingTime+","+this.endingTime+","+(this.endingTime-this.startingTime)+","+this.initialSoc+","+arrayToString(this.chargeDetails);
 	}
 }

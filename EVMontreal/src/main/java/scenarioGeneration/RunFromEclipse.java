@@ -14,7 +14,8 @@ public class RunFromEclipse {
 				"--ts","montreal_transitSchedule.xml",
 				"--facilities","output_facilitiesV1.xml.gz",
 				"--plan","plan.xml",
-				"--evpricing","RunFolder/pricingProfiles.xml"
+				"--evpricing","RunFolder/pricingProfiles.xml",
+				"--thread","10",
 			};
 		RunEVExampleV2.main(args2);
 		

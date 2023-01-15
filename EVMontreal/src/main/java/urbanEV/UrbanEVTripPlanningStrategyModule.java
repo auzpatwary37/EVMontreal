@@ -268,7 +268,8 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			//				});
 			boolean pluginBeforeStart = configGroup.getPluginBeforeStartingThePlan();
 
-			if(pluginBeforeStart && hasHomeCharger(plan.getPerson(), modifiablePlan, evCarLegs, pseudoVehicle) && modifiablePlan.getPlanElements().indexOf(evCarLegs.get(0))==1){ //TODO potentially check for activity duration and/or SoC
+			if(pluginBeforeStart && pseudoVehicle.getBattery().getSoc()/pseudoVehicle.getBattery().getCapacity() <.80 && hasHomeCharger(plan.getPerson(), modifiablePlan, evCarLegs, pseudoVehicle) 
+					&& modifiablePlan.getPlanElements().indexOf(evCarLegs.get(0))==1){ //TODO potentially check for activity duration and/or SoC
 
 				Leg firstEvLeg = evCarLegs.get(0);
 				//				Activity originalActWhileCharging = EditPlans.findRealActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(firstEvLeg));//
@@ -289,6 +290,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 					Activity plugoutTripDestination = findRealOrChargingActAfter(plan, modifiablePlan.getPlanElements().indexOf(plugoutLeg));
 					planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, plugoutTripOrigin, plugoutTripDestination, chargingLink, tripRouter, PlanRouter.calcEndOfActivity(plugoutTripOrigin, modifiablePlan, config));
 				//TODO don't we need to trigger SoC emulation here (in order to account for the energy charged before home actvity is ended?) see also todo-comment below
+					
 				}
 			}
 
@@ -319,12 +321,17 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 						//trip leads to location of the first activity in the plan and there is a charger and so we can charge at home do not search for opportunity charge before
 						Activity actBefore = EditPlansReplan.findRealActBefore(plan, modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC));
 						Activity lastAct = EditPlansReplan.findRealActAfter(plan, modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC));
-						if(!((Activity)modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC)+1)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)) {
+						if(!((Activity)modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC)+1)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) &&
+								pseudoVehicle.getBattery().getSoc()/pseudoVehicle.getBattery().getCapacity()<.85) {
 							Network modeNetwork = this.singleModeNetworksCache.getSingleModeNetworksCache().get(legWithCriticalSOC.getMode());
 							Link chargingLink = modeNetwork.getLinks().get(lastAct.getLinkId());
 							String routingMode = TripStructureUtils.getRoutingMode(legWithCriticalSOC);
 
 							planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, actBefore, lastAct, chargingLink, tripRouter);
+							Activity actEnd = PopulationUtils.createActivity(lastAct);
+							lastAct.setEndTime(config.qsim().getEndTime().seconds()-600);
+							modifiablePlan.addActivity(actEnd);
+							this.planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, lastAct, actEnd, chargingLink, tripRouter, config.qsim().getEndTime().seconds()-600);
 							log.info(plan.getPerson().getId() + " is charging at home.");
 							PersonContainer2 personContainer2 = new PersonContainer2(plan.getPerson().getId(), "is charging at home.");
 							personContainer2s.add(personContainer2);
@@ -701,6 +708,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		Activity pluginAct =PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
 				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);
 //		Activity pluginAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER, chargingLink.getCoord());
+		pluginAct.setStartTime(now);
 		pluginAct.setLinkId(chargingLink.getId());
 		pluginAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER).getTypicalDuration().seconds());
 		
@@ -898,7 +906,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	 * @param chargingLink
 	 * @param tripRouter
 	 */
-	protected void planPluginTripFromHomeToCharger(Plan plan, String routingMode, ElectricVehicleSpecification electricVehicleSpecification,Activity actWhileCharging, Link chargingLink, TripRouter tripRouter) {
+	protected double planPluginTripFromHomeToCharger(Plan plan, String routingMode, ElectricVehicleSpecification electricVehicleSpecification,Activity actWhileCharging, Link chargingLink, TripRouter tripRouter) {
 		PopulationFactory factory = scenario.getPopulation().getFactory();
 		Facility fromFacility = FacilitiesUtils.toFacility(actWhileCharging, scenario.getActivityFacilities());
 		Facility chargerFacility = new LinkWrapperFacility(chargingLink);
@@ -908,7 +916,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		Activity newFirstAct = factory.createActivityFromLinkId(actWhileCharging.getType(), actWhileCharging.getLinkId());
 		newFirstAct.setEndTime(0);
 		double now = 0;
-		TripRouter.calcEndOfPlanElement(now, newFirstAct, config);
+		//TripRouter.calcEndOfPlanElement(now, newFirstAct, config);
 		plan.getPlanElements().add(0, newFirstAct);
 
 
@@ -931,20 +939,23 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);//This is how to add a aplugin activity
 		pluginAct.setLinkId(chargingLink.getId());
 		pluginAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER).getTypicalDuration().seconds());
-		now = TripRouter.calcEndOfPlanElement(now, pluginAct, config);
 		pluginAct.setStartTime(now);
+		now = TripRouter.calcEndOfPlanElement(now, pluginAct, config);
+		pluginAct.setEndTime(now);
 		plan.getPlanElements().add(2, pluginAct);
 		TripRouter.insertTrip(plan, newFirstAct,routeToCharger,pluginAct);
 		//add walk leg to destination
 		List<? extends PlanElement> routeFromChargerToAct = tripRouter.calcRoute(TransportMode.walk, chargerFacility, toFacility,
-				PlanRouter.calcEndOfActivity(newFirstAct, plan, config), plan.getPerson());
+				now, plan.getPerson());
 		int indexRouteFromChargerToAct = plan.getPlanElements().indexOf(pluginAct) + 1;
 		plan.getPlanElements().add(indexRouteFromChargerToAct, routeFromChargerToAct.get(0));
 		now = TripRouter.calcEndOfPlanElement(now, routeFromChargerToAct.get(0), config);
 		plan.getPlanElements().add(indexRouteFromChargerToAct+1, actWhileCharging);
 		actWhileCharging.setStartTime(now);
+		actWhileCharging.setEndTime(PopulationUtils.decideOnActivityEndTime(actWhileCharging, now, config).seconds());
 		Leg egress = (Leg) routeFromChargerToAct.get(0);
 		TripStructureUtils.setRoutingMode(egress, routingMode);
+		return now;
 	}
 
 	protected Boolean isHomeChargingTrip(Plan modifiablePlan, List<Leg> evLegs, ElectricVehicle ev) {
@@ -1039,6 +1050,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		plugOutAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER).getTypicalDuration().seconds());
 		
 		trip.add(plugOutAct);
+		plugOutAct.setStartTime(now);
 		now = TripRouter.calcEndOfPlanElement(now, plugOutAct, config);
 
 		//add leg to destination
@@ -1059,14 +1071,79 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 		//insert trip
 		TripRouter.insertTrip(plan, origin, trip, destination);
-
+		destination.setStartTime(now);
 		//reset activity end time
 		if (!plan.getPlanElements().get(plan.getPlanElements().size() - 1).equals(destination)) {
 			destination.setEndTime(PopulationUtils.decideOnActivityEndTime(destination, now, config).seconds());
 		}
 	}
 	
-	
+	/**
+	 * 
+	 * @param plan
+	 * @param routingMode is the mode of the ev
+	 * @param electricVehicleSpecification
+	 * @param origin the location of the activity before the ev leg
+	 * @param destination the location of the activity after the ev leg
+	 * @param chargingLink 
+	 * @param tripRouter
+	 * @param now is the time the origin activity finishes
+	 */
+	protected void planPlugoutTripAtTheEnd(Plan plan, String routingMode, ElectricVehicleSpecification electricVehicleSpecification, Activity origin, Activity destination, Link chargingLink, TripRouter tripRouter, double now) {
+		Facility fromFacility = FacilitiesUtils.toFacility(origin, scenario.getActivityFacilities());
+		Facility chargerFacility = new LinkWrapperFacility(chargingLink);
+		Facility toFacility = FacilitiesUtils.toFacility(destination, scenario.getActivityFacilities());
+
+		List<? extends PlanElement> routedSegment;
+		//actually destination can not be null based on how we determine the actWhileCharging = origin at the moment...
+		if (destination == null) throw new RuntimeException("should not happen");
+
+		List<PlanElement> trip = new ArrayList<>();
+
+		//add leg to charger
+		routedSegment = tripRouter.calcRoute(TransportMode.walk, fromFacility, chargerFacility,
+				now, plan.getPerson());
+		Leg accessLeg = (Leg) routedSegment.get(0);
+		now = TripRouter.calcEndOfPlanElement(now, accessLeg, config);
+		TripStructureUtils.setRoutingMode(accessLeg, routingMode);//TODO: Should not the routing mode here be walk???
+		trip.add(accessLeg);
+
+		//add plugout act
+		
+		Activity plugOutAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
+				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);// this is how to plan a plugout activity
+		//Activity plugOutAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER, chargingLink.getCoord());
+		plugOutAct.setLinkId(chargingLink.getId());
+		plugOutAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER).getTypicalDuration().seconds());
+		
+		trip.add(plugOutAct);
+		plugOutAct.setStartTime(now);
+		now = TripRouter.calcEndOfPlanElement(now, plugOutAct, config);
+
+		//add leg to destination
+		routedSegment = tripRouter.calcRoute(routingMode, chargerFacility, toFacility, now, plan.getPerson());
+		trip.addAll(routedSegment);
+
+		for (PlanElement element : routedSegment) {
+			now = TripRouter.calcEndOfPlanElement(now, element, config);
+			//insert vehicle id
+			if(element instanceof Leg){
+				Leg leg = (Leg) element;
+				if(leg.getMode().equals(routingMode)){
+					NetworkRoute route = ((NetworkRoute) leg.getRoute());
+					if(route.getVehicleId() == null) route.setVehicleId(Id.createVehicleId(electricVehicleSpecification.getId()));
+				}
+			}
+		}
+
+		//insert trip
+		TripRouter.insertTrip(plan, origin, trip, destination);
+		destination.setStartTime(now);
+		//reset activity end time
+		if (!plan.getPlanElements().get(plan.getPlanElements().size() - 1).equals(destination)) {
+			destination.setEndTime(PopulationUtils.decideOnActivityEndTime(destination, now, config).seconds());
+		}
+	}
 
 }
 
