@@ -312,8 +312,8 @@ public class Tutorial {
 				Id<Link> linkId = NetworkUtils.getNearestRightEntryLink(net, d.getValue()).getId();
 				double m = Math.random();
 				
-				if(!chargerLinkIds.containsKey(linkId)&& m<homeChargerPercentage) {
-						
+				if(!chargerLinkIds.containsKey(linkId)) {
+					if(m<homeChargerPercentage) {
 					ChargerSpecification c = ImmutableChargerSpecification.newBuilder()
 							.id(Id.create(d.getKey()+"_home", Charger.class))
 							.linkId(linkId)
@@ -327,6 +327,7 @@ public class Tutorial {
 					csp.addChargerSpecification(c);
 					chargerCoord.put(c.getId(),d.getValue());
 					chargerLinkIds.put(linkId, c);
+					}
 					}else{
 						Id<Charger> chargerId = chargerLinkIds.get(linkId).getId();
 						if(personsToChargerAssignment.get(chargerId)!=null) {
