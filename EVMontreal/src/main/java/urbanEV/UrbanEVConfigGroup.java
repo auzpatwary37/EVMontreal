@@ -64,7 +64,7 @@ public class UrbanEVConfigGroup extends ReflectiveConfigGroup {
      */
     private Set<String> whileChargingActivityTypes = new HashSet<>();
 
-    private double maxDistanceBetweenActAndCharger_m = 5000;
+    private double maxDistanceBetweenActAndCharger_m = 500;
     /**
      * determines the maximum distance between act while charging and charger
      */

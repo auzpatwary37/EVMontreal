@@ -218,7 +218,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 			if((cd.endingTime-cd.startingTime)<599){
 				System.out.println("Error");
 			}
-			this.events.processEvent(new PersonMoneyEvent(time, this.personIdForEV.get(cd.v.getId()), cost, this.ChargingCostName,  cd.charger.toString()+"___"+vId.toString()));
+			//this.events.processEvent(new PersonMoneyEvent(time, this.personIdForEV.get(cd.v.getId()), cost, this.ChargingCostName,  cd.charger.toString()+"___"+vId.toString()));
 			Person person = scenario.getPopulation().getPersons().get(this.personIdForEV.get(cd.v.getId()));
 			System.out.println();
 	}

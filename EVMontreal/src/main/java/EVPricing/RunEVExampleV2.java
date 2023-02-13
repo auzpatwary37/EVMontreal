@@ -45,7 +45,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--config"}, description = {"Optional Path to config file to load."}, defaultValue = "config.xml")
   private String config;
   
-  @Option(names = {"--plan"}, description = {"Optional Path to plan file to load."}, defaultValue = "prepared_plan.xml.gz")
+  @Option(names = {"--plan"}, description = {"Optional Path to plan file to load."}, defaultValue = "plan.xml")
   private String planFile;
   
   @Option(names = {"--network"}, description = {"Optional Path to network file to load."}, defaultValue = "montreal_network.xml.gz")
@@ -60,7 +60,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--facilities"}, description = {"Optional Path to facilities file to load."}, defaultValue = "montreal_facilities.xml.gz")
   private String facilitiesFileLoc;
   
-  @Option(names = {"--lastiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "250")
+  @Option(names = {"--lastiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "50")
   private int maxIterations;
   
   @Option(names = {"--firstiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "0")
@@ -72,25 +72,25 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "0.05")
   private Double scale;
   
-  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/")
+  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/DUMB")
   private String output;
   
   @Option(names = {"--charger"}, description = {"Charger file location"}, defaultValue = "charger.xml")
   private String chargerFile;
   
-  @Option(names = {"--vehicles"}, description = {"Vehicles file"}, defaultValue = "vehicles.xml")
+  @Option(names = {"--vehicles"}, description = {"Vehicles file"}, defaultValue = "vehicle.xml")
   private String vehicleFile;
   
-  @Option(names = {"--evehicle"}, description = {"Electric vehicle file"}, defaultValue = "evehicles.xml")
+  @Option(names = {"--evehicle"}, description = {"Electric vehicle file"}, defaultValue = "evehicle.xml")
   private String evehicleFile;
   
   @Option(names = {"--evpricing"}, description = {"Charger pricing file location"}, defaultValue = "pricingProfiles.xml")
   private String pricingEVFile;
   
-  @Option(names = {"--distanceForCharger"}, description = {"Maximum search radius for charger around activity"}, defaultValue = "500.")
+  @Option(names = {"--distanceForCharger"}, description = {"Maximum search radius for charger around activity"}, defaultValue = "1000.")
   private Double chargerDist;
   
-  @Option(names = {"--thread"}, description = {"No of thread"}, defaultValue = "1")
+  @Option(names = {"--thread"}, description = {"No of thread"}, defaultValue = "10")
   private int thread;
   
   public static void main(String[] args) {
@@ -130,7 +130,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(true);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(chargerDist);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaximumChargingProceduresPerAgent(2);
-	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.25);
+	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.2);
 	((EvConfigGroup)config.getModules().get("ev")).setChargersFile(this.chargerFile);
 	((EvConfigGroup)config.getModules().get("ev")).setVehiclesFile(this.evehicleFile);
 	
@@ -265,7 +265,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 					bind(ChargePricingEventHandler.class).asEagerSingleton();
 					//addMobsimScopeEventHandlerBinding().to(VehicleChargingHandler.class);
 					
-					//addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
+					addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
 					this.addQSimComponentBinding(EvModule.EV_COMPONENT).to(ChargePricingEventHandler.class);
 				}
 				

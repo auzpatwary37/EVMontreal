@@ -55,6 +55,7 @@ import org.matsim.core.router.StageActivityTypeIdentifier;
 import org.matsim.core.router.TripRouter;
 import org.matsim.core.router.TripStructureUtils;
 import org.matsim.core.router.util.TravelTime;
+import org.matsim.core.utils.misc.OptionalTime;
 import org.matsim.facilities.ActivityFacility;
 import org.matsim.facilities.FacilitiesUtils;
 import org.matsim.facilities.Facility;
@@ -126,6 +127,9 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	
 	protected static final Logger log = Logger.getLogger(UrbanEVTripPlanningStrategyModule.class);
 	protected static List<PersonContainer2> personContainer2s = new ArrayList<>();
+	private boolean ifDumbCharing = false;
+	private double dumbChargingStartTime = 9*3600;
+	private double dumbChargingEndTime = 15*3600;
 
 	@Override
 	public void prepareReplanning(ReplanningContext replanningContext) {
@@ -145,6 +149,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	 * @return
 	 */
 	
+
 	private boolean hasCharging(Plan plan) {
 		
 		for(PlanElement pe:plan.getPlanElements()) {
@@ -266,9 +271,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			//			TripStructureUtils.getLegs(modifiablePlan).stream().forEach(l->{
 			//				if(l.getMode().equals(TransportMode.car))evCarLegs.add(l);
 			//				});
-			boolean pluginBeforeStart = configGroup.getPluginBeforeStartingThePlan();
 
-			if(pluginBeforeStart && pseudoVehicle.getBattery().getSoc()/pseudoVehicle.getBattery().getCapacity() <.80 && hasHomeCharger(plan.getPerson(), modifiablePlan, evCarLegs, pseudoVehicle) 
+			
+			boolean pluginBeforeStart = configGroup.getPluginBeforeStartingThePlan();
+			if(pluginBeforeStart && pseudoVehicle.getBattery().getSoc()/pseudoVehicle.getBattery().getCapacity() <.50 && hasHomeCharger(plan.getPerson(), modifiablePlan, evCarLegs, pseudoVehicle) 
 					&& modifiablePlan.getPlanElements().indexOf(evCarLegs.get(0))==1){ //TODO potentially check for activity duration and/or SoC
 
 				Leg firstEvLeg = evCarLegs.get(0);
@@ -277,10 +283,13 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				Activity actWhileCharging = (Activity) modifiablePlan.getPlanElements().get(0);
 				int indFirstEvLeg=  modifiablePlan.getPlanElements().indexOf(firstEvLeg);
 				actWhileCharging =  EditPlansReplan.findRealActBefore(plan,indFirstEvLeg);// comment this line out TODO: figure out this line 
+
+				
 				if(((Activity)modifiablePlan.getPlanElements().get(indFirstEvLeg+1)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)
 						&& ifSameAct((Activity)modifiablePlan.getPlanElements().get(indFirstEvLeg+3),actWhileCharging)){// Already replanned before 
-							log.info("Already have a home charging trip. Skipping.");
-				}else {
+							log.info("Already have a home charging trip. Skipping.");				
+				
+				} else {
 					Network modeNetwork = this.singleModeNetworksCache.getSingleModeNetworksCache().get(firstEvLeg.getMode());
 					Link chargingLink = modeNetwork.getLinks().get(actWhileCharging.getLinkId());
 					String routingMode = TripStructureUtils.getRoutingMode(firstEvLeg);
@@ -340,6 +349,34 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 						
 
 					} else if( evLegs.get(evLegs.size()-1).equals(legWithCriticalSOC) && pseudoVehicle.getBattery().getSoc() > capacityThreshold ){
+						
+						if(this.ifDumbCharing) {
+							int i = 0;
+							for (PlanElement pel: new ArrayList <> (modifiablePlan.getPlanElements())) {
+								if (pel instanceof Activity && ((Activity) pel).getStartTime().isDefined() && !pel.equals(modifiablePlan.getPlanElements().get(0)) && !pel.equals(modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().size()-1)) && ((Activity) pel).getStartTime().seconds() >= this.dumbChargingStartTime && ((Activity) pel).getStartTime().seconds() <= this.dumbChargingEndTime) {
+									if (!((Activity) pel).getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER) && !((Activity) pel).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)) {
+										if(i>1 && !((Activity) modifiablePlan.getPlanElements().get(i-2)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)) {
+											Activity pluginTripOrigin = findRealOrChargingActBefore(modifiablePlan, modifiablePlan.getPlanElements().indexOf((Activity) pel));
+											Activity plugoutTripDestination = findRealOrChargingActAfter(modifiablePlan, modifiablePlan.getPlanElements().indexOf((Activity) pel));
+											String routingMode = TripStructureUtils.getRoutingMode(evLegs.get(0)); //can be an error that the leg before the activity is not an ev leg
+											Network modeNetwork = this.singleModeNetworksCache.getSingleModeNetworksCache().get(evLegs.get(0).getMode());
+											ChargerSpecification selectedCharger = selectChargerNearToLink(modifiablePlan.getPerson().getId(),((Activity) pel).getLinkId(), electricVehicleSpecification, modeNetwork, ((Activity) pel).getStartTime().seconds());
+											if(selectedCharger != null) {
+											Link chargingLink = modeNetwork.getLinks().get(selectedCharger.getLinkId());
+											planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, pluginTripOrigin, (Activity) pel, chargingLink, tripRouter);
+											planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, (Activity) pel, plugoutTripDestination, chargingLink, tripRouter, PlanRouter.calcEndOfActivity((Activity) pel, modifiablePlan, config));
+											cnt --;
+											break;
+												}
+											}
+									}
+								
+								}
+								i++;
+							}
+						}
+						
+						
 						cnt = 0;
 
 					} else {
@@ -360,9 +397,11 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		}
 		if(!isConsistant(modifiablePlan) ||!checkPlanConsistancy(modifiablePlan)) {
 			System.out.println("Plan is not consistant!!! Debug!!!");
-		}
+		
 	
 	}
+	
+			}
 	
 	public static boolean ifSameAct(Activity act1, Activity act2) {
 		if(act1.getType().equals(act2.getType())&&act1.getLinkId().equals(act2.getLinkId())) {
@@ -435,7 +474,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			}
 			int ind = generateRandom(0,actWhileChargingList.size()-1,allreadyChecked);
 			allreadyChecked.add(ind);
-			selectedCharger = selectChargerNearToLink(modifiablePlan.getPerson().getId(),actWhileChargingList.get(ind).getLinkId(), electricVehicleSpecification, modeNetwork);
+			selectedCharger = selectChargerNearToLink(modifiablePlan.getPerson().getId(),actWhileChargingList.get(ind).getLinkId(), electricVehicleSpecification, modeNetwork, actWhileChargingList.get(ind).getStartTime().seconds());
 			
 			if(selectedCharger == null){
 
@@ -636,6 +675,53 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				.stream()
 				.filter(charger -> vehicleSpecification.getChargerTypes().contains(charger.getChargerType()))
 				.filter(c->this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().isEmpty()||this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().contains(pId))
+				.collect(Collectors.toList());
+
+		//		List<ChargerSpecification> chargerList = new ArrayList<>();
+		//		chargingInfrastructureSpecification.getChargerSpecifications()
+		//		.values()
+		//		.stream().forEach(c->{
+		//			if(vehicleSpecification.getChargerTypes().contains(c.getChargerType()) && 
+		//					(this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().isEmpty() ||
+		//							this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().contains(pId))) {
+		//				chargerList.add(c);
+		//			}
+		//		});
+
+		StraightLineKnnFinder<Link, ChargerSpecification> straightLineKnnFinder = new StraightLineKnnFinder<>(
+				6, l -> l.getFromNode().getCoord(), s -> network.getLinks().get(s.getLinkId()).getToNode().getCoord()); //TODO get closest X chargers and choose randomly?
+		List<ChargerSpecification> nearestChargers = straightLineKnnFinder.findNearest(network.getLinks().get(linkId),chargerList.stream());
+		List<ChargerSpecification>nearestChargersWithinLimit = nearestChargers.stream().filter(c->NetworkUtils.getEuclideanDistance(network.getLinks().get(linkId).getCoord(), network.getLinks().get(c.getLinkId()).getCoord())<maxDistanceToAct).collect(Collectors.toList()); 
+		if (nearestChargersWithinLimit.isEmpty()) {
+			//throw new RuntimeException("no charger could be found for vehicle type " + vehicleSpecification.getVehicleType());
+			return null;
+		}
+		//double distanceFromActToCharger = NetworkUtils.getEuclideanDistance(network.getLinks().get(linkId).getToNode().getCoord(), network.getLinks().get(nearestChargers.get(0).getLinkId()).getToNode().getCoord());
+		//		if (distanceFromActToCharger >= maxDistanceToAct) {
+		//			return null;
+		//		}
+		//			//throw new RuntimeException("There are no chargers within 1000m");
+		//			log.warn("Charger out of range. Inefficient charging " + NetworkUtils.getEuclideanDistance(network.getLinks().get(linkId).getToNode().getCoord(), network.getLinks().get(nearestChargers.get(0).getLinkId()).getToNode().getCoord()));
+		//		}
+		else{
+			int rand = MatsimRandom.getRandom().nextInt(nearestChargersWithinLimit.size());//These two lines applies random charger selection. Delete these two lines and uncomment the commented line to get back to the original version. 
+			return nearestChargersWithinLimit.get(rand);
+			//return nearestChargers.get(0);
+
+		}
+	}
+	
+	protected ChargerSpecification selectChargerNearToLink(Id<Person>pId, Id<Link> linkId, ElectricVehicleSpecification vehicleSpecification, Network network, double time) {
+
+		UrbanEVConfigGroup configGroup = (UrbanEVConfigGroup) config.getModules().get(UrbanEVConfigGroup.GROUP_NAME);
+		double maxDistanceToAct = configGroup.getMaxDistanceBetweenActAndCharger_m();
+
+		List<ChargerSpecification> chargerList = chargingInfrastructureSpecification.getChargerSpecifications()
+				.values()
+				.stream()
+				.filter(charger -> vehicleSpecification.getChargerTypes().contains(charger.getChargerType()))
+				.filter(c->this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().isEmpty()||this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().contains(pId))
+				.filter(c->this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getChargerSwitch().get((int) (time/3600)))
 				.collect(Collectors.toList());
 
 		//		List<ChargerSpecification> chargerList = new ArrayList<>();
@@ -1157,3 +1243,4 @@ this.personId = personId;
 this.reason = reason;
 }
 }
+

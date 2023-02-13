@@ -27,6 +27,7 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.network.Node;
 import org.matsim.api.core.v01.population.Activity;
+import org.matsim.api.core.v01.population.Leg;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.PlanElement;
 import org.matsim.api.core.v01.population.Population;
@@ -92,13 +93,13 @@ public class Tutorial {
 	public static void main(String[] args){
 
 		//Inputs
-		double evPercentage = 0.1; // Percentage of cars to take as EV
+		double evPercentage = 0.3; // Percentage of cars to take as EV
 		boolean assignChargersToEveryone = true;
 		double homeChargerPercentage = 0.5;
 
 		String configIn = "config_with_calibrated_parameters.xml";// input MATSim Montreal Config without ev
-		String planInput = "newData/output_plans.xml.gz";// Population file without EV
-		String networkInput = "newData/montreal_network.xml.gz";// Input Network File
+		String planInput = "prepared_population.xml.gz";// Population file without EV
+		String networkInput = "montreal_network.xml.gz";// Input Network File
 		String chargerFileInput = "cleaned_station.csv";//Charger file with exactly same headers as given to me by Arsham but in .csv format. Save the excel as csv and input its file location
 
 		String planOutput = "Output/plan.xml"; // Saving location of the EV included population
@@ -110,23 +111,23 @@ public class Tutorial {
 		String resultOut = "Output";
 		String pricingProfileOutputLoc = "Output/pricingProfiles.xml";
 
-		double BatteryCapMin = 30; // Min Battery capacity
-		double BatteryCapMax = 50;// Max Battery Capacity
+		double BatteryCapMin = 10; // Min Battery capacity
+		double BatteryCapMax = 30;// Max Battery Capacity
 		//put the min and max same to make capacity non random
 
-		double socMIn = 20; // Min initial soc level.
-		double chargeAtStartOfDayAboveSocMin = 5;
-		boolean multipleZone = true;// set this to false for one zone and true for multiple zones
+		double socMIn = 7; // Min initial soc level.
+		double chargeAtStartOfDayAboveSocMin = 1;
+		boolean multipleZone = false;// set this to false for one zone and true for multiple zones
 		String zoneFile = "zones.csv";// Modify zones details in this file (zoneId,X,Y,PricingMultiplier) do not change the header in the file, just the values 
 	
 
 		//ChargerTypes and power
 
 		Map<String,Double> cp = new HashMap<>();
-		cp.put("Level 1", 50.);
-		cp.put("Level 2", 70.);
-		cp.put("Fast", 100.);
-		cp.put("home",11.5);
+		cp.put("Level 1", 5.);
+		cp.put("Level 2", 20.);
+		cp.put("Fast", 50.);
+		cp.put("home", 5.);
 
 		//____________________________________________________
 		
@@ -260,49 +261,59 @@ public class Tutorial {
 			String cc = (String) p.getValue().getAttributes().getAttribute("carAvail");
 
 			if(cc.equals("always") && p.getValue().getSelectedPlan().getPlanElements().size()>1) {// have cars and have at least one leg 
-				if(Math.random()<=evPercentage) {
-					Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), ev1);// create ev vehicle in the vehicles file.
-					Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
-					vMap.put(v.getId(), v);
-					vs.addVehicle(v);
-					
-					//Create vehicle in the ElectricVehicle file
-					Double b = (BatteryCapMin+(BatteryCapMax-BatteryCapMin)*random.nextDouble())*36e5;
-					Double c = socMIn*36e5+(b-socMIn*36e5)*random.nextDouble();
-					ElectricVehicleSpecification s = ImmutableElectricVehicleSpecification.newBuilder()
-							.id(Id.create(p.getKey().toString(), ElectricVehicle.class))
-							.batteryCapacity(b.intValue())
-							.initialSoc(c.intValue())
-							.chargerTypes(ImmutableList.copyOf(cp.keySet()))
-							.vehicleType(ev1.getId().toString())
-							.build();
-					
-					sp.addVehicleSpecification(s);
-					// Now insert a charger at the home location. 
-					p.getValue().getSelectedPlan().getPlanElements().stream().filter(pp->pp instanceof Activity)
-					.filter(a->((Activity)a).getType().equals("home")).forEach(a->homeChargerLocations.put(p.getKey().toString(),((Activity)a).getCoord()));
-					
-					// check if have access to at least one charger
-					Set<Id<Link>> actLinkIds = new HashSet<>();
-					p.getValue().getSelectedPlan().getPlanElements().stream().filter(pp->pp instanceof Activity)
-					.forEach(a->actLinkIds.add(((Activity)a).getLinkId()));
-					boolean haveAccessToCharger = false;
-					for(Id<Link> lIds:actLinkIds) {
-						if(chargerLinkIds.containsKey(lIds)) {
-							haveAccessToCharger = true;
-							break;
+				for(PlanElement pl:p.getValue().getSelectedPlan().getPlanElements()){
+					if(pl instanceof Leg) {
+						Leg leg = (Leg) pl;
+						if (leg.getMode().equals("car")) {
+							if(Math.random()<=evPercentage) {
+								Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), ev1);// create ev vehicle in the vehicles file.
+								Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
+								vMap.put(v.getId(), v);
+								vs.addVehicle(v);
+								
+								//Create vehicle in the ElectricVehicle file
+								Double b = (BatteryCapMin+(BatteryCapMax-BatteryCapMin)*random.nextDouble())*36e5;
+								Double c = socMIn*36e5+(b-socMIn*36e5)*random.nextDouble();
+								ElectricVehicleSpecification s = ImmutableElectricVehicleSpecification.newBuilder()
+										.id(Id.create(p.getKey().toString(), ElectricVehicle.class))
+										.batteryCapacity(b.intValue())
+										.initialSoc(c.intValue())
+										.chargerTypes(ImmutableList.copyOf(cp.keySet()))
+										.vehicleType(ev1.getId().toString())
+										.build();
+								
+								sp.addVehicleSpecification(s);
+								// Now insert a charger at the home location. 
+								p.getValue().getSelectedPlan().getPlanElements().stream().filter(pp->pp instanceof Activity)
+								.filter(a->((Activity)a).getType().equals("home")).forEach(a->homeChargerLocations.put(p.getKey().toString(),((Activity)a).getCoord()));
+								
+								// check if have access to at least one charger
+								Set<Id<Link>> actLinkIds = new HashSet<>();
+								p.getValue().getSelectedPlan().getPlanElements().stream().filter(pp->pp instanceof Activity)
+								.forEach(a->actLinkIds.add(((Activity)a).getLinkId()));
+								boolean haveAccessToCharger = false;
+								for(Id<Link> lIds:actLinkIds) {
+									if(chargerLinkIds.containsKey(lIds)) {
+										haveAccessToCharger = true;
+										break;
+									}
+								}
+//								if(haveAccessToCharger == false) {
+//									homeChargerLocations.put(p.getKey().toString(), ((Activity)p.getValue().getSelectedPlan().getPlanElements().get(0)).getCoord());
+//								}
+								
+							}else {
+								Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), noEV);// Create a non EV vehicle
+								Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
+								vMap.put(v.getId(), v);
+								vs.addVehicle(v);
+							}
+							break;	
 						}
+						
 					}
-//					if(haveAccessToCharger == false) {
-//						homeChargerLocations.put(p.getKey().toString(), ((Activity)p.getValue().getSelectedPlan().getPlanElements().get(0)).getCoord());
-//					}
-					
-				}else {
-					Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), noEV);// Create a non EV vehicle
-					Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
-					vMap.put(v.getId(), v);
-					vs.addVehicle(v);
 				}
+
 			}
 		});
 		Map<Id<Charger>,Set<Id<Person>>> personsToChargerAssignment = new HashMap<>();
@@ -319,7 +330,7 @@ public class Tutorial {
 							.linkId(linkId)
 							.chargerType("home")
 							.plugCount(1)
-							.plugPower(1000 * 11.5)
+							.plugPower(1000 * cp.get("home"))
 							.build();
 					Set<Id<Person>> pSet= new HashSet<>();
 					pSet.add(Id.createPersonId(d.getKey()));
