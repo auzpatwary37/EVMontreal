@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
+import org.matsim.api.core.v01.events.Event;
 import org.matsim.api.core.v01.events.LinkLeaveEvent;
 import org.matsim.api.core.v01.events.PersonEntersVehicleEvent;
 import org.matsim.api.core.v01.events.PersonLeavesVehicleEvent;
@@ -39,7 +40,9 @@ import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.controler.MatsimServices;
 import org.matsim.core.events.MobsimScopeEventHandler;
 import org.matsim.core.mobsim.framework.events.MobsimAfterSimStepEvent;
+import org.matsim.core.mobsim.framework.events.MobsimBeforeSimStepEvent;
 import org.matsim.core.mobsim.framework.listeners.MobsimAfterSimStepListener;
+import org.matsim.core.mobsim.framework.listeners.MobsimBeforeSimStepListener;
 import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleUtils;
 
@@ -58,10 +61,10 @@ import com.google.inject.Inject;
  */
 
 public class ChargePricingEventHandler implements ChargingStartEventHandler, ChargingEndEventHandler, LinkLeaveEventHandler,TransitDriverStartsEventHandler,
-PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTrafficEventHandler,VehicleLeavesTrafficEventHandler, MobsimScopeEventHandler, MobsimAfterSimStepListener{
+PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTrafficEventHandler,VehicleLeavesTrafficEventHandler, MobsimScopeEventHandler, MobsimAfterSimStepListener,MobsimBeforeSimStepListener{
 	
 
-	
+	private Set<Event> queuedEvents = new HashSet<>();
 	private ChargingInfrastructureSpecification chargingInfrastructure;
 	
 	
@@ -215,12 +218,14 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 				charge=cd.chargeDetails[i];
 			}
 			writeDetails(cd,cost,vId);
-			if((cd.endingTime-cd.startingTime)<599){
-				System.out.println("Error");
-			}
-			//this.events.processEvent(new PersonMoneyEvent(time, this.personIdForEV.get(cd.v.getId()), cost, this.ChargingCostName,  cd.charger.toString()+"___"+vId.toString()));
-			Person person = scenario.getPopulation().getPersons().get(this.personIdForEV.get(cd.v.getId()));
-			System.out.println();
+//			if((cd.endingTime-cd.startingTime)<599){
+//				System.out.println("Error");
+//			}
+			
+//			Person person = scenario.getPopulation().getPersons().get(this.personIdForEV.get(cd.v.getId()));
+			this.queuedEvents.add(new PersonMoneyEvent(time, this.personIdForEV.get(cd.v.getId()), cost, this.ChargingCostName,  cd.charger.toString()+"___"+vId.toString()));
+			
+			//System.out.println();
 	}
 	
 	public synchronized void writeDetails(chargingDetails cd, double cost, Id<Vehicle>vId) {
@@ -261,6 +266,18 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 				if(o>=cd.chargeDetails.length)o = cd.chargeDetails.length-1;
 				cd.chargeDetails[o] = cd.v.getBattery().getSoc();
 			}
+		}
+		
+	}
+
+	@Override
+	public void notifyMobsimBeforeSimStep(MobsimBeforeSimStepEvent e) {
+		if(!this.queuedEvents.isEmpty()) {
+			this.queuedEvents.stream().forEach(ee->{
+				ee.setTime(e.getSimulationTime());
+				this.events.processEvent(ee);
+			});
+			this.queuedEvents.clear();
 		}
 		
 	}
