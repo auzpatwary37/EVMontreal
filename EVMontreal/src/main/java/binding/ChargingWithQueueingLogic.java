@@ -23,13 +23,14 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.Scenario;
+import org.matsim.api.core.v01.population.Person;
 import org.matsim.contrib.ev.charging.ChargingEndEvent;
 import org.matsim.contrib.ev.charging.ChargingListener;
 import org.matsim.contrib.ev.charging.ChargingLogic;
@@ -43,16 +44,18 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 	private final ChargerSpecification charger;
 	private final ChargingStrategy chargingStrategy;
 	private final EventsManager eventsManager;
+	private final Scenario scenario;
 
 	private final Map<Id<ElectricVehicle>, ElectricVehicle> pluggedVehicles = Collections.synchronizedMap(new LinkedHashMap<>());
 	private final Queue<ElectricVehicle> queuedVehicles = new ConcurrentLinkedQueue<>();
 	private final Map<Id<ElectricVehicle>, ChargingListener> listeners = Collections.synchronizedMap(new LinkedHashMap<>());
 
 	public ChargingWithQueueingLogic(ChargerSpecification charger, ChargingStrategy chargingStrategy,
-			EventsManager eventsManager) {
+			EventsManager eventsManager, Scenario scenario) {
 		this.chargingStrategy = Objects.requireNonNull(chargingStrategy);
 		this.charger = Objects.requireNonNull(charger);
 		this.eventsManager = Objects.requireNonNull(eventsManager);
+		this.scenario = scenario;
 	}
 
 	@Override
@@ -66,8 +69,9 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 
 			if (chargingStrategy.isChargingCompleted(ev)) {
 				evIter.remove();
-				ChargingEndEvent event = new ChargingEndEvent(now, charger.getId(), ev.getId());
-				event.getAttributes().put("when", "whileCharging");
+				Person person = scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString()));
+				ChargingEndEvent event = new ChargingEndEventUrbanEv(now, charger.getId(), ev.getId(),person);
+				scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString())).getAttributes().putAttribute("charginatLogicIndicator", false);
 				eventsManager.processEvent(event);
 				listeners.remove(ev.getId()).notifyChargingEnded(ev, now);
 			}
@@ -100,8 +104,8 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 	@Override
 	public void removeVehicle(ElectricVehicle ev, double now) {
 		if (pluggedVehicles.remove(ev.getId()) != null) {// successfully removed
-			ChargingEndEvent event = new ChargingEndEvent(now, charger.getId(), ev.getId());
-			event.getAttributes().put("when", "ActivityEnd");
+			ChargingEndEvent event = new ChargingEndEventUrbanEv(now, charger.getId(), ev.getId(),scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString())));
+			scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString())).getAttributes().putAttribute("charginatLogicIndicator", false);
 			eventsManager.processEvent(event);
 			listeners.remove(ev.getId()).notifyChargingEnded(ev, now);
 
@@ -124,7 +128,8 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 		if (pluggedVehicles.put(ev.getId(), ev) != null) {
 			throw new IllegalArgumentException();
 		}
-		eventsManager.processEvent(new ChargingStartEvent(now, charger.getId(), ev.getId(), charger.getChargerType()));
+		eventsManager.processEvent(new ChargingStartEventUrbanEv(now, charger.getId(), ev.getId(), charger.getChargerType(),scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString()))));
+		scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString())).getAttributes().putAttribute("charginatLogicIndicator", true);
 		listeners.get(ev.getId()).notifyChargingStarted(ev, now);
 	}
 

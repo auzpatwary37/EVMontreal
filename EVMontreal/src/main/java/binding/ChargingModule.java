@@ -20,6 +20,7 @@ package binding;
  */
 
 
+import org.matsim.api.core.v01.Scenario;
 import org.matsim.contrib.ev.EvModule;
 import org.matsim.contrib.ev.charging.ChargeUpToMaxSocStrategy;
 import org.matsim.contrib.ev.charging.ChargingHandler;
@@ -42,11 +43,14 @@ public class ChargingModule extends AbstractModule {
 		bind(ChargingLogic.Factory.class).toProvider(new Provider<>() {
 			@Inject
 			private EventsManager eventsManager;
+			
+			@Inject
+			private Scenario scenario;
 
 			@Override
 			public ChargingLogic.Factory get() {
 				return charger -> new ChargingWithQueueingLogic(charger, new ChargeUptoFixedSocStrategy(charger, 1.,1.0),
-						eventsManager);
+						eventsManager,scenario);
 			}
 		});
 
