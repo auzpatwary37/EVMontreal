@@ -33,13 +33,14 @@ class FinalSoc2VehicleType implements MobsimBeforeCleanupListener {
             Id<VehicleType> typeId = Id.create(electricVehicle.getVehicleType(), VehicleType.class);
             //assume the vehicle type to be existing and throw NullPointer if not
             EVUtils.setInitialEnergy(vehicles.getVehicleTypes().get(typeId).getEngineInformation(), EvUnits.J_to_kWh(electricVehicle.getBattery().getSoc()));
-            spec.replaceVehicleSpecification(ImmutableElectricVehicleSpecification.newBuilder()
-							.id(electricVehicle.getId())
-							.batteryCapacity(electricVehicle.getBattery().getCapacity())
-							.initialSoc(electricVehicle.getBattery().getSoc())
-							.chargerTypes(electricVehicle.getChargerTypes())
-							.vehicleType(typeId.toString())
-							.build());
+         //   this is to do not update the SOC
+//            spec.replaceVehicleSpecification(ImmutableElectricVehicleSpecification.newBuilder()
+//							.id(electricVehicle.getId())
+//							.batteryCapacity(electricVehicle.getBattery().getCapacity())
+//							.initialSoc(electricVehicle.getBattery().getSoc())
+//							.chargerTypes(electricVehicle.getChargerTypes())
+//							.vehicleType(typeId.toString())
+//							.build());
         }
     }
 }

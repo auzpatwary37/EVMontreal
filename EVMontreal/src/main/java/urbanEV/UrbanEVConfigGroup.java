@@ -50,7 +50,7 @@ public class UrbanEVConfigGroup extends ReflectiveConfigGroup {
     /**
      * agents intend to charge their vehicle prior to the relative SOC falling under the given value
      */
-    private double criticalRelativeSOC = 0.2;
+    private double criticalRelativeSOC = 0.5;
 
     private static final String MIN_WHILE_CHARGING_ACT_DURATION_s = "minWhileChargingActivityDuration_s";
     /**

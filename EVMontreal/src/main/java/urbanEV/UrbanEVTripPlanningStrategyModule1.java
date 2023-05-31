@@ -70,14 +70,14 @@ import EVPricing.ChargerPricingProfiles;
 
 
 
-public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
+public class UrbanEVTripPlanningStrategyModule1 implements PlanStrategyModule{
 	public static final String urbanEVTripPlannerStrategyName = "evTripPlanner";
 	public static final double cov = 1.2;
 	public static final String ifBrokenActivity = "ifBroken";
 	private Map<Id<Person>,List<Plan>> purePlan = new HashMap<>();
 	public double factorOfSafety = 1.5;
 	@Inject
-	protected Provider<TripRouter> tripRouterProvider;
+	protected Provider<TripRouter> tripRouterProvider;  //what is this line?
 
 	@Inject
 	Scenario scenario;
@@ -123,18 +123,18 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	private ChargerPricingProfiles chargerPricingProfiles;
 
 	
-	protected static final Logger log = Logger.getLogger(UrbanEVTripPlanningStrategyModule.class);
+	protected static final Logger log = Logger.getLogger(UrbanEVTripPlanningStrategyModule1.class);
 	protected static List<PersonContainer2> personContainer2s = new ArrayList<>();
 	private boolean ifDumbCharing = false;
-	private double dumbChargingStartTime = 9*3600;
-	private double dumbChargingEndTime = 15*3600;
+	private double dumbChargingStartTime = 10*3600;
+	private double dumbChargingEndTime = 12*3600;
 
 	@Override
 	public void prepareReplanning(ReplanningContext replanningContext) {
 		plans = new HashSet<>();
 	}
 	@Inject
-	UrbanEVTripPlanningStrategyModule(){
+	UrbanEVTripPlanningStrategyModule1(){
 		
 	}
 	
@@ -194,7 +194,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		Set<Id<Vehicle>> evs = getUsedEV(plan);
 		if(!evs.isEmpty()) {
 			if(!haveSufficientCharging(plan)) {
-				if(!this.purePlan.containsKey(plan.getPerson().getId()))this.purePlan.put(plan.getPerson().getId(), new ArrayList<>());
+				if(!this.purePlan.containsKey(plan.getPerson().getId())) {
+					this.purePlan.put(plan.getPerson().getId(), new ArrayList<>());
+					plan.getPerson().getAttributes().putAttribute("purePlan", plan);
+				}
 				boolean unique = true;
 				for(Plan pl : this.purePlan.get(plan.getPerson().getId())) {
 					if(this.planEquals(plan, pl)) {
@@ -236,6 +239,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		return true;
 	}
 	
+
 	private void execute(Plan plan) {
 		Set<Id<Vehicle>> evs = getUsedEV(plan);
 		Plan pl = PopulationUtils.createPlan();
@@ -270,9 +274,11 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			//				if(l.getMode().equals(TransportMode.car))evCarLegs.add(l);
 			//				});
 
+
+			
 			
 			boolean pluginBeforeStart = configGroup.getPluginBeforeStartingThePlan();
-			if(pluginBeforeStart && pseudoVehicle.getBattery().getSoc()/pseudoVehicle.getBattery().getCapacity() <.50 && hasHomeCharger(plan.getPerson(), modifiablePlan, evCarLegs, pseudoVehicle) 
+			if(pluginBeforeStart && pseudoVehicle.getBattery().getSoc()/pseudoVehicle.getBattery().getCapacity() <.30 && hasHomeCharger(plan.getPerson(), modifiablePlan, evCarLegs, pseudoVehicle) 
 					&& modifiablePlan.getPlanElements().indexOf(evCarLegs.get(0))==1){ //TODO potentially check for activity duration and/or SoC
 
 				Leg firstEvLeg = evCarLegs.get(0);
@@ -286,6 +292,8 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				if(((Activity)modifiablePlan.getPlanElements().get(indFirstEvLeg+1)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)
 						&& ifSameAct((Activity)modifiablePlan.getPlanElements().get(indFirstEvLeg+3),actWhileCharging)){// Already replanned before 
 							log.info("Already have a home charging trip. Skipping.");				
+										
+							
 				
 				} else {
 					Network modeNetwork = this.singleModeNetworksCache.getSingleModeNetworksCache().get(firstEvLeg.getMode());
@@ -322,6 +330,8 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 						break;
 					}
 
+					
+					
 					else if (evLegs.get(evLegs.size()-1).equals(legWithCriticalSOC) && isHomeChargingTrip(modifiablePlan, evLegs, pseudoVehicle) && pseudoVehicle.getBattery().getSoc() > 0 && 
 							!((Activity)modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC)-1)).getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER)) {
 
@@ -329,7 +339,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 						Activity actBefore = EditPlansReplan.findRealActBefore(plan, modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC));
 						Activity lastAct = EditPlansReplan.findRealActAfter(plan, modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC));
 						if(!((Activity)modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC)+1)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) &&
-								pseudoVehicle.getBattery().getSoc()/pseudoVehicle.getBattery().getCapacity()<.85) {
+								pseudoVehicle.getBattery().getSoc()/pseudoVehicle.getBattery().getCapacity()<.999) {
 							Network modeNetwork = this.singleModeNetworksCache.getSingleModeNetworksCache().get(legWithCriticalSOC.getMode());
 							Link chargingLink = modeNetwork.getLinks().get(lastAct.getLinkId());
 							String routingMode = TripStructureUtils.getRoutingMode(legWithCriticalSOC);
@@ -346,7 +356,13 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 						break;
 						
 
-					} else if( evLegs.get(evLegs.size()-1).equals(legWithCriticalSOC) && pseudoVehicle.getBattery().getSoc() > capacityThreshold ){
+					} 
+					
+					
+					
+					
+					
+					else if( evLegs.get(evLegs.size()-1).equals(legWithCriticalSOC) && pseudoVehicle.getBattery().getSoc() > capacityThreshold ){
 						
 						if(this.ifDumbCharing) {
 							int i = 0;
@@ -365,6 +381,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 											planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, (Activity) pel, plugoutTripDestination, chargingLink, tripRouter, PlanRouter.calcEndOfActivity((Activity) pel, modifiablePlan, config));
 											cnt --;
 											break;
+											
 												}
 											}
 									}
@@ -398,6 +415,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		
 	
 	}
+
 	
 			}
 	
@@ -540,12 +558,12 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				}
 				actBeforeBreak.setEndTime(beforeActEndTime);
 				
-				actBeforeBreak.getAttributes().putAttribute(ifBrokenActivity, true);
+				actBeforeBreak.getAttributes().putAttribute(ifBrokenActivity, false);
 				Activity actAfterBreak = scenario.getPopulation().getFactory().createActivityFromCoord(actWhileCharging.getType(), actWhileCharging.getCoord());
 				actAfterBreak.setLinkId(actWhileCharging.getLinkId());
 				actAfterBreak.setFacilityId(actWhileCharging.getFacilityId());
 				actAfterBreak.setEndTime(actWhileCharging.getEndTime().seconds());
-				actAfterBreak.getAttributes().putAttribute(ifBrokenActivity, true);
+				actAfterBreak.getAttributes().putAttribute(ifBrokenActivity, false);
 				
 				if((fac = scenario.getActivityFacilities().getFacilities().get(actAfterBreak.getFacilityId())).getCoord()==null) {
 					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
@@ -566,12 +584,12 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				if((fac = scenario.getActivityFacilities().getFacilities().get(actBeforeBreak.getFacilityId())).getCoord()==null) {
 					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
 				}
-				actBeforeBreak.getAttributes().putAttribute(ifBrokenActivity, true);
+				actBeforeBreak.getAttributes().putAttribute(ifBrokenActivity, false);
 				Activity actAfterBreak = scenario.getPopulation().getFactory().createActivityFromCoord(actWhileCharging.getType(), actWhileCharging.getCoord());
 				actAfterBreak.setLinkId(actWhileCharging.getLinkId());
 				actAfterBreak.setFacilityId(actWhileCharging.getFacilityId());
 				actAfterBreak.setEndTime(actWhileCharging.getEndTime().seconds());
-				actAfterBreak.getAttributes().putAttribute(ifBrokenActivity, true);
+				actAfterBreak.getAttributes().putAttribute(ifBrokenActivity, false);
 				if((fac = scenario.getActivityFacilities().getFacilities().get(actAfterBreak.getFacilityId())).getCoord()==null) {
 					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
 				}

@@ -66,7 +66,9 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 
 			if (chargingStrategy.isChargingCompleted(ev)) {
 				evIter.remove();
-				eventsManager.processEvent(new ChargingEndEvent(now, charger.getId(), ev.getId()));
+				ChargingEndEvent event = new ChargingEndEvent(now, charger.getId(), ev.getId());
+				event.getAttributes().put("when", "whileCharging");
+				eventsManager.processEvent(event);
 				listeners.remove(ev.getId()).notifyChargingEnded(ev, now);
 			}
 		}
@@ -98,7 +100,9 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 	@Override
 	public void removeVehicle(ElectricVehicle ev, double now) {
 		if (pluggedVehicles.remove(ev.getId()) != null) {// successfully removed
-			eventsManager.processEvent(new ChargingEndEvent(now, charger.getId(), ev.getId()));
+			ChargingEndEvent event = new ChargingEndEvent(now, charger.getId(), ev.getId());
+			event.getAttributes().put("when", "ActivityEnd");
+			eventsManager.processEvent(event);
 			listeners.remove(ev.getId()).notifyChargingEnded(ev, now);
 
 			if (!queuedVehicles.isEmpty()) {

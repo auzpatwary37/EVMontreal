@@ -3,7 +3,7 @@ package EVPricing;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Arrays;
+import java.lang.reflect.Array;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -27,13 +27,16 @@ import org.matsim.api.core.v01.events.handler.TransitDriverStartsEventHandler;
 import org.matsim.api.core.v01.events.handler.VehicleEntersTrafficEventHandler;
 import org.matsim.api.core.v01.events.handler.VehicleLeavesTrafficEventHandler;
 import org.matsim.api.core.v01.population.Person;
+import org.matsim.api.core.v01.population.Plan;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.charging.ChargingEndEvent;
 import org.matsim.contrib.ev.charging.ChargingEndEventHandler;
 import org.matsim.contrib.ev.charging.ChargingStartEvent;
 import org.matsim.contrib.ev.charging.ChargingStartEventHandler;
 import org.matsim.contrib.ev.fleet.ElectricFleet;
+import org.matsim.contrib.ev.fleet.ElectricFleetSpecification;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
+import org.matsim.contrib.ev.fleet.ElectricVehicleSpecification;
 import org.matsim.contrib.ev.infrastructure.Charger;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureSpecification;
 import org.matsim.core.api.experimental.events.EventsManager;
@@ -70,6 +73,9 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	
 	@Inject
 	private ChargerPricingProfiles pricingProfies;
+	
+	@Inject
+	private ElectricFleetSpecification vehicleSpecifications;
 	
 	private ElectricFleet fleet;
 	
@@ -115,7 +121,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		
 		try {
 			fw = new FileWriter(new File(controler.getControlerIO().getIterationFilename(controler.getIterationNumber(), "charging.csv")));
-			fw.append("pId,chargerId,startingTime,EndingTime,duration,charge,cost\n");
+			fw.append("pId,chargerId,startingTime,EndingTime,duration,initialSOC,charge,finalSoC,cost\n");
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -134,6 +140,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	public void handleEvent(ChargingEndEvent event) {
 		
 		Id<Person> pId = this.personIdForEV.get(event.getVehicleId());
+		Plan plan = this.scenario.getPopulation().getPersons().get(pId).getSelectedPlan();
 		chargingDetails cd = this.personLists.get(pId.toString());
 		cd.endingTime = event.getTime();
 //		String chargerType = this.chargingInfrastructure.getChargerSpecifications().get(cd.charger).getChargerType();
@@ -143,6 +150,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 //		this.events.processEvent(new PersonMoneyEvent(event.getTime(), pId, cost*-1, this.ChargingCostName, cd.charger.toString()+"___"+chargerType));
 		this.chargePeopleForElectricity(cd, event.getTime());
 		this.personLists.remove(pId.toString());
+		this.scenario.getPopulation().getPersons().get(Id.createPersonId(event.getVehicleId().toString())).getAttributes().putAttribute("chargingIndicator", false);
 		}
 
 	/**
@@ -151,6 +159,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	@Override
 	public void handleEvent(ChargingStartEvent event) {
 		personLists.put(event.getVehicleId().toString(), new chargingDetails(event.getChargerId(),event.getTime(),this.fleet.getElectricVehicles().get(event.getVehicleId()),this.pricingProfies.getChargerPricingProfiles().get(event.getChargerId()).getPricingStepsSize()));
+		this.scenario.getPopulation().getPersons().get(Id.createPersonId(event.getVehicleId().toString())).getAttributes().putAttribute("chargingIndicator", true);
 	}
 	@Override
 	public void handleEvent(LinkLeaveEvent event) {
@@ -199,6 +208,14 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 			
 		}
 	}
+	
+	public synchronized void addQueuedEvenet(Event event) {
+        this.queuedEvents.add(event);
+    }
+
+	public synchronized void cleanQueuedEvenet() {
+        this.queuedEvents.clear();
+    }
 	/**
 	 * 
 	 * @param cd
@@ -212,10 +229,12 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 			double[] pricingProfile = this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getPricingProfile().get(timeId);
 			double cost = 0;
 			double charge = 0;
+			double finalSoC = 0;
 			for(int i = 0; i<pricingProfile.length;i++) {
 				//System.out.println((cd.chargeDetails[i]-charge)*2.78e-7);
 				cost+=pricingProfile[i]*(cd.chargeDetails[i]-charge)*2.78e-7;
 				charge=cd.chargeDetails[i];
+				
 			}
 			writeDetails(cd,cost,vId);
 //			if((cd.endingTime-cd.startingTime)<599){
@@ -223,14 +242,14 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 //			}
 			
 //			Person person = scenario.getPopulation().getPersons().get(this.personIdForEV.get(cd.v.getId()));
-			this.queuedEvents.add(new PersonMoneyEvent(time, this.personIdForEV.get(cd.v.getId()), cost, this.ChargingCostName,  cd.charger.toString()+"___"+vId.toString()));
+			this.addQueuedEvenet(new PersonMoneyEvent(time, this.personIdForEV.get(cd.v.getId()), -1*cost, this.ChargingCostName,  cd.charger.toString()+"___"+vId.toString()));
 			
 			//System.out.println();
 	}
 	
 	public synchronized void writeDetails(chargingDetails cd, double cost, Id<Vehicle>vId) {
 		try {
-			fw.append(this.vehicleToPersonMapping.get(vId).toString()+","+cd.toString()+","+cost+"\n");
+			fw.append(this.vehicleToPersonMapping.get(vId).toString()+","+cd.toString()+","+ cost+"\n");
 			fw.flush();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -271,13 +290,13 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	}
 
 	@Override
-	public void notifyMobsimBeforeSimStep(MobsimBeforeSimStepEvent e) {
+	public synchronized void notifyMobsimBeforeSimStep(MobsimBeforeSimStepEvent e) {
 		if(!this.queuedEvents.isEmpty()) {
 			this.queuedEvents.stream().forEach(ee->{
 				ee.setTime(e.getSimulationTime());
 				this.events.processEvent(ee);
 			});
-			this.queuedEvents.clear();
+			this.cleanQueuedEvenet();
 		}
 		
 	}
@@ -288,9 +307,14 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 
 class chargingDetails{
 	public static String arrayToString(double[] a) {
-		String b = "";
-		for(double d:a)b=b+Double.toString(d);
-		return b;
+		String out = "";
+		String sep = "";
+		for(double d:a) {
+			out=out+sep+Double.toString(d);
+			sep = " ";
+		}
+		
+		return out;
 	}
 
 	public final Id<Charger> charger;
@@ -299,6 +323,8 @@ class chargingDetails{
 	public ElectricVehicle v;
 	public double initialSoc = 0;
 	public double[] chargeDetails;
+	public double finalSoC = 0;
+	
 	
 	public chargingDetails(Id<Charger> chargerId, double startingTime, ElectricVehicle v, int pricingStepSize) {
 		
@@ -307,9 +333,12 @@ class chargingDetails{
 		this.v =  v;
 		this.initialSoc = v.getBattery().getSoc();
 		chargeDetails = new double[pricingStepSize];
+		this.finalSoC = initialSoc+(chargeDetails[0]+chargeDetails[1]+chargeDetails[2]);
+
+		
 	}
 	@Override
 	public String toString() {
-		return this.charger+","+this.startingTime+","+this.endingTime+","+(this.endingTime-this.startingTime)+","+this.initialSoc+","+arrayToString(this.chargeDetails);
+		return this.charger+","+this.startingTime+","+this.endingTime+","+(this.endingTime-this.startingTime)+","+this.initialSoc+","+arrayToString(this.chargeDetails)+this.finalSoC;
 	}
 }

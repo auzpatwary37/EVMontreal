@@ -110,12 +110,16 @@ public class UrbanVehicleChargingHandler
 				if (electricFleet.getElectricVehicles().containsKey(evId)) {
 					ElectricVehicle ev = electricFleet.getElectricVehicles().get(evId);
 					List<Charger> chargers = chargersAtLinks.get(event.getLinkId());
-					
-					Charger charger = chargers.stream()
+					Charger charger = null;
+					try {
+					 charger = chargers.stream()
 							.filter(ch -> ev.getChargerTypes().contains(ch.getChargerType()))
 
 							.findAny()
 							.get();
+					}catch(Exception e) {
+						System.out.println();	
+					}
 					charger.getLogic().addVehicle(ev, event.getTime());
 					
 					Map<Id<Person>, chargingInfo> proceduresOnLink = this.chargingProcedures.get(event.getLinkId());
@@ -150,7 +154,7 @@ public class UrbanVehicleChargingHandler
 				if(vehiclesAtChargers.remove(evId) != null){ //if null, vehicle is fully charged and de-plugged already (see handleEvent(ChargingEndedEvent) )
 					Id<Charger> chargerId = tuple.chargerId;
 					Charger c = chargingInfrastructure.getChargers().get(chargerId);
-					c.getLogic().removeVehicle(electricFleet.getElectricVehicles().get(evId), event.getTime());
+					if(c.getLogic().getPluggedVehicles().contains(electricFleet.getElectricVehicles().get(evId)))c.getLogic().removeVehicle(electricFleet.getElectricVehicles().get(evId), event.getTime());
 				}
 			} else {
 				throw new RuntimeException("there is something wrong with the charging procedure of person=" + event.getPersonId() + " on link= " + event.getLinkId());

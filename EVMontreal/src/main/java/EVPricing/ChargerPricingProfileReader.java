@@ -4,6 +4,7 @@ package EVPricing;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParserFactory;
@@ -59,7 +60,8 @@ public class ChargerPricingProfileReader  extends DefaultHandler{
 		} catch (SAXException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
-			e.printStackTrace();
+			e.printStackTrace(); 
+		
 		} catch (ParserConfigurationException e) {
 			e.printStackTrace();
 		}
@@ -67,4 +69,5 @@ public class ChargerPricingProfileReader  extends DefaultHandler{
 		this.profiles.values().stream().forEach(pp->p.addChargerPricingProfile(pp));
 		return p;
 	}
+
 }

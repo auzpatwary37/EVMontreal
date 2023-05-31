@@ -45,7 +45,7 @@ public class ChargingModule extends AbstractModule {
 
 			@Override
 			public ChargingLogic.Factory get() {
-				return charger -> new ChargingWithQueueingLogic(charger, new ChargeUpToMaxSocStrategy(charger, 1.),
+				return charger -> new ChargingWithQueueingLogic(charger, new ChargeUptoFixedSocStrategy(charger, 1.,1.0),
 						eventsManager);
 			}
 		});
@@ -56,7 +56,7 @@ public class ChargingModule extends AbstractModule {
 			@Override
 			protected void configureQSim() {
 				this.bind(ChargingHandler.class).asEagerSingleton();
-				this.bind(EVOutOfBatteryChecker.class).asEagerSingleton();
+			//	this.bind(EVOutOfBatteryChecker.class).asEagerSingleton();
 				this.addQSimComponentBinding(EvModule.EV_COMPONENT).to(ChargingHandler.class);
 				this.addQSimComponentBinding(EvModule.EV_COMPONENT+"dis").to(EVOutOfBatteryChecker.class);
 			}

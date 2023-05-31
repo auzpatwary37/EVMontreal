@@ -93,7 +93,7 @@ public class Tutorial {
 	public static void main(String[] args){
 
 		//Inputs
-		double evPercentage = 0.3; // Percentage of cars to take as EV
+		double evPercentage = 0.5; // Percentage of cars to take as EV
 		boolean assignChargersToEveryone = true;
 		double homeChargerPercentage = 0.5;
 
@@ -111,11 +111,11 @@ public class Tutorial {
 		String resultOut = "Output";
 		String pricingProfileOutputLoc = "Output/pricingProfiles.xml";
 
-		double BatteryCapMin = 10; // Min Battery capacity
-		double BatteryCapMax = 30;// Max Battery Capacity
+		double BatteryCapMin = 9; // Min Battery capacity
+		double BatteryCapMax = 40;// Max Battery Capacity
 		//put the min and max same to make capacity non random
 
-		double socMIn = 7; // Min initial soc level.
+		double socMIn = 5; // Min initial soc level.
 		double chargeAtStartOfDayAboveSocMin = 1;
 		boolean multipleZone = false;// set this to false for one zone and true for multiple zones
 		String zoneFile = "zones.csv";// Modify zones details in this file (zoneId,X,Y,PricingMultiplier) do not change the header in the file, just the values 
@@ -126,7 +126,7 @@ public class Tutorial {
 		Map<String,Double> cp = new HashMap<>();
 		cp.put("Level 1", 5.);
 		cp.put("Level 2", 20.);
-		cp.put("Fast", 50.);
+		cp.put("Fast", 40.);
 		cp.put("home", 5.);
 
 		//____________________________________________________
@@ -273,7 +273,8 @@ public class Tutorial {
 								
 								//Create vehicle in the ElectricVehicle file
 								Double b = (BatteryCapMin+(BatteryCapMax-BatteryCapMin)*random.nextDouble())*36e5;
-								Double c = socMIn*36e5+(b-socMIn*36e5)*random.nextDouble();
+//								Double c = socMIn*36e5+(b-socMIn*36e5)*random.nextDouble();
+								Double c = socMIn*36e5+(b-socMIn*36e5)*0.05;
 								ElectricVehicleSpecification s = ImmutableElectricVehicleSpecification.newBuilder()
 										.id(Id.create(p.getKey().toString(), ElectricVehicle.class))
 										.batteryCapacity(b.intValue())
@@ -401,25 +402,25 @@ public class Tutorial {
 		
 //Level 1 off peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = 2.60;
-		nonLinear[1] = 2.60;
-		nonLinear[2] = 5.20;
+		nonLinear[0] = 2.00;
+		nonLinear[1] = 2.00;
+		nonLinear[2] = 2.00;
 		
 		offPeakPricing.put("Level 1", nonLinear);
 		
 		//Level 2 off peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = 3.40;
-		nonLinear[1] = 3.40;
-		nonLinear[2] = 6.80;
+		nonLinear[0] = 3.00;
+		nonLinear[1] = 3.00;
+		nonLinear[2] = 3.00;
 		
 		offPeakPricing.put("Level 2", nonLinear);
 		
 		//Fast off peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = 5.70;
-		nonLinear[1] = 11.4;
-		nonLinear[2] = 11.4;
+		nonLinear[0] = 5.00;
+		nonLinear[1] = 5.00;
+		nonLinear[2] = 5.00;
 		
 		offPeakPricing.put("Fast", nonLinear);
 		
@@ -438,36 +439,36 @@ public class Tutorial {
 		
 		//Level 1 peak hour 1.5 times
 		nonLinear = new double[3];
-		nonLinear[0] = 3.9;
-		nonLinear[1] = 3.9;
-		nonLinear[2] = 7.8;
+		nonLinear[0] = 4.00;
+		nonLinear[1] = 4.00;
+		nonLinear[2] = 4.00;
 		
 		PeakPricing.put("Level 1", nonLinear);
 		
 		//Level 2 peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = 5.10;
-		nonLinear[1] = 5.10;
-		nonLinear[2] = 10.2;
+		nonLinear[0] = 6.00;
+		nonLinear[1] = 6.00;
+		nonLinear[2] = 6.00;
 		
 		PeakPricing.put("Level 2", nonLinear);
 		
 		//Fast peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = 8.55;
-		nonLinear[1] = 17.10;
-		nonLinear[2] = 17.10;
+		nonLinear[0] = 10.00;
+		nonLinear[1] = 10.00;
+		nonLinear[2] = 10.00;
 		PeakPricing.put("Fast", nonLinear);
 		//home peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = 1.5;
-		nonLinear[1] = 1.5;
-		nonLinear[2] = 1.5;
+		nonLinear[0] = 2.0;
+		nonLinear[1] = 2.0;
+		nonLinear[2] = 2.0;
 		
 		PeakPricing.put("home", nonLinear);
 		
-		int[] peakTime = new int[] {7,8,9,10,11,12,13,14,15,16,17,18,19,20};
-		int[] offPeakTime = new int[] {0,1,2,3,4,5,6,21,22,23};
+		int[] peakTime = new int[] {};
+		int[] offPeakTime = new int[] {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23};
 		
 		ChargerPricingProfiles cpp = new ChargerPricingProfiles(zones);
 		

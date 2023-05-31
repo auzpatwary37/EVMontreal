@@ -30,12 +30,14 @@ import org.matsim.vehicles.VehicleCapacity;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.Vehicles;
 
+import binding.EVOutOfBatteryChecker;
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
 import urbanEV.UrbanEVConfigGroup;
 import urbanEV.UrbanEVModule;
 import urbanEV.UrbanEVTripPlanningStrategyModule;
 import urbanEV.UrbanVehicleChargingHandler;
+import withinDay.TrialWithinday;
 
 public final class RunEVExampleV2 implements Callable<Integer> {
   public static final String COLOR = "@|bold,fg(81) ";
@@ -60,7 +62,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--facilities"}, description = {"Optional Path to facilities file to load."}, defaultValue = "montreal_facilities.xml.gz")
   private String facilitiesFileLoc;
   
-  @Option(names = {"--lastiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "50")
+  @Option(names = {"--lastiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "200")
   private int maxIterations;
   
   @Option(names = {"--firstiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "0")
@@ -72,7 +74,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "0.05")
   private Double scale;
   
-  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/DUMB")
+  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/dumboffbase")
   private String output;
   
   @Option(names = {"--charger"}, description = {"Charger file location"}, defaultValue = "charger.xml")
@@ -87,7 +89,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--evpricing"}, description = {"Charger pricing file location"}, defaultValue = "pricingProfiles.xml")
   private String pricingEVFile;
   
-  @Option(names = {"--distanceForCharger"}, description = {"Maximum search radius for charger around activity"}, defaultValue = "1000.")
+  @Option(names = {"--distanceForCharger"}, description = {"Maximum search radius for charger around activity"}, defaultValue = "30000.")
   private Double chargerDist;
   
   @Option(names = {"--thread"}, description = {"No of thread"}, defaultValue = "10")
@@ -130,7 +132,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(true);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(chargerDist);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaximumChargingProceduresPerAgent(2);
-	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.2);
+	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.);
 	((EvConfigGroup)config.getModules().get("ev")).setChargersFile(this.chargerFile);
 	((EvConfigGroup)config.getModules().get("ev")).setVehiclesFile(this.evehicleFile);
 	
@@ -270,6 +272,8 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 				}
 				
 			});
+//			addMobsimListenerBinding().to(TrialWithinday.class);
+//			addMobsimListenerBinding().to(EVOutOfBatteryChecker.class);
 		}
 	});
     
