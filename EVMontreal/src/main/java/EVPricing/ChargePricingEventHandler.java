@@ -4,14 +4,17 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
+import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.events.Event;
 import org.matsim.api.core.v01.events.LinkLeaveEvent;
 import org.matsim.api.core.v01.events.PersonEntersVehicleEvent;
@@ -46,6 +49,7 @@ import org.matsim.core.mobsim.framework.events.MobsimAfterSimStepEvent;
 import org.matsim.core.mobsim.framework.events.MobsimBeforeSimStepEvent;
 import org.matsim.core.mobsim.framework.listeners.MobsimAfterSimStepListener;
 import org.matsim.core.mobsim.framework.listeners.MobsimBeforeSimStepListener;
+import org.matsim.core.population.PersonUtils;
 import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleUtils;
 
@@ -89,8 +93,8 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	
 	public final Map<Id<ElectricVehicle>,Id<Person>> personIdForEV;
 	
-	public Map<Id<Vehicle>,Set<Id<Person>>> vehicleToPersonMapping = new HashMap<>(); 
-	public Map<Id<Vehicle>,Double> vehicleToDistance = new HashMap<>();
+	public Map<Id<Vehicle>,Set<Id<Person>>> vehicleToPersonMapping = new ConcurrentHashMap<>(); 
+	public Map<Id<Vehicle>,Double> vehicleToDistance = new ConcurrentHashMap<>();
 	
 	public double gasMoneyCostPer_m = 2.0E-4;
 	
@@ -103,6 +107,11 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	@Inject
 	ChargePricingEventHandler(final MatsimServices controler,ChargingInfrastructureSpecification chargingInfrastructure, ElectricFleet data) {
 		this.scenario = controler.getScenario();
+		scenario.getPopulation().getPersons().values().forEach(p->{
+			Id<Vehicle> vId= VehicleUtils.getVehicleId(p, TransportMode.car);
+			this.vehicleToPersonMapping.put(vId, new HashSet<>());
+			this.vehicleToPersonMapping.get(vId).add(p.getId());
+		});
 		events = controler.getEvents();
 		this.fleet = data;
 		this.chargingInfrastructure = chargingInfrastructure;
@@ -130,7 +139,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	
 	@Override
 	public void reset(int iteration) {
-		this.vehicleToPersonMapping.clear();
+//		this.vehicleToPersonMapping.clear();
 		this.vehicleToDistance.clear();
 		this.personLists.clear();
 		
@@ -138,7 +147,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 
 	@Override
 	public void handleEvent(ChargingEndEvent event) {
-		
+
 		Id<Person> pId = this.personIdForEV.get(event.getVehicleId());
 		Plan plan = this.scenario.getPopulation().getPersons().get(pId).getSelectedPlan();
 		chargingDetails cd = this.personLists.get(pId.toString());
@@ -173,7 +182,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	public void handleEvent(PersonEntersVehicleEvent event) {
 		if(!this.transitVehicles.contains(event.getVehicleId())) {
 			if(!this.vehicleToPersonMapping.containsKey(event.getVehicleId()))this.vehicleToPersonMapping.put(event.getVehicleId(), new HashSet<>());
-			if(!this.fleet.getElectricVehicles().keySet().contains(Id.create(event.getVehicleId().toString(),ElectricVehicle.class))) {this.chargePeopleForGasoline(event.getVehicleId(), event.getTime());}
+			if(!this.fleet.getElectricVehicles().keySet().contains(Id.create(event.getVehicleId().toString(),ElectricVehicle.class)) && this.vehicleToDistance.containsKey(event.getVehicleId())) {this.chargePeopleForGasoline(event.getVehicleId(), event.getTime());}
 			this.vehicleToPersonMapping.get(event.getVehicleId()).add(event.getPersonId());
 			
 			// if the vehicle did not have anyone
@@ -191,13 +200,13 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 				this.chargePeopleForGasoline(event.getVehicleId(), event.getTime());
 			
 			}
-			this.vehicleToPersonMapping.get(event.getVehicleId()).remove(event.getPersonId());
+			//this.vehicleToPersonMapping.get(event.getVehicleId()).remove(event.getPersonId());
 		}
 	}
 	
 	
 
-	void chargePeopleForGasoline(Id<Vehicle> vId, double time) {
+	synchronized void chargePeopleForGasoline(Id<Vehicle> vId, double time) {
 		if(!this.vehicleToPersonMapping.get(vId).isEmpty()){
 			double distance = this.vehicleToDistance.get(vId);
 			double cost = this.gasMoneyCostPer_m*distance;
@@ -228,14 +237,15 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 			if(timeId>23)timeId = timeId-24;
 			double[] pricingProfile = this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getPricingProfile().get(timeId);
 			double cost = 0;
-			double charge = 0;
-			double finalSoC = 0;
+			double charge = cd.initialSoc;
 			for(int i = 0; i<pricingProfile.length;i++) {
 				//System.out.println((cd.chargeDetails[i]-charge)*2.78e-7);
-				cost+=pricingProfile[i]*(cd.chargeDetails[i]-charge)*2.78e-7;
+				if(cd.chargeDetails[i]>0)cost+=pricingProfile[i]*(cd.chargeDetails[i]-charge)*2.78e-7;
+				else break;
 				charge=cd.chargeDetails[i];
-				
+				cd.finalSoC = charge;
 			}
+			
 			writeDetails(cd,cost,vId);
 //			if((cd.endingTime-cd.startingTime)<599){
 //				System.out.println("Error");
@@ -327,18 +337,16 @@ class chargingDetails{
 	
 	
 	public chargingDetails(Id<Charger> chargerId, double startingTime, ElectricVehicle v, int pricingStepSize) {
-		
 		this.charger = chargerId;
 		this.startingTime =startingTime;
 		this.v =  v;
 		this.initialSoc = v.getBattery().getSoc();
 		chargeDetails = new double[pricingStepSize];
-		this.finalSoC = initialSoc+(chargeDetails[0]+chargeDetails[1]+chargeDetails[2]);
-
-		
 	}
 	@Override
 	public String toString() {
-		return this.charger+","+this.startingTime+","+this.endingTime+","+(this.endingTime-this.startingTime)+","+this.initialSoc+","+arrayToString(this.chargeDetails)+this.finalSoC;
+//		this.finalSoC = this.initialSoc+(this.chargeDetails[0]+this.chargeDetails[1]+this.chargeDetails[2]);
+		return this.charger+","+this.startingTime/3600+","+this.endingTime/3600+","+(this.endingTime-this.startingTime)+","+this.initialSoc+","+arrayToString(this.chargeDetails)+","+this.finalSoC;
 	}
+	
 }

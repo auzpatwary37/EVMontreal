@@ -3,9 +3,10 @@ package EVPricing;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.Callable;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.matsim.api.core.v01.Scenario;
@@ -13,13 +14,15 @@ import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.EvModule;
+import org.matsim.contrib.ev.fleet.ElectricVehicleSpecification;
 import org.matsim.contrib.ev.routing.EvNetworkRoutingProvider;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
-import org.matsim.core.config.groups.PlansCalcRouteConfigGroup;
-import org.matsim.core.config.groups.StrategyConfigGroup;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup.ActivityParams;
+import org.matsim.core.config.groups.PlansCalcRouteConfigGroup;
+import org.matsim.core.config.groups.QSimConfigGroup;
+import org.matsim.core.config.groups.StrategyConfigGroup;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
@@ -30,7 +33,6 @@ import org.matsim.vehicles.VehicleCapacity;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.Vehicles;
 
-import binding.EVOutOfBatteryChecker;
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
 import urbanEV.UrbanEVConfigGroup;
@@ -74,7 +76,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "0.05")
   private Double scale;
   
-  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/dumboffbase")
+  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/testbasewithoutSoCupdateRevisedtestflat6")
   private String output;
   
   @Option(names = {"--charger"}, description = {"Charger file location"}, defaultValue = "charger.xml")
@@ -132,7 +134,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(true);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(chargerDist);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaximumChargingProceduresPerAgent(2);
-	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.);
+	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.3);
 	((EvConfigGroup)config.getModules().get("ev")).setChargersFile(this.chargerFile);
 	((EvConfigGroup)config.getModules().get("ev")).setVehiclesFile(this.evehicleFile);
 	
@@ -167,6 +169,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	config.planCalcScore().addActivityParams(
 			new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGIN_INTERACTION)
 					.setScoringThisActivityAtAll(false));
+	//config.qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.fromVehiclesData);
 
 	Scenario scenario = ScenarioUtils.loadScenario(config);
 	
@@ -272,11 +275,10 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 				}
 				
 			});
-//			addMobsimListenerBinding().to(TrialWithinday.class);
+			addMobsimListenerBinding().to(TrialWithinday.class);
 //			addMobsimListenerBinding().to(EVOutOfBatteryChecker.class);
 		}
 	});
-    
     
     
 	controler.configureQSimComponents(components -> components.addNamedComponent(EvModule.EV_COMPONENT));

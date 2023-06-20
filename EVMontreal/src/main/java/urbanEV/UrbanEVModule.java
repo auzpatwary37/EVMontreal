@@ -49,7 +49,7 @@ public class UrbanEVModule extends AbstractModule {
 
 
 	public UrbanEVModule(){
-
+		System.out.println();
 	}
 
 
@@ -67,8 +67,7 @@ public class UrbanEVModule extends AbstractModule {
 		install(new EvStatsModule());
 		addPlanStrategyBinding(UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName).toProvider(EvTripPlanningStrategyProvider.class);
 		
-		bind(UrbanVehicleChargingHandler.class);
-		addEventHandlerBinding().to(UrbanVehicleChargingHandler.class);
+		
 		//bind custom EVFleet stuff
 //		bind(MATSimVehicleWrappingEVSpecificationProvider.class).in(Singleton.class);
 //		bind(ElectricFleetSpecification.class).toProvider(MATSimVehicleWrappingEVSpecificationProvider.class);
@@ -77,7 +76,8 @@ public class UrbanEVModule extends AbstractModule {
 			@Override
 			protected void configureQSim() {
 				//this is responsible for charging vehicles according to person activity start and end events..
-				
+				bind(UrbanVehicleChargingHandler.class);
+				addMobsimScopeEventHandlerBinding().to(UrbanVehicleChargingHandler.class);
 
 				//if we use agent-specific vehicle types (with specific initial energies), we transfer the final SOCs of every iteration to the vehicle type and thus to the next iter
 				if(config.qsim().getVehiclesSource().equals(QSimConfigGroup.VehiclesSource.fromVehiclesData)){

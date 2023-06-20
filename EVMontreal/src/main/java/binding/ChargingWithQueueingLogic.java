@@ -21,20 +21,24 @@ package binding;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.population.Person;
+import org.matsim.api.core.v01.population.PopulationWriter;
 import org.matsim.contrib.ev.charging.ChargingEndEvent;
 import org.matsim.contrib.ev.charging.ChargingListener;
 import org.matsim.contrib.ev.charging.ChargingLogic;
-import org.matsim.contrib.ev.charging.ChargingStartEvent;
 import org.matsim.contrib.ev.charging.ChargingStrategy;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
 import org.matsim.contrib.ev.infrastructure.ChargerSpecification;
@@ -45,10 +49,10 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 	private final ChargingStrategy chargingStrategy;
 	private final EventsManager eventsManager;
 	private final Scenario scenario;
-
-	private final Map<Id<ElectricVehicle>, ElectricVehicle> pluggedVehicles = Collections.synchronizedMap(new LinkedHashMap<>());
+	private PopulationWriter popWriter;
+	private final Map<Id<ElectricVehicle>, ElectricVehicle> pluggedVehicles = new ConcurrentHashMap<>();//Collections.synchronizedMap(new LinkedHashMap<>())
 	private final Queue<ElectricVehicle> queuedVehicles = new ConcurrentLinkedQueue<>();
-	private final Map<Id<ElectricVehicle>, ChargingListener> listeners = Collections.synchronizedMap(new LinkedHashMap<>());
+	private final Map<Id<ElectricVehicle>, ChargingListener> listeners = new ConcurrentHashMap<>();
 
 	public ChargingWithQueueingLogic(ChargerSpecification charger, ChargingStrategy chargingStrategy,
 			EventsManager eventsManager, Scenario scenario) {
@@ -61,20 +65,37 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 	@Override
 	public void chargeVehicles(double chargePeriod, double now) {
 		Iterator<ElectricVehicle> evIter = pluggedVehicles.values().iterator();
-		while (evIter.hasNext()) {
-			ElectricVehicle ev = evIter.next();
+//		while (evIter.hasNext()) {
+//			ElectricVehicle ev = evIter.next();
+//			// with fast charging, we charge around 4% of SOC per minute,
+//			// so when updating SOC every 10 seconds, SOC increases by less then 1%
+//			ev.getBattery().changeSoc(ev.getChargingPower().calcChargingPower(charger) * chargePeriod);
+//
+//			if (chargingStrategy.isChargingCompleted(ev)) {
+//				evIter.remove();
+//				Person person = scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString()));
+//				ChargingEndEvent event = new ChargingEndEventUrbanEv(now, charger.getId(), ev.getId(),person);
+//				scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString())).getAttributes().putAttribute("charginatLogicIndicator", false);
+//				eventsManager.processEvent(event);
+//				listeners.remove(ev.getId()).notifyChargingEnded(ev, now);
+//			}
+//		}
+		
+		for(Entry<Id<ElectricVehicle>, ElectricVehicle> evEntry:new HashMap<>(pluggedVehicles).entrySet()) {
+			ElectricVehicle ev = evEntry.getValue();
 			// with fast charging, we charge around 4% of SOC per minute,
 			// so when updating SOC every 10 seconds, SOC increases by less then 1%
 			ev.getBattery().changeSoc(ev.getChargingPower().calcChargingPower(charger) * chargePeriod);
-
+//___________________________________________________comment these lines to not kick vehicles from queue_______________
 			if (chargingStrategy.isChargingCompleted(ev)) {
-				evIter.remove();
 				Person person = scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString()));
 				ChargingEndEvent event = new ChargingEndEventUrbanEv(now, charger.getId(), ev.getId(),person);
 				scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString())).getAttributes().putAttribute("charginatLogicIndicator", false);
 				eventsManager.processEvent(event);
 				listeners.remove(ev.getId()).notifyChargingEnded(ev, now);
+				pluggedVehicles.remove(evEntry.getKey());
 			}
+//________________________________________________________________________________________________
 		}
 
 		int queuedToPluggedCount = Math.min(queuedVehicles.size(), charger.getPlugCount() - pluggedVehicles.size());
@@ -113,6 +134,7 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 				plugVehicle(queuedVehicles.poll(), now);
 			}
 		} else if (queuedVehicles.remove(ev)) {//
+			listeners.remove(ev.getId()).notifyChargingEnded(ev, now);
 		} else {// neither plugged nor queued
 			throw new IllegalArgumentException(
 					"Vehicle: " + ev.getId() + " is neither queued nor plugged at charger: " + charger.getId());

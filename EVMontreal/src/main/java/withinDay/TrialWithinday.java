@@ -105,7 +105,7 @@ public class TrialWithinday implements MobsimInitializedListener{
 				ElectricVehicleSpecification electricVehicleSpecification = electricFleetSpecification.getVehicleSpecifications()
 					.get(getWrappedElectricVehicleId(ev));
 					ElectricVehicle pseudoVehicle = ElectricVehicleImpl.create(electricVehicleSpecification, driveConsumptionFactory, auxConsumptionFactory, chargingPowerFactory);
-					if (((Activity)plan.getPlanElements().get(2)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) && (electricVehicleSpecification.getInitialSoc() / pseudoVehicle.getBattery().getCapacity() ) >.70 ) {
+					if (haveChargingAtStart(modifiablePlan) && (electricVehicleSpecification.getInitialSoc() / pseudoVehicle.getBattery().getCapacity() ) >.70 ) {
 						List<PlanElement> planEl = modifiablePlan.getPlanElements().subList(0, 7);
 						planEl.clear();
 						planEl.add(purePlan.getPlanElements().get(0));
@@ -113,7 +113,7 @@ public class TrialWithinday implements MobsimInitializedListener{
 					}
 				
 
-					if (((Activity) plan.getPlanElements().get(plan.getPlanElements().size()-3)).getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER) && ((Activity) plan.getPlanElements().get(plan.getPlanElements().size()-1)).getType().equals(((Activity) plan.getPlanElements().get(plan.getPlanElements().size()-5)).getType()) &&(electricVehicleSpecification.getInitialSoc() / pseudoVehicle.getBattery().getCapacity() ) >.70 ) {
+					if (haveChargingAtEnd(modifiablePlan) &&(electricVehicleSpecification.getInitialSoc() / pseudoVehicle.getBattery().getCapacity() ) >.70 ) {
 						List<PlanElement> planEle = modifiablePlan.getPlanElements().subList(plan.getPlanElements().size()-9, plan.getPlanElements().size()-1);
 						planEle.clear();
 						planEle.add(purePlan.getPlanElements().get(purePlan.getPlanElements().size()-2));
@@ -125,7 +125,21 @@ public class TrialWithinday implements MobsimInitializedListener{
 
 		
 	}
+	
+	private boolean haveChargingAtStart(Plan plan) {
+		if(plan.getPlanElements().size()<9)return false;
+		if(((Activity)plan.getPlanElements().get(2)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER))return false;
+		if(((Activity)plan.getPlanElements().get(0)).getFacilityId().equals(((Activity)plan.getPlanElements().get(4)).getFacilityId()))return true;
+		return false;
+	}
 
+	private boolean haveChargingAtEnd(Plan plan) {
+		if(plan.getPlanElements().size()<9)return false;
+		if(((Activity)plan.getPlanElements().get(plan.getPlanElements().size()-3)).getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))return false;
+		if(((Activity)plan.getPlanElements().get(plan.getPlanElements().size()-1)).getFacilityId().equals(((Activity)plan.getPlanElements().get(plan.getPlanElements().size()-5)).getFacilityId()))return true;
+		return false;
+	}
+	
 	private int size() {
 		// TODO Auto-generated method stub
 		return 0;

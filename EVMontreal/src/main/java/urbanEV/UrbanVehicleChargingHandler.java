@@ -48,6 +48,7 @@ import org.matsim.contrib.ev.infrastructure.Charger;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructure;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructures;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
+import org.matsim.core.events.MobsimScopeEventHandler;
 import org.matsim.core.utils.collections.Tuple;
 import org.matsim.vehicles.Vehicle;
 
@@ -69,7 +70,7 @@ import binding.ChargingWithQueueingLogic;
  */
 public class UrbanVehicleChargingHandler
 		implements ActivityStartEventHandler, ActivityEndEventHandler, PersonLeavesVehicleEventHandler,
-		ChargingEndEventHandler, ChargingStartEventHandler {
+		ChargingEndEventHandler, ChargingStartEventHandler,MobsimScopeEventHandler  {
 
 	public static final String PLUGIN_IDENTIFIER = " plugin";
 	public static final String PLUGIN_INTERACTION = PlanCalcScoreConfigGroup.createStageActivityType(
@@ -151,11 +152,15 @@ public class UrbanVehicleChargingHandler
 			chargingInfo tuple = chargingProcedures.get(event.getLinkId()).remove(event.getPersonId());
 			if (tuple != null) {
 				Id<ElectricVehicle> evId = tuple.vehicleId;
-				if(vehiclesAtChargers.remove(evId) != null){ //if null, vehicle is fully charged and de-plugged already (see handleEvent(ChargingEndedEvent) )
+				if(vehiclesAtChargers.remove(evId) != null){ //if null, vehicle is fully charged and de-plugged already or the vehicle never got plugged in and still in the queue (see handleEvent(ChargingEndedEvent) )
 					Id<Charger> chargerId = tuple.chargerId;
 					Charger c = chargingInfrastructure.getChargers().get(chargerId);
 					if(c.getLogic().getPluggedVehicles().contains(electricFleet.getElectricVehicles().get(evId)))c.getLogic().removeVehicle(electricFleet.getElectricVehicles().get(evId), event.getTime());
-				}
+				}else {////________________changed code
+					Id<Charger> chargerId = tuple.chargerId;
+					Charger c = chargingInfrastructure.getChargers().get(chargerId);
+					if(c.getLogic().getQueuedVehicles().contains(electricFleet.getElectricVehicles().get(evId)))c.getLogic().removeVehicle(electricFleet.getElectricVehicles().get(evId), event.getTime());
+				}////________________________________________
 			} else {
 				throw new RuntimeException("there is something wrong with the charging procedure of person=" + event.getPersonId() + " on link= " + event.getLinkId());
 			}
