@@ -61,6 +61,12 @@ import urbanEV.UrbanEVConfigGroup;
 import urbanEV.UrbanEVModule;
 import urbanEV.UrbanVehicleChargingHandler;
 
+@Deprecated
+/**
+ * This class is now replaced by RunEvExampleV2. Use that class. 
+ * @author arsha
+ *
+ */
 public class RunEvExample {
 	static final String DEFAULT_CONFIG_FILE = "montreal scenario5/5_percent/config.xml";
 	private static final Logger log = Logger.getLogger(RunEvExample.class);

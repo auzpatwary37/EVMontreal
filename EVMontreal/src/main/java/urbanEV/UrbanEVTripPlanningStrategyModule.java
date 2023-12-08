@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.inject.Provider;
 
@@ -116,8 +117,9 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	@Inject
 	OutputDirectoryHierarchy controlerIO;
 
+	private final double thresholdDuration = 3*3600;
 
-	@Inject
+
 	Config config;
 
 	@Inject 
@@ -128,15 +130,19 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	protected static List<PersonContainer2> personContainer2s = new ArrayList<>();
 	private boolean ifDumbCharing = true;
 	private double dumbChargingStartTime = 0*3600;
-	private double dumbChargingEndTime = 23*3600;
+	private double dumbChargingEndTime =  24*3600;
+//	private double dumbChargingStartTime = this.config.qsim().getStartTime().seconds();
+//	private double dumbChargingEndTime =  this.config.qsim().getEndTime().seconds();
 
 	@Override
 	public void prepareReplanning(ReplanningContext replanningContext) {
 		plans = new HashSet<>();
 	}
 	@Inject
-	UrbanEVTripPlanningStrategyModule(){
-
+	UrbanEVTripPlanningStrategyModule(Config config){
+		this.config = config;
+		if(this.config.qsim().getEndTime().isDefined())this.dumbChargingEndTime = this.config.qsim().getEndTime().seconds();
+		if(this.config.qsim().getStartTime().isDefined())this.dumbChargingStartTime = this.config.qsim().getStartTime().seconds();
 	}
 
 	Set<Plan> plans = new HashSet<>();
@@ -168,9 +174,12 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 	protected Set<Id<Vehicle>> getUsedEV(Plan plan) {
 		return TripStructureUtils.getLegs(plan).stream().filter(leg->leg.getMode().equals("car")||leg.getMode().equals("car_passenger"))
-				.map(leg -> VehicleUtils.getVehicleId(plan.getPerson(), leg.getMode()))
+				.map(leg -> getVehicleId(plan.getPerson(), leg.getMode()))
 				.filter(vehicleId -> isEV(vehicleId))
 				.collect(toSet());
+		
+		
+		
 		//		Set<Id<Vehicle>> vs = new HashSet<>();
 		//		TripStructureUtils.getLegs(plan).stream().forEach(l->{
 		//			if(l.getMode().equals("car")&&l.getMode().equals("car_passenger")) {
@@ -179,6 +188,32 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		//			}
 		//		});
 		//		return vs;
+	}
+	
+	public static Id<Vehicle> getVehicleId(Person person, String mode) {
+		Map<String, Id<Vehicle>> vehicleIds = getVehicleIds(person);
+		if (!vehicleIds.containsKey(mode)) {
+			throw new RuntimeException("Could not retrieve vehicle id from person: " + person.getId().toString() + " for mode: " + mode +
+					". \nIf you are not using config.qsim().getVehicleSource() with 'defaultVehicle' or 'modeVehicleTypesFromVehiclesData' you have to provide " +
+					"a vehicle for each mode for each person. Attach a map of mode:String -> id:Id<Vehicle> with key 'vehicles' as person attribute to each person." +
+					"\n VehicleUtils.insertVehicleIdIntoAttributes does this for you."
+			);
+		}
+		return vehicleIds.get(mode);
+	}
+	public static Map<String, Id<Vehicle>> getVehicleIds(Person person) {
+		Object a=person.getAttributes().getAttribute("vehicles");
+		if(a instanceof Integer) {
+			System.out.println("Error here!!!");
+		}
+		var vehicleIds = (Map<String, Id<Vehicle>>) a;
+		if (vehicleIds == null) {
+			throw new RuntimeException("Could not retrieve vehicle id from person: " + person.getId().toString() +
+					". \nIf you are not using config.qsim().getVehicleSource() with 'defaultVehicle' or 'modeVehicleTypesFromVehiclesData' you have to provide " +
+					"a vehicle for each mode for each person. Attach a map of mode:String -> id:Id<Vehicle> with key 'vehicles' as person attribute to each person." +
+					"\n VehicleUtils.insertVehicleIdIntoAttributes does this for you.");
+		}
+		return vehicleIds;
 	}
 
 	protected boolean isEV(Id<Vehicle> vehicleId) {
@@ -195,30 +230,30 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		Set<Id<Vehicle>> evs = getUsedEV(plan);
 		if(!evs.isEmpty()) {
 			//if(!haveSufficientCharging(plan)) {
-				if(!this.purePlan.containsKey(plan.getPerson().getId())) {
-					this.purePlan.put(plan.getPerson().getId(), new ArrayList<>());
-					plan.getPerson().getAttributes().putAttribute("purePlan", plan);
+			if(!this.purePlan.containsKey(plan.getPerson().getId())) {
+				this.purePlan.put(plan.getPerson().getId(), new ArrayList<>());
+				plan.getPerson().getAttributes().putAttribute("purePlan", plan);
+			}
+			boolean unique = true;
+			for(Plan pl : this.purePlan.get(plan.getPerson().getId())) {
+				if(this.planEquals(plan, pl)) {
+					unique = false;
+					break;
 				}
-				boolean unique = true;
-				for(Plan pl : this.purePlan.get(plan.getPerson().getId())) {
-					if(this.planEquals(plan, pl)) {
-						unique = false;
-						break;
-					}
-				}
+			}
 
-				if(unique==true) {
-					Plan newPlan = PopulationUtils.createPlan();
-					PopulationUtils.copyFromTo(plan, newPlan);
-					newPlan.setPerson(plan.getPerson());
-					this.purePlan.get(plan.getPerson().getId()).add(newPlan);
-				}
+			if(unique==true) {
+				Plan newPlan = PopulationUtils.createPlan();
+				PopulationUtils.copyFromTo(plan, newPlan);
+				newPlan.setPerson(plan.getPerson());
+				this.purePlan.get(plan.getPerson().getId()).add(newPlan);
+			}
 
-//			}else {
-//				Random random = MatsimRandom.getRandom();
-//				int ind = random.nextInt(this.purePlan.get(plan.getPerson().getId()).size());
-//				PopulationUtils.copyFromTo(this.purePlan.get(plan.getPerson().getId()).get(ind), plan);
-//			}
+			//			}else {
+			//				Random random = MatsimRandom.getRandom();
+			//				int ind = random.nextInt(this.purePlan.get(plan.getPerson().getId()).size());
+			//				PopulationUtils.copyFromTo(this.purePlan.get(plan.getPerson().getId()).get(ind), plan);
+			//			}
 			this.plans.add(plan);
 		}
 	}
@@ -240,6 +275,443 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		return true;
 	}
 
+
+	public List<Activity> logicExperienceBased(Plan modifiablePlan){
+		List<PlanElement> planElements = modifiablePlan.getPlanElements();
+		List <Leg> evCarLegs = TripStructureUtils.getLegs(modifiablePlan).stream().filter(leg -> leg.getMode().equals(TransportMode.car)).collect(toList());
+		int size = planElements.size();
+		int activityIndex = -1;
+		List<Activity> pe = new ArrayList<>();
+
+		// 2 hours in seconds
+		//		for (PlanElement planElement : modifiablePlan.getPlanElements()) {
+		//			if (planElement instanceof Activity) {
+		//				Activity activity = (Activity) planElement;
+		//				double typicalDuration = this.scenario.getConfig().planCalcScore().getActivityParams(activity.getType()).getTypicalDuration().seconds();
+		//
+		//				if (typicalDuration > thresholdDuration) {
+		//					pe.add(activity);
+		//				}
+		//			}
+		//		}     
+		Set<Integer> peIndex = new HashSet<>();
+		int in = 0;
+		boolean hasCritical = false;
+
+
+		if (size > 0) {
+			int actOrder = 0;
+			for(PlanElement pl:modifiablePlan.getPlanElements()) {
+				if(pl instanceof Activity) {
+					if(((Map<Integer,Double>)modifiablePlan.getAttributes().getAttribute("actSOC")).get(actOrder)!=null) {
+						//Double soc = (Double)((Activity)pl).getAttributes().getAttribute("actSOC");
+						Double soc = ((Map<Integer,Double>)modifiablePlan.getAttributes().getAttribute("actSOC")).get(actOrder);
+						if(soc>= 0.3) {
+							peIndex.add(in);	
+						}else {
+							hasCritical = true;
+							break;
+						}
+					}
+					in++;
+					
+				}
+				actOrder++;
+			}
+			if(hasCritical==false)peIndex.clear();
+
+			PlanElement firstElement = planElements.get(0);
+			if (firstElement instanceof Activity) {
+				Activity firstActivity = (Activity) planElements.get(0);
+
+				Activity secondActivity = null;
+				secondActivity = (Activity) planElements.get(2);
+				Activity thirdActivity = null;
+				if(size>4)thirdActivity = (Activity) planElements.get(4);
+				boolean isSecondPlugin = secondActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);
+				boolean isThirdNotSameAsFirst = isSecondPlugin && !thirdActivity.getFacilityId().equals(firstActivity.getFacilityId());
+
+				boolean isFirstWithinTimeRange = firstActivity.getStartTime().isDefined() &&
+						firstActivity.getStartTime().seconds() >= this.dumbChargingStartTime &&
+						firstActivity.getStartTime().isDefined() &&
+						firstActivity.getStartTime().seconds() <= this.dumbChargingEndTime;  //Do we really need to check the end of activity?
+						if ((!isSecondPlugin || isThirdNotSameAsFirst) && isThirdNotSameAsFirst && isFirstWithinTimeRange && planElements.indexOf(evCarLegs.get(0))==1) {
+							if (peIndex.contains(0)) {
+								pe.add(firstActivity);
+							}
+						}
+			}
+
+
+
+
+			// Iterate over the plan elements to find the desired activities
+			for (int i = 1; i < size - 1; i++) {
+				PlanElement currentElement = planElements.get(i);
+
+
+
+				if (currentElement instanceof Activity) {
+
+					Activity currentActivity = (Activity) currentElement;
+
+
+
+					// Check if the current activity is already surrounded by plugin and plugout activities
+					boolean isSurroundedByPluginOrPlugout = false;
+
+
+
+					//			        Activity prevActivity = ((Activity) currentActivity).get(i - 2);
+					Activity prevActivity = (Activity) planElements.get(i - 2);
+					//			        Activity nextActivity = ((Category) currentActivity).get(i + 2);
+					Activity nextActivity = (Activity) planElements.get(i + 2);
+
+
+
+					if (prevActivity != null && nextActivity != null &&
+							(prevActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
+									//										prevActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER) ||
+									//										nextActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
+									nextActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))) {
+						isSurroundedByPluginOrPlugout = true;
+					}
+
+
+
+
+
+					// Check if the current activity is not of type "PLUGIN_IDENTIFIER" or "PLUGOUT_IDENTIFIER"
+					boolean isNotPluginOrPlugout = !currentActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) &&
+							!currentActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
+
+
+
+					// Check if the start and end times of the current activity are within the specified range
+					boolean isWithinTimeRange = currentActivity.getStartTime().isDefined() &&
+							currentActivity.getStartTime().seconds() >= this.dumbChargingStartTime &&
+							currentActivity.getStartTime().isDefined() &&
+							currentActivity.getStartTime().seconds() <= this.dumbChargingEndTime;
+
+
+
+							// Add the current activity to the pe list if it meets all the criteria
+							if (!isSurroundedByPluginOrPlugout && isNotPluginOrPlugout && isWithinTimeRange) {
+								if (peIndex.contains(i)) {
+									pe.add(currentActivity);
+								}
+							}
+				}
+			}
+
+
+
+			// Check the last activity separately
+			if (size > 1) {
+				Activity lastActivity = (Activity)planElements.get(size - 1);
+				Activity secondLastActivity = (Activity)planElements.get(size - 3);
+				Activity thirdLastActivity = null;
+				if(size>3)thirdLastActivity = (Activity)planElements.get(size - 5);
+
+				boolean isSecondLastPlugout = secondLastActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
+				boolean isLastWithinTimeRange = lastActivity.getStartTime().isDefined() &&
+						lastActivity.getStartTime().seconds() >= this.dumbChargingStartTime &&
+						lastActivity.getStartTime().isDefined() &&
+						lastActivity.getStartTime().seconds() <= this.dumbChargingEndTime;   
+						boolean isThirdLastNotSameAsLast = isSecondLastPlugout && !thirdLastActivity.getFacilityId().equals(lastActivity.getFacilityId());
+						if ((!isSecondLastPlugout || isThirdLastNotSameAsLast) && isLastWithinTimeRange && ((Leg) planElements.get(size-2)).getMode().equals(TransportMode.car)) {
+							if (peIndex.contains(size-1)) {
+								pe.add(lastActivity);
+							}
+						}
+
+			}
+		}
+
+		return pe;
+
+	}
+	
+	public void cleanActSOC(Plan plan) {
+		plan.getPlanElements().forEach(pl->{
+			if(pl instanceof Activity && ((Activity)pl).getAttributes().getAttribute("actSOC")!=null) ((Activity)pl).getAttributes().removeAttribute("actSOC");
+			
+		});
+		plan.getAttributes().removeAttribute("actSOC");
+	}
+
+	public List<Activity> logicActivityDuration(Plan modifiablePlan){
+		List<PlanElement> planElements = modifiablePlan.getPlanElements();
+		List <Leg> evCarLegs = TripStructureUtils.getLegs(modifiablePlan).stream().filter(leg -> leg.getMode().equals(TransportMode.car)).collect(toList());
+		int size = planElements.size();
+		int activityIndex = -1;
+		List<Activity> pe = new ArrayList<>();
+
+		// 2 hours in seconds
+		//		for (PlanElement planElement : modifiablePlan.getPlanElements()) {
+		//			if (planElement instanceof Activity) {
+		//				Activity activity = (Activity) planElement;
+		//				double typicalDuration = this.scenario.getConfig().planCalcScore().getActivityParams(activity.getType()).getTypicalDuration().seconds();
+		//
+		//				if (typicalDuration > thresholdDuration) {
+		//					pe.add(activity);
+		//				}
+		//			}
+		//		}     
+
+
+		if (size > 0) {
+
+
+			PlanElement firstElement = planElements.get(0);
+			if (firstElement instanceof Activity) {
+				Activity firstActivity = (Activity) planElements.get(0);
+
+				Activity secondActivity = null;
+				secondActivity = (Activity) planElements.get(2);
+				Activity thirdActivity = null;
+				if(size>4)thirdActivity = (Activity) planElements.get(4);
+				boolean isSecondPlugin = secondActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);
+				boolean isThirdNotSameAsFirst = isSecondPlugin && !thirdActivity.getFacilityId().equals(firstActivity.getFacilityId());
+
+				boolean isFirstWithinTimeRange = firstActivity.getStartTime().isDefined() &&
+						firstActivity.getStartTime().seconds() >= this.dumbChargingStartTime &&
+						firstActivity.getStartTime().isDefined() &&
+						firstActivity.getStartTime().seconds() <= this.dumbChargingEndTime;  //Do we really need to check the end of activity?
+						if ((!isSecondPlugin || isThirdNotSameAsFirst) && isThirdNotSameAsFirst && isFirstWithinTimeRange && planElements.indexOf(evCarLegs.get(0))==1) {
+							double typicalDuration = this.scenario.getConfig().planCalcScore().getActivityParams(firstActivity.getType()).getTypicalDuration().seconds();
+
+							if (typicalDuration > thresholdDuration) {
+								pe.add(firstActivity);
+							}
+						}
+			}
+
+
+
+
+			// Iterate over the plan elements to find the desired activities
+			for (int i = 1; i < size - 1; i++) {
+				PlanElement currentElement = planElements.get(i);
+
+
+
+				if (currentElement instanceof Activity) {
+
+					Activity currentActivity = (Activity) currentElement;
+
+
+
+					// Check if the current activity is already surrounded by plugin and plugout activities
+					boolean isSurroundedByPluginOrPlugout = false;
+
+
+
+					//			        Activity prevActivity = ((Activity) currentActivity).get(i - 2);
+					Activity prevActivity = (Activity) planElements.get(i - 2);
+					//			        Activity nextActivity = ((Category) currentActivity).get(i + 2);
+					Activity nextActivity = (Activity) planElements.get(i + 2);
+
+
+
+					if (prevActivity != null && nextActivity != null &&
+							(prevActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
+									//										prevActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER) ||
+									//										nextActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
+									nextActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))) {
+						isSurroundedByPluginOrPlugout = true;
+					}
+
+
+
+
+
+					// Check if the current activity is not of type "PLUGIN_IDENTIFIER" or "PLUGOUT_IDENTIFIER"
+					boolean isNotPluginOrPlugout = !currentActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) &&
+							!currentActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
+
+
+
+					// Check if the start and end times of the current activity are within the specified range
+					boolean isWithinTimeRange = currentActivity.getStartTime().isDefined() &&
+							currentActivity.getStartTime().seconds() >= this.dumbChargingStartTime &&
+							currentActivity.getStartTime().isDefined() &&
+							currentActivity.getStartTime().seconds() <= this.dumbChargingEndTime;
+
+
+
+							// Add the current activity to the pe list if it meets all the criteria
+							if (!isSurroundedByPluginOrPlugout && isNotPluginOrPlugout && isWithinTimeRange) {
+								double typicalDuration = this.scenario.getConfig().planCalcScore().getActivityParams(currentActivity.getType()).getTypicalDuration().seconds();
+
+								if (typicalDuration > thresholdDuration) {
+									pe.add(currentActivity);
+								}
+							}
+				}
+			}
+
+
+
+			// Check the last activity separately
+			if (size > 1) {
+				Activity lastActivity = (Activity)planElements.get(size - 1);
+				Activity secondLastActivity = (Activity)planElements.get(size - 3);
+				Activity thirdLastActivity = null;
+				if(size>3)thirdLastActivity = (Activity)planElements.get(size - 5);
+
+				boolean isSecondLastPlugout = secondLastActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
+				boolean isLastWithinTimeRange = lastActivity.getStartTime().isDefined() &&
+						lastActivity.getStartTime().seconds() >= this.dumbChargingStartTime &&
+						lastActivity.getStartTime().isDefined() &&
+						lastActivity.getStartTime().seconds() <= this.dumbChargingEndTime;   
+						boolean isThirdLastNotSameAsLast = isSecondLastPlugout && !thirdLastActivity.getFacilityId().equals(lastActivity.getFacilityId());
+						if ((!isSecondLastPlugout || isThirdLastNotSameAsLast) && isLastWithinTimeRange && ((Leg) planElements.get(size-2)).getMode().equals(TransportMode.car)) {
+							double typicalDuration = this.scenario.getConfig().planCalcScore().getActivityParams(lastActivity.getType()).getTypicalDuration().seconds();
+
+							if (typicalDuration > thresholdDuration) {
+								pe.add(lastActivity);
+							}
+						}
+
+			}
+		}
+		return pe;
+	}
+
+
+	public List<Activity> logicOptimized(Plan modifiablePlan){
+		List<PlanElement> planElements = modifiablePlan.getPlanElements();
+		List <Leg> evCarLegs = TripStructureUtils.getLegs(modifiablePlan).stream().filter(leg -> leg.getMode().equals(TransportMode.car)).collect(toList());
+		int size = planElements.size();
+		int activityIndex = -1;
+		List<Activity> pe = new ArrayList<>();
+
+		// 2 hours in seconds
+		//		for (PlanElement planElement : modifiablePlan.getPlanElements()) {
+		//			if (planElement instanceof Activity) {
+		//				Activity activity = (Activity) planElement;
+		//				double typicalDuration = this.scenario.getConfig().planCalcScore().getActivityParams(activity.getType()).getTypicalDuration().seconds();
+		//
+		//				if (typicalDuration > thresholdDuration) {
+		//					pe.add(activity);
+		//				}
+		//			}
+		//		}     
+
+
+		if (size > 0) {
+
+
+			PlanElement firstElement = planElements.get(0);
+			if (firstElement instanceof Activity) {
+				Activity firstActivity = (Activity) planElements.get(0);
+
+				Activity secondActivity = null;
+				secondActivity = (Activity) planElements.get(2);
+				Activity thirdActivity = null;
+				if(size>4)thirdActivity = (Activity) planElements.get(4);
+				boolean isSecondPlugin = secondActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);
+				boolean isThirdNotSameAsFirst = isSecondPlugin && !thirdActivity.getFacilityId().equals(firstActivity.getFacilityId());
+
+				boolean isFirstWithinTimeRange = firstActivity.getStartTime().isDefined() &&
+						firstActivity.getStartTime().seconds() >= this.dumbChargingStartTime;
+//						firstActivity.getStartTime().isDefined() &&
+//						firstActivity.getStartTime().seconds() <= this.dumbChargingEndTime;  //Do we really need to check the end of activity?
+						if ((!isSecondPlugin || isThirdNotSameAsFirst) && isThirdNotSameAsFirst && isFirstWithinTimeRange && planElements.indexOf(evCarLegs.get(0))==1) {
+
+							pe.add(firstActivity);
+
+						}
+			}
+
+
+
+
+			// Iterate over the plan elements to find the desired activities
+			for (int i = 1; i < size - 1; i++) {
+				PlanElement currentElement = planElements.get(i);
+
+
+
+				if (currentElement instanceof Activity) {
+
+					Activity currentActivity = (Activity) currentElement;
+
+
+
+					// Check if the current activity is already surrounded by plugin and plugout activities
+					boolean isSurroundedByPluginOrPlugout = false;
+
+
+
+					//			        Activity prevActivity = ((Activity) currentActivity).get(i - 2);
+					Activity prevActivity = (Activity) planElements.get(i - 2);
+					//			        Activity nextActivity = ((Category) currentActivity).get(i + 2);
+					Activity nextActivity = (Activity) planElements.get(i + 2);
+
+
+
+					if (prevActivity != null && nextActivity != null &&
+							(prevActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
+									//										prevActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER) ||
+									//										nextActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
+									nextActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))) {
+						isSurroundedByPluginOrPlugout = true;
+					}
+
+
+
+
+
+					// Check if the current activity is not of type "PLUGIN_IDENTIFIER" or "PLUGOUT_IDENTIFIER"
+					boolean isNotPluginOrPlugout = !currentActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) &&
+							!currentActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
+
+
+
+					// Check if the start and end times of the current activity are within the specified range
+					boolean isWithinTimeRange = currentActivity.getStartTime().isDefined() &&
+							currentActivity.getStartTime().seconds() >= this.dumbChargingStartTime;
+	//						currentActivity.getStartTime().isDefined() &&
+//							currentActivity.getStartTime().seconds() <= this.dumbChargingEndTime;
+
+
+
+							// Add the current activity to the pe list if it meets all the criteria
+							if (!isSurroundedByPluginOrPlugout && isNotPluginOrPlugout && isWithinTimeRange) {
+
+								pe.add(currentActivity);
+
+							}
+				}
+			}
+
+
+
+			// Check the last activity separately
+			if (size > 1) {
+				Activity lastActivity = (Activity)planElements.get(size - 1);
+				Activity secondLastActivity = (Activity)planElements.get(size - 3);
+				Activity thirdLastActivity = null;
+				if(size>3)thirdLastActivity = (Activity)planElements.get(size - 5);
+
+				boolean isSecondLastPlugout = secondLastActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
+				boolean isLastWithinTimeRange = lastActivity.getStartTime().isDefined() &&
+						lastActivity.getStartTime().seconds() >= this.dumbChargingStartTime;
+	//					lastActivity.getStartTime().isDefined() &&
+//						lastActivity.getStartTime().seconds() <= this.dumbChargingEndTime;   
+						boolean isThirdLastNotSameAsLast = isSecondLastPlugout && !thirdLastActivity.getFacilityId().equals(lastActivity.getFacilityId());
+						if ((!isSecondLastPlugout || isThirdLastNotSameAsLast) && isLastWithinTimeRange && ((Leg) planElements.get(size-2)).getMode().equals(TransportMode.car)) {
+
+							pe.add(lastActivity);
+
+						}
+
+			}
+		}
+		return pe;
+	}
 
 	private void execute(Plan plan) {
 		Set<Id<Vehicle>> evs = getUsedEV(plan);
@@ -280,202 +752,90 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 			//			do {
 			//			if(this.ifDumbCharing) {
-//			
-//			Leg firstEvLeg = evCarLegs.get(0);
-//			Activity actWhileCharging = (Activity) modifiablePlan.getPlanElements().get(0);
-//			int indFirstEvLeg=  modifiablePlan.getPlanElements().indexOf(firstEvLeg);
-//			actWhileCharging =  EditPlansReplan.findRealActBefore(plan,indFirstEvLeg);
-//
+			//			
+			//			Leg firstEvLeg = evCarLegs.get(0);
+			//			Activity actWhileCharging = (Activity) modifiablePlan.getPlanElements().get(0);
+			//			int indFirstEvLeg=  modifiablePlan.getPlanElements().indexOf(firstEvLeg);
+			//			actWhileCharging =  EditPlansReplan.findRealActBefore(plan,indFirstEvLeg);
+			//
+
+			double random = Math.random();
+			String logicSwitch = null;
+			if(random<=0.33) {
+				logicSwitch = "activityDuration";
+			}else if(random<=.67) {
+				logicSwitch = "experienceBased";
+			}else {
+				logicSwitch = "optimized";
+			}
 			
-			List<PlanElement> planElements = modifiablePlan.getPlanElements();
-			int size = planElements.size();
-			int activityIndex = -1;
-			List<Activity> pe = new ArrayList<>();
+//			logicSwitch= "optimized";
+			modifiablePlan.getAttributes().putAttribute("logicSwitch", logicSwitch);
+			List<Activity> pe;
+			switch(logicSwitch){
+			case "activityDuration":
+				pe = this.logicActivityDuration(modifiablePlan);
+				break;
+			case "experienceBased":
+				pe = this.logicExperienceBased(modifiablePlan);
+				break;
+			case "optimized":
+				pe = this.logicOptimized(modifiablePlan);
+				break;
+			default:
+				pe = this.logicOptimized(modifiablePlan);
+				break;
 
-			 
-
-			// Check the first activity separately
-			if (size > 0) {
-			    PlanElement firstElement = planElements.get(0);
-			    if (firstElement instanceof Activity) {
-			        Activity firstActivity = (Activity) firstElement;
-			        boolean isFirstNotPluginOrPlugout = !firstActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) &&
-			                !firstActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
-			        boolean isFirstWithinTimeRange = firstActivity.getStartTime().isDefined() &&
-			                firstActivity.getStartTime().seconds() >= this.dumbChargingStartTime &&
-			                firstActivity.getStartTime().isDefined() &&
-			                firstActivity.getStartTime().seconds() <= this.dumbChargingEndTime;  //Do we really need to check the end of activity?
-			        if (isFirstNotPluginOrPlugout && isFirstWithinTimeRange && planElements.indexOf(evCarLegs.get(0))==1) {
-			            pe.add(firstActivity);
-			        }
-			    }
 			}
 
-			 
 
-			// Iterate over the plan elements to find the desired activities
-			for (int i = 1; i < size - 1; i++) {
-			    PlanElement currentElement = planElements.get(i);
 
-			 
-
-			    if (currentElement instanceof Activity) {
-			        activityIndex++;
-			        Activity currentActivity = (Activity) currentElement;
-
-			 
-
-			        // Check if the current activity is already surrounded by plugin and plugout activities
-			        boolean isSurroundedByPluginOrPlugout = false;
-
-			 
-
-//			        Activity prevActivity = ((Activity) currentActivity).get(i - 2);
-			        Activity prevActivity = (Activity) planElements.get(i - 2);
-//			        Activity nextActivity = ((Category) currentActivity).get(i + 2);
-			        Activity nextActivity = (Activity) planElements.get(i + 2);
-
-			 
-
-			        if (prevActivity != null && nextActivity != null &&
-			                (prevActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
-			                prevActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER) ||
-			                nextActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
-			                nextActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))) {
-			            isSurroundedByPluginOrPlugout = true;
-			        }
-
-			 
-
-			        // Check if two immediate activities are surrounded by plugin and plugout activities
-			        boolean areImmediateActivitiesSurrounded = false;
-
-			 
-
-			        if (activityIndex > 0 && activityIndex < size / 2 - 1) {
-			            Activity prevPrevActivity = (Activity) planElements.get(i - 2);
-			            Activity nextNextActivity = (Activity) planElements.get(i + 2);
-
-			 
-
-			            if (prevPrevActivity != null && nextNextActivity != null &&
-			                    (prevPrevActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
-			                    prevPrevActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER) ||
-			                    nextNextActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
-			                    nextNextActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))) {
-			                areImmediateActivitiesSurrounded = true;
-			            }
-			        }
-
-			 
-
-			        // Check if the current activity is not of type "PLUGIN_IDENTIFIER" or "PLUGOUT_IDENTIFIER"
-			        boolean isNotPluginOrPlugout = !currentActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) &&
-			                !currentActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
-
-			 
-
-			        // Check if the start and end times of the current activity are within the specified range
-			        boolean isWithinTimeRange = currentActivity.getStartTime().isDefined() &&
-			                currentActivity.getStartTime().seconds() >= this.dumbChargingStartTime &&
-			                currentActivity.getStartTime().isDefined() &&
-			                currentActivity.getStartTime().seconds() <= this.dumbChargingEndTime;
-
-			 
-
-			        // Add the current activity to the pe list if it meets all the criteria
-			        if (!isSurroundedByPluginOrPlugout && !areImmediateActivitiesSurrounded && isNotPluginOrPlugout && isWithinTimeRange) {
-			            pe.add(currentActivity);
-			        }
-			    }
-			}
-
-			 
-
-			// Check the last activity separately
-			if (size > 1) {
-			    PlanElement lastElement = planElements.get(size - 1);
-			    PlanElement prevLastElement = planElements.get(size - 3);
-			    if (lastElement instanceof Activity) {
-			        Activity lastActivity = (Activity) lastElement;
-			        boolean isLastNotPluginOrPlugout = !lastActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) &&
-			                !lastActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
-			        boolean isLastWithinTimeRange = lastActivity.getStartTime().isDefined() &&
-			                lastActivity.getStartTime().seconds() >= this.dumbChargingStartTime &&
-			                lastActivity.getStartTime().isDefined() &&
-			                lastActivity.getStartTime().seconds() <= this.dumbChargingEndTime;   
-			        if (isLastNotPluginOrPlugout && isLastWithinTimeRange && ((Leg) planElements.get(size-2)).getMode().equals(TransportMode.car) &&   !((Activity) planElements.get(size-3)).getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER)) {
-			            pe.add(lastActivity);
-			        }
-			    }
-			}
-
-			
-			
-			boolean prevLegIsEV;
-//			int i = 0;
-//			List<Activity> pe = new ArrayList<>();
-//			for (PlanElement pel: new ArrayList <> (modifiablePlan.getPlanElements())) {
-//				
-//				if (pel instanceof Activity && ((Activity) pel).getStartTime().isDefined() && ((Activity) pel).getStartTime().seconds() >= this.dumbChargingStartTime && ((Activity) pel).getStartTime().seconds() <= this.dumbChargingEndTime) {
-//					if (!((Activity) pel).getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER) && !((Activity) pel).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)) {
-//						if(i>1 && ((Leg) modifiablePlan.getPlanElements().get(i-1)).getMode().equals(TransportMode.car) &&!((Activity) modifiablePlan.getPlanElements().get(i-2)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) &&!(((Activity) modifiablePlan.getPlanElements().get(i-2)).getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))) {
-//							pe.add((Activity) pel);
-//						} else if (i==0 && modifiablePlan.getPlanElements().indexOf(evCarLegs.get(0))==1 && !((Activity) modifiablePlan.getPlanElements().get(i+2)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)) {
-//							pe.add((Activity) pel);
-//						}
-//					}
-//		}
-//				i++;	
-//			}
-			//				Random random = MatsimRandom.getRandom();
-			//				int ind = random.nextInt(pe.size());
 			if (pe.size()>0) {
 				Activity act = pe.get(MatsimRandom.getRandom().nextInt(pe.size()));
 				if(modifiablePlan.getPlanElements().indexOf(act)==0) {	
-//					Leg firstEvLeg = evCarLegs.get(0);
+					//		Leg firstEvLeg = evCarLegs.get(0);
 					//				Activity originalActWhileCharging = EditPlans.findRealActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(firstEvLeg));//
 					//				Activity lastAct = EditPlans.findRealActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(firstEvLeg));
-//					Activity act = (Activity) modifiablePlan.getPlanElements().get(0); ****** maybe this is not necessary
-//					int indFirstEvLeg=  modifiablePlan.getPlanElements().indexOf(firstEvLeg);
-//					actWhileCharging =  EditPlansReplan.findRealActBefore(plan,indFirstEvLeg);// comment this line out TODO: figure out this line 
+					//		Activity act = (Activity) modifiablePlan.getPlanElements().get(0); ****** maybe this is not necessary
+					//		int indFirstEvLeg=  modifiablePlan.getPlanElements().indexOf(firstEvLeg);
+					//		actWhileCharging =  EditPlansReplan.findRealActBefore(plan,indFirstEvLeg);// comment this line out TODO: figure out this line 
 
 
-//					if(((Activity)modifiablePlan.getPlanElements().get(indFirstEvLeg+1)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)
-//							&& ifSameAct((Activity)modifiablePlan.getPlanElements().get(indFirstEvLeg+3),actWhileCharging)){// Already replanned before 
-//						log.info("Already have a home charging trip. Skipping.");
-//						
+					//		if(((Activity)modifiablePlan.getPlanElements().get(indFirstEvLeg+1)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)
+					//				&& ifSameAct((Activity)modifiablePlan.getPlanElements().get(indFirstEvLeg+3),actWhileCharging)){// Already replanned before 
+					//			log.info("Already have a home charging trip. Skipping.");
+					//			
 
 
 
-//					} else {
+					//		} else {
 					Leg leg = ((Leg) modifiablePlan.getPlanElements().get(1));
-						Network modeNetwork = this.singleModeNetworksCache.getSingleModeNetworksCache().get(leg.getMode());
-						ChargerSpecification charger = selectChargerNearToLink(modifiablePlan.getPerson().getId(), act.getLinkId(), electricVehicleSpecification, modeNetwork, act.getStartTime().seconds());
-//						Link chargingLink = modeNetwork.getLinks().get(actWhileCharging.getLinkId());
-						Link chargingLink = modeNetwork.getLinks().get(charger.getLinkId());
-						if(charger!= null) {
+					Network modeNetwork = this.singleModeNetworksCache.getSingleModeNetworksCache().get(leg.getMode());
+					ChargerSpecification charger = selectChargerNearToLink(modifiablePlan.getPerson().getId(), act.getLinkId(), electricVehicleSpecification, modeNetwork, act.getStartTime().seconds());
+					//			Link chargingLink = modeNetwork.getLinks().get(actWhileCharging.getLinkId());
+					Link chargingLink = modeNetwork.getLinks().get(charger.getLinkId());
+					if(charger!= null) {
 						String routingMode = TripStructureUtils.getRoutingMode(leg);
 						planPluginTripFromHomeToCharger(modifiablePlan, routingMode, electricVehicleSpecification, act, chargingLink, tripRouter);
-//						Leg plugoutLeg = leg;
+						//			Leg plugoutLeg = leg;
 						Activity plugoutTripOrigin = findRealOrChargingActBefore(plan, modifiablePlan.getPlanElements().indexOf(leg));
 						Activity plugoutTripDestination = findRealOrChargingActAfter(plan, modifiablePlan.getPlanElements().indexOf(leg));
 						planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, plugoutTripOrigin, plugoutTripDestination, chargingLink, tripRouter, PlanRouter.calcEndOfActivity(plugoutTripOrigin, modifiablePlan, config));
 						//TODO don't we need to trigger SoC emulation here (in order to account for the energy charged before home actvity is ended?) see also todo-comment below
-						}
-//					}
+					}
+					//		}
 				} else if(modifiablePlan.getPlanElements().indexOf(act) == (modifiablePlan.getPlanElements().size()-1)) {
 
 					Activity actBefore = findRealOrChargingActBefore(plan, modifiablePlan.getPlanElements().size()-2);
-//					Activity lastAct = (Activity) modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().size()-1);
+					//		Activity lastAct = (Activity) modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().size()-1);
 					Leg leg = (Leg) modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().size()-2);
-//							EditPlansReplan.findRealActAfter(plan, modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC));
-//					if(!((Activity)modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC)+1)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) &&
-//							pseudoVehicle.getBattery().getSoc()/pseudoVehicle.getBattery().getCapacity()<.999) {
-						Network modeNetwork = this.singleModeNetworksCache.getSingleModeNetworksCache().get(leg.getMode());
-//						Link chargingLink = modeNetwork.getLinks().get(act.getLinkId());
-						ChargerSpecification charger = selectChargerNearToLink(modifiablePlan.getPerson().getId(), act.getLinkId(), electricVehicleSpecification, modeNetwork, act.getStartTime().seconds());
-						if(charger!= null) {
+					//				EditPlansReplan.findRealActAfter(plan, modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC));
+					//		if(!((Activity)modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(legWithCriticalSOC)+1)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) &&
+					//				pseudoVehicle.getBattery().getSoc()/pseudoVehicle.getBattery().getCapacity()<.999) {
+					Network modeNetwork = this.singleModeNetworksCache.getSingleModeNetworksCache().get(leg.getMode());
+					//			Link chargingLink = modeNetwork.getLinks().get(act.getLinkId());
+					ChargerSpecification charger = selectChargerNearToLink(modifiablePlan.getPerson().getId(), act.getLinkId(), electricVehicleSpecification, modeNetwork, act.getStartTime().seconds());
+					if(charger!= null) {
 						Link chargingLink = modeNetwork.getLinks().get(charger.getLinkId());
 						String routingMode = TripStructureUtils.getRoutingMode(leg);
 						planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, actBefore, act, chargingLink, tripRouter);
@@ -486,7 +846,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 						log.info(plan.getPerson().getId() + " is charging at home.");
 						PersonContainer2 personContainer2 = new PersonContainer2(plan.getPerson().getId(), "is charging at home.");
 						personContainer2s.add(personContainer2);
-				}
+					}
 
 
 
@@ -508,9 +868,16 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 					}
 				}
 			}
+
 		}
+
+		//         }
+		
+		cleanActSOC(modifiablePlan);
 	}
 
+
+	// --------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 	//			int i = 0;
@@ -660,10 +1027,8 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 	//}
 
-	private Map<Id<Person>, List<Plan>> pel() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+
+
 	public static boolean ifSameAct(Activity act1, Activity act2) {
 		if(act1.getType().equals(act2.getType())&&act1.getLinkId().equals(act2.getLinkId())) {
 			return true;
@@ -750,7 +1115,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			personContainer2s.add(personContainer2);
 			return;
 		}
-	}
+
 
 		//		Preconditions.checkNotNull(actWhileCharging, "could not insert plugin activity in plan of agent " + mobsimagent.getId() +
 		//				".\n One reason could be that the agent has no suitable activity prior to the leg for which the " +
@@ -760,146 +1125,146 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 		//TODO what if actWhileCharging does not hold a link id?
 
-//		Link chargingLink = modeNetwork.getLinks().get(selectedCharger.getLinkId());
-//
-//		boolean breakAct = MatsimRandom.getRandom().nextBoolean();
-//		boolean breakAct = false; // if you keep it false, no activity break will happen**
-//		boolean chargeAtStart = false;
-//		if(breakAct == true) {
-//			chargeAtStart = MatsimRandom.getRandom().nextBoolean();
-//
-//			// now we choose duration of the charging and place to break the activity
-//			ElectricVehicle pseudoVehicle = ElectricVehicleImpl.create(electricVehicleSpecification, driveConsumptionFactory, auxConsumptionFactory, chargingPowerFactory);
-//			pseudoVehicle.getBattery().setSoc(pseudoVehicle.getBattery().getCapacity());
-//			//double charge = pseudoVehicle.getChargingPower().calcChargingPower(selectedCharger) * chargingDuration;
-//			double reqCharge = 0;
-//			for(int i = modifiablePlan.getPlanElements().indexOf(leg);i<modifiablePlan.getPlanElements().size();i++) {
-//				if(modifiablePlan.getPlanElements().get(i) instanceof Leg) {
-//					Leg leg_ = (Leg) modifiablePlan.getPlanElements().get(i);
-//					if (leg_.getMode().equals(leg.getMode()) && VehicleUtils.getVehicleId(modifiablePlan.getPerson(), leg_.getMode()).toString().equals(pseudoVehicle.getId().toString())) {
-//						emulateVehicleDischarging(pseudoVehicle, leg_);
-//					}
-//				}
-//			}
-//			//TODO: fix the issue, the required 
-//			reqCharge = (pseudoVehicle.getBattery().getCapacity() - pseudoVehicle.getBattery().getSoc())*this.factorOfSafety;
-//			if(reqCharge<=0)reqCharge = pseudoVehicle.getBattery().getCapacity();
-//			double chargeTime = reqCharge/pseudoVehicle.getChargingPower().calcChargingPower(selectedCharger);
-//			double randomChargeTime = chargeTime + MatsimRandom.getRandom().nextGaussian()*chargeTime*cov;//
-//			if(randomChargeTime<600)randomChargeTime =600; 
-//			double actBreakTime = 0;
-//			TripRouter tripRouter = tripRouterProvider.get();
-//			int ind = modifiablePlan.getPlanElements().indexOf(actWhileCharging);
-//			if(chargeAtStart) {
-//				Activity pluginTripOrigin = findRealOrChargingActBefore(modifiablePlan, modifiablePlan.getPlanElements().indexOf(actWhileCharging));
-//				this.planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, pluginTripOrigin, actWhileCharging, chargingLink, tripRouter);
-//				double beforeActStartTime = TripRouter.calcEndOfPlanElement(pluginTripOrigin.getEndTime().seconds(), 
-//						modifiablePlan.getPlanElements().get(ind-1), config);
-//				double beforeActEndTime = beforeActStartTime+randomChargeTime; 
-//				Activity actBeforeBreak = scenario.getPopulation().getFactory().createActivityFromCoord(actWhileCharging.getType(), actWhileCharging.getCoord());
-//				actBeforeBreak.setLinkId(actWhileCharging.getLinkId());
-//				actBeforeBreak.setFacilityId(actWhileCharging.getFacilityId());
-//				ActivityFacility fac;
-//				if((fac = scenario.getActivityFacilities().getFacilities().get(actBeforeBreak.getFacilityId())).getCoord()==null) {
-//					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
-//				}
-//				actBeforeBreak.setEndTime(beforeActEndTime);
-//
-//				actBeforeBreak.getAttributes().putAttribute(ifBrokenActivity, false);
-//				Activity actAfterBreak = scenario.getPopulation().getFactory().createActivityFromCoord(actWhileCharging.getType(), actWhileCharging.getCoord());
-//				actAfterBreak.setLinkId(actWhileCharging.getLinkId());
-//				actAfterBreak.setFacilityId(actWhileCharging.getFacilityId());
-//				actAfterBreak.setEndTime(actWhileCharging.getEndTime().seconds());
-//				actAfterBreak.getAttributes().putAttribute(ifBrokenActivity, false);
-//
-//				if((fac = scenario.getActivityFacilities().getFacilities().get(actAfterBreak.getFacilityId())).getCoord()==null) {
-//					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
-//				}
-//				Leg legDummy = scenario.getPopulation().getFactory().createLeg(TransportMode.walk);
-//				modifiablePlan.getPlanElements().add(ind,actBeforeBreak);
-//				modifiablePlan.getPlanElements().add(ind+1,legDummy);
-//				modifiablePlan.getPlanElements().add(ind+2,actAfterBreak);
-//				modifiablePlan.getPlanElements().remove(actWhileCharging);
-//				this.planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, actBeforeBreak, actAfterBreak, chargingLink, tripRouter, beforeActEndTime);
-//			}else {
-//				actBreakTime = actWhileCharging.getEndTime().seconds()-randomChargeTime-600;
-//				Activity actBeforeBreak = scenario.getPopulation().getFactory().createActivityFromCoord(actWhileCharging.getType(), actWhileCharging.getCoord());
-//				actBeforeBreak.setEndTime(actBreakTime);
-//				actBeforeBreak.setLinkId(actWhileCharging.getLinkId());
-//				actBeforeBreak.setFacilityId(actWhileCharging.getFacilityId());
-//				ActivityFacility fac;
-//				if((fac = scenario.getActivityFacilities().getFacilities().get(actBeforeBreak.getFacilityId())).getCoord()==null) {
-//					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
-//				}
-//				actBeforeBreak.getAttributes().putAttribute(ifBrokenActivity, false);
-//				Activity actAfterBreak = scenario.getPopulation().getFactory().createActivityFromCoord(actWhileCharging.getType(), actWhileCharging.getCoord());
-//				actAfterBreak.setLinkId(actWhileCharging.getLinkId());
-//				actAfterBreak.setFacilityId(actWhileCharging.getFacilityId());
-//				actAfterBreak.setEndTime(actWhileCharging.getEndTime().seconds());
-//				actAfterBreak.getAttributes().putAttribute(ifBrokenActivity, false);
-//				if((fac = scenario.getActivityFacilities().getFacilities().get(actAfterBreak.getFacilityId())).getCoord()==null) {
-//					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
-//				}
-//				Leg legDummy = scenario.getPopulation().getFactory().createLeg(routingMode);
-//				modifiablePlan.getPlanElements().add(ind,actBeforeBreak);
-//				modifiablePlan.getPlanElements().add(ind+1,legDummy);
-//				modifiablePlan.getPlanElements().add(ind+2,actAfterBreak);
-//				modifiablePlan.getPlanElements().remove(actWhileCharging);
-//				this.planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, actBeforeBreak, actAfterBreak, chargingLink, tripRouter);
-//				Leg plugoutLeg = activityWhileChargingFinder.getNextLegOfRoutingModeAfterActivity(ImmutableList.copyOf(modifiablePlan.getPlanElements()), actWhileCharging, routingMode);
-//				Activity plugoutTripDestination = findRealOrChargingActAfter(modifiablePlan, modifiablePlan.getPlanElements().indexOf(plugoutLeg));
-//				planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, actAfterBreak, plugoutTripDestination, chargingLink, tripRouter, PlanRouter.calcEndOfActivity(actBeforeBreak, modifiablePlan, config));
-//			}
-//
-//
-//		}else {
-//
-//
-//
-//			//		Activity pluginTripOrigin = EditPlans.findRealActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(actWhileCharging));
-//			Activity pluginTripOrigin = findRealOrChargingActBefore(modifiablePlan, modifiablePlan.getPlanElements().indexOf(actWhileCharging));
-//
-//			Leg plugoutLeg = activityWhileChargingFinder.getNextLegOfRoutingModeAfterActivity(ImmutableList.copyOf(modifiablePlan.getPlanElements()), actWhileCharging, routingMode);
-//			Activity plugoutTripOrigin = findRealOrChargingActBefore(modifiablePlan, modifiablePlan.getPlanElements().indexOf(plugoutLeg));
-//			Activity plugoutTripDestination = findRealOrChargingActAfter(modifiablePlan, modifiablePlan.getPlanElements().indexOf(plugoutLeg));
-//
-//			//		{    //some consistency checks.. //TODO consider to put in a JUnit test..
-//			//			Preconditions.checkNotNull(pluginTripOrigin, "pluginTripOrigin is null. should never happen..");
-//			//			Preconditions.checkState(!pluginTripOrigin.equals(actWhileCharging), "pluginTripOrigin is equal to actWhileCharging. should never happen..");
-//			//
-//			//			PlanElement legToBeReplaced = modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(pluginTripOrigin) + 3);
-//			//			Preconditions.checkState(legToBeReplaced instanceof Leg);
-//			//			Preconditions.checkState(TripStructureUtils.getRoutingMode((Leg) legToBeReplaced).equals(routingMode), "leg after pluginTripOrigin has the wrong routing mode. should not happen..");
-//			//
-//			//			legToBeReplaced = modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(actWhileCharging) - 3);
-//			//			Preconditions.checkState(legToBeReplaced instanceof Leg);
-//			//			Preconditions.checkState(TripStructureUtils.getRoutingMode((Leg) legToBeReplaced).equals(routingMode), "leg before actWhileCharging has the wrong routing mode. should not happen..");
-//			//
-//			//			Preconditions.checkState(!plugoutTripDestination.equals(actWhileCharging), "plugoutTripDestination is equal to actWhileCharging. should never happen..");
-//			//
-//			//			Preconditions.checkState(modifiablePlan.getPlanElements().indexOf(pluginTripOrigin) < modifiablePlan.getPlanElements().indexOf(actWhileCharging));
-//			//			Preconditions.checkState(modifiablePlan.getPlanElements().indexOf(actWhileCharging) <= modifiablePlan.getPlanElements().indexOf(plugoutTripOrigin));
-//			//			Preconditions.checkState(modifiablePlan.getPlanElements().indexOf(plugoutTripOrigin) < modifiablePlan.getPlanElements().indexOf(plugoutTripDestination));
-//			//
-//			//			legToBeReplaced = modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(plugoutTripOrigin) + 3);
-//			//			Preconditions.checkState(legToBeReplaced instanceof Leg);
-//			//			Preconditions.checkState(TripStructureUtils.getRoutingMode((Leg) legToBeReplaced).equals(routingMode), "leg after plugoutTripOrigin has the wrong routing mode. should not happen..");
-//			//
-//			//			legToBeReplaced = modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(plugoutTripDestination) - 3);
-//			//			Preconditions.checkState(legToBeReplaced instanceof Leg);
-//			//			Preconditions.checkState(TripStructureUtils.getRoutingMode((Leg) legToBeReplaced).equals(routingMode), "leg before plugoutTripDestination has the wrong routing mode. should not happen..");
-//			//		}
-//
-//			TripRouter tripRouter = tripRouterProvider.get();
-//			planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, pluginTripOrigin, actWhileCharging, chargingLink, tripRouter);
-//			planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, plugoutTripOrigin, plugoutTripDestination, chargingLink, tripRouter, PlanRouter.calcEndOfActivity(plugoutTripOrigin, modifiablePlan, config));
-//		}
-//		if(!isConsistant(modifiablePlan)||!this.checkPlanConsistancy(modifiablePlan)) {
-//			System.out.println("Plan is not consistant!!! Debug!!!");
-//		}
-//		//this.checkPlanConsistancy(modifiablePlan);
-//
-//	}
+		Link chargingLink = modeNetwork.getLinks().get(selectedCharger.getLinkId());
+
+		//		boolean breakAct = MatsimRandom.getRandom().nextBoolean();
+		boolean breakAct = true; // if you keep it false, no activity break will happen**
+		boolean chargeAtStart = false;
+		if(breakAct == true) {
+			chargeAtStart = MatsimRandom.getRandom().nextBoolean();
+
+			// now we choose duration of the charging and place to break the activity
+			ElectricVehicle pseudoVehicle = ElectricVehicleImpl.create(electricVehicleSpecification, driveConsumptionFactory, auxConsumptionFactory, chargingPowerFactory);
+			pseudoVehicle.getBattery().setSoc(pseudoVehicle.getBattery().getCapacity());
+			//double charge = pseudoVehicle.getChargingPower().calcChargingPower(selectedCharger) * chargingDuration;
+			double reqCharge = 0;
+			for(int i = modifiablePlan.getPlanElements().indexOf(leg);i<modifiablePlan.getPlanElements().size();i++) {
+				if(modifiablePlan.getPlanElements().get(i) instanceof Leg) {
+					Leg leg_ = (Leg) modifiablePlan.getPlanElements().get(i);
+					if (leg_.getMode().equals(leg.getMode()) && VehicleUtils.getVehicleId(modifiablePlan.getPerson(), leg_.getMode()).toString().equals(pseudoVehicle.getId().toString())) {
+						emulateVehicleDischarging(pseudoVehicle, leg_);
+					}
+				}
+			}
+			//TODO: fix the issue, the required 
+			reqCharge = (pseudoVehicle.getBattery().getCapacity() - pseudoVehicle.getBattery().getSoc())*this.factorOfSafety;
+			if(reqCharge<=0)reqCharge = pseudoVehicle.getBattery().getCapacity();
+			double chargeTime = reqCharge/pseudoVehicle.getChargingPower().calcChargingPower(selectedCharger);
+			double randomChargeTime = chargeTime + MatsimRandom.getRandom().nextGaussian()*chargeTime*cov;//
+			if(randomChargeTime<600)randomChargeTime =600; 
+			double actBreakTime = 0;
+			TripRouter tripRouter = tripRouterProvider.get();
+			int ind = modifiablePlan.getPlanElements().indexOf(actWhileCharging);
+			if(chargeAtStart) {
+				Activity pluginTripOrigin = findRealOrChargingActBefore(modifiablePlan, modifiablePlan.getPlanElements().indexOf(actWhileCharging));
+				this.planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, pluginTripOrigin, actWhileCharging, chargingLink, tripRouter);
+				double beforeActStartTime = TripRouter.calcEndOfPlanElement(pluginTripOrigin.getEndTime().seconds(), 
+						modifiablePlan.getPlanElements().get(ind-1), config);
+				double beforeActEndTime = beforeActStartTime+randomChargeTime; 
+				Activity actBeforeBreak = scenario.getPopulation().getFactory().createActivityFromCoord(actWhileCharging.getType(), actWhileCharging.getCoord());
+				actBeforeBreak.setLinkId(actWhileCharging.getLinkId());
+				actBeforeBreak.setFacilityId(actWhileCharging.getFacilityId());
+				ActivityFacility fac;
+				if((fac = scenario.getActivityFacilities().getFacilities().get(actBeforeBreak.getFacilityId())).getCoord()==null) {
+					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
+				}
+				actBeforeBreak.setEndTime(beforeActEndTime);
+
+				actBeforeBreak.getAttributes().putAttribute(ifBrokenActivity, false);
+				Activity actAfterBreak = scenario.getPopulation().getFactory().createActivityFromCoord(actWhileCharging.getType(), actWhileCharging.getCoord());
+				actAfterBreak.setLinkId(actWhileCharging.getLinkId());
+				actAfterBreak.setFacilityId(actWhileCharging.getFacilityId());
+				actAfterBreak.setEndTime(actWhileCharging.getEndTime().seconds());
+				actAfterBreak.getAttributes().putAttribute(ifBrokenActivity, false);
+
+				if((fac = scenario.getActivityFacilities().getFacilities().get(actAfterBreak.getFacilityId())).getCoord()==null) {
+					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
+				}
+				Leg legDummy = scenario.getPopulation().getFactory().createLeg(TransportMode.walk);
+				modifiablePlan.getPlanElements().add(ind,actBeforeBreak);
+				modifiablePlan.getPlanElements().add(ind+1,legDummy);
+				modifiablePlan.getPlanElements().add(ind+2,actAfterBreak);
+				modifiablePlan.getPlanElements().remove(actWhileCharging);
+				this.planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, actBeforeBreak, actAfterBreak, chargingLink, tripRouter, beforeActEndTime);
+			}else {
+				actBreakTime = actWhileCharging.getEndTime().seconds()-randomChargeTime-600;
+				Activity actBeforeBreak = scenario.getPopulation().getFactory().createActivityFromCoord(actWhileCharging.getType(), actWhileCharging.getCoord());
+				actBeforeBreak.setEndTime(actBreakTime);
+				actBeforeBreak.setLinkId(actWhileCharging.getLinkId());
+				actBeforeBreak.setFacilityId(actWhileCharging.getFacilityId());
+				ActivityFacility fac;
+				if((fac = scenario.getActivityFacilities().getFacilities().get(actBeforeBreak.getFacilityId())).getCoord()==null) {
+					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
+				}
+				actBeforeBreak.getAttributes().putAttribute(ifBrokenActivity, false);
+				Activity actAfterBreak = scenario.getPopulation().getFactory().createActivityFromCoord(actWhileCharging.getType(), actWhileCharging.getCoord());
+				actAfterBreak.setLinkId(actWhileCharging.getLinkId());
+				actAfterBreak.setFacilityId(actWhileCharging.getFacilityId());
+				actAfterBreak.setEndTime(actWhileCharging.getEndTime().seconds());
+				actAfterBreak.getAttributes().putAttribute(ifBrokenActivity, false);
+				if((fac = scenario.getActivityFacilities().getFacilities().get(actAfterBreak.getFacilityId())).getCoord()==null) {
+					fac.setCoord(scenario.getNetwork().getLinks().get(fac.getLinkId()).getCoord());
+				}
+				Leg legDummy = scenario.getPopulation().getFactory().createLeg(routingMode);
+				modifiablePlan.getPlanElements().add(ind,actBeforeBreak);
+				modifiablePlan.getPlanElements().add(ind+1,legDummy);
+				modifiablePlan.getPlanElements().add(ind+2,actAfterBreak);
+				modifiablePlan.getPlanElements().remove(actWhileCharging);
+				this.planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, actBeforeBreak, actAfterBreak, chargingLink, tripRouter);
+				Leg plugoutLeg = activityWhileChargingFinder.getNextLegOfRoutingModeAfterActivity(ImmutableList.copyOf(modifiablePlan.getPlanElements()), actWhileCharging, routingMode);
+				Activity plugoutTripDestination = findRealOrChargingActAfter(modifiablePlan, modifiablePlan.getPlanElements().indexOf(plugoutLeg));
+				planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, actAfterBreak, plugoutTripDestination, chargingLink, tripRouter, PlanRouter.calcEndOfActivity(actBeforeBreak, modifiablePlan, config));
+			}
+
+
+		}else {
+			//
+			//
+			//
+			//		Activity pluginTripOrigin = EditPlans.findRealActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(actWhileCharging));
+			Activity pluginTripOrigin = findRealOrChargingActBefore(modifiablePlan, modifiablePlan.getPlanElements().indexOf(actWhileCharging));
+
+			Leg plugoutLeg = activityWhileChargingFinder.getNextLegOfRoutingModeAfterActivity(ImmutableList.copyOf(modifiablePlan.getPlanElements()), actWhileCharging, routingMode);
+			Activity plugoutTripOrigin = findRealOrChargingActBefore(modifiablePlan, modifiablePlan.getPlanElements().indexOf(plugoutLeg));
+			Activity plugoutTripDestination = findRealOrChargingActAfter(modifiablePlan, modifiablePlan.getPlanElements().indexOf(plugoutLeg));
+			//
+			//			//		{    //some consistency checks.. //TODO consider to put in a JUnit test..
+			//			//			Preconditions.checkNotNull(pluginTripOrigin, "pluginTripOrigin is null. should never happen..");
+			//			//			Preconditions.checkState(!pluginTripOrigin.equals(actWhileCharging), "pluginTripOrigin is equal to actWhileCharging. should never happen..");
+			//			//
+			//			//			PlanElement legToBeReplaced = modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(pluginTripOrigin) + 3);
+			//			//			Preconditions.checkState(legToBeReplaced instanceof Leg);
+			//			//			Preconditions.checkState(TripStructureUtils.getRoutingMode((Leg) legToBeReplaced).equals(routingMode), "leg after pluginTripOrigin has the wrong routing mode. should not happen..");
+			//			//
+			//			//			legToBeReplaced = modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(actWhileCharging) - 3);
+			//			//			Preconditions.checkState(legToBeReplaced instanceof Leg);
+			//			//			Preconditions.checkState(TripStructureUtils.getRoutingMode((Leg) legToBeReplaced).equals(routingMode), "leg before actWhileCharging has the wrong routing mode. should not happen..");
+			//			//
+			//			//			Preconditions.checkState(!plugoutTripDestination.equals(actWhileCharging), "plugoutTripDestination is equal to actWhileCharging. should never happen..");
+			//			//
+			//			//			Preconditions.checkState(modifiablePlan.getPlanElements().indexOf(pluginTripOrigin) < modifiablePlan.getPlanElements().indexOf(actWhileCharging));
+			//			//			Preconditions.checkState(modifiablePlan.getPlanElements().indexOf(actWhileCharging) <= modifiablePlan.getPlanElements().indexOf(plugoutTripOrigin));
+			//			//			Preconditions.checkState(modifiablePlan.getPlanElements().indexOf(plugoutTripOrigin) < modifiablePlan.getPlanElements().indexOf(plugoutTripDestination));
+			//			//
+			//			//			legToBeReplaced = modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(plugoutTripOrigin) + 3);
+			//			//			Preconditions.checkState(legToBeReplaced instanceof Leg);
+			//			//			Preconditions.checkState(TripStructureUtils.getRoutingMode((Leg) legToBeReplaced).equals(routingMode), "leg after plugoutTripOrigin has the wrong routing mode. should not happen..");
+			//			//
+			//			//			legToBeReplaced = modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(plugoutTripDestination) - 3);
+			//			//			Preconditions.checkState(legToBeReplaced instanceof Leg);
+			//			//			Preconditions.checkState(TripStructureUtils.getRoutingMode((Leg) legToBeReplaced).equals(routingMode), "leg before plugoutTripDestination has the wrong routing mode. should not happen..");
+			//			//		}
+			//
+			TripRouter tripRouter = tripRouterProvider.get();
+			planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, pluginTripOrigin, actWhileCharging, chargingLink, tripRouter);
+			planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, plugoutTripOrigin, plugoutTripDestination, chargingLink, tripRouter, PlanRouter.calcEndOfActivity(plugoutTripOrigin, modifiablePlan, config));
+		}
+		if(!isConsistant(modifiablePlan)||!this.checkPlanConsistancy(modifiablePlan)) {
+			System.out.println("Plan is not consistant!!! Debug!!!");
+		}
+		//		//this.checkPlanConsistancy(modifiablePlan);
+		//
+	}
 
 
 	protected boolean isConsistant(Plan plan) {
@@ -974,6 +1339,20 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		}
 	}
 
+	private int getTimeStep(double time) {
+		if(time == 0) {
+			time = 1;
+		}else if(time>24*3600) {
+			time = time-24*3600;
+		}
+		for(int i = 0; i<24;i++) {
+			if(time>i*3600 && time<=(i+1)*3600) {
+				return i;
+			}
+		}
+		return 0;
+	}
+	
 	protected ChargerSpecification selectChargerNearToLink(Id<Person>pId, Id<Link> linkId, ElectricVehicleSpecification vehicleSpecification, Network network, double time) {
 
 		UrbanEVConfigGroup configGroup = (UrbanEVConfigGroup) config.getModules().get(UrbanEVConfigGroup.GROUP_NAME);
@@ -984,7 +1363,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				.stream()
 				.filter(charger -> vehicleSpecification.getChargerTypes().contains(charger.getChargerType()))
 				.filter(c->this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().isEmpty()||this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getPersonsAccecibleTo().contains(pId))
-				.filter(c->this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getChargerSwitch().get((int) (time/3600)))
+				.filter(c->this.chargerPricingProfiles.getChargerPricingProfiles().get(c.getId()).getChargerSwitch().get((int) (this.getTimeStep(time))))
 				.collect(Collectors.toList());
 
 		//		List<ChargerSpecification> chargerList = new ArrayList<>();

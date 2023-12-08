@@ -67,8 +67,10 @@ import com.google.inject.Inject;
  *
  */
 
+
 public class ChargePricingEventHandler implements ChargingStartEventHandler, ChargingEndEventHandler, LinkLeaveEventHandler,TransitDriverStartsEventHandler,
 PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTrafficEventHandler,VehicleLeavesTrafficEventHandler, MobsimScopeEventHandler, MobsimAfterSimStepListener,MobsimBeforeSimStepListener{
+
 	
 
 	private Set<Event> queuedEvents = new HashSet<>();
@@ -235,16 +237,16 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		
 			int timeId = (int)(cd.startingTime/3600);
 			if(timeId>23)timeId = timeId-24;
-			double[] pricingProfile = this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getPricingProfile().get(timeId);
-			double cost = 0;
-			double charge = cd.initialSoc;
-			for(int i = 0; i<pricingProfile.length;i++) {
-				//System.out.println((cd.chargeDetails[i]-charge)*2.78e-7);
-				if(cd.chargeDetails[i]>0)cost+=pricingProfile[i]*(cd.chargeDetails[i]-charge)*2.78e-7;
-				else break;
-				charge=cd.chargeDetails[i];
-				cd.finalSoC = charge;
-			}
+			//double[] pricingProfile = this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getPricingProfile().get(timeId);
+			double cost = getCostBasedOnTimeUsage(cd,this.pricingProfies.getChargerPricingProfiles().get(cd.charger),timeId);
+//			double charge = cd.initialSoc;
+//			for(int i = 0; i<pricingProfile.length;i++) {
+//				//System.out.println((cd.chargeDetails[i]-charge)*2.78e-7);
+//				if(cd.chargeDetails[i]>0)cost+=pricingProfile[i]*(cd.chargeDetails[i]-charge)*2.78e-7;
+//				else break;
+//				charge=cd.chargeDetails[i];
+//				cd.finalSoC = charge;
+//			}
 			
 			writeDetails(cd,cost,vId);
 //			if((cd.endingTime-cd.startingTime)<599){
@@ -256,6 +258,43 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 			
 			//System.out.println();
 	}
+	
+	
+	public static double getCostBasedOnKwUsage(chargingDetails cd,ChargerPricingProfile cpf, int timeId) {
+		double[] pricingProfile = cpf.getPricingProfile().get(timeId);
+		double cost = 0;
+		double charge = cd.initialSoc;
+		for(int i = 0; i<pricingProfile.length;i++) {
+			//System.out.println((cd.chargeDetails[i]-charge)*2.78e-7);
+			if(cd.chargeDetails[i]>0)cost+=pricingProfile[i]*(cd.chargeDetails[i]-charge)*2.78e-7;
+			else break;
+			charge=cd.chargeDetails[i];
+			cd.finalSoC = charge;
+		}
+		return cost;
+	}
+	
+	public static double getCostBasedOnTimeUsage(chargingDetails cd,ChargerPricingProfile cpf, int timeId) {
+		double[] pricingProfile = cpf.getPricingProfilePerHr().get(timeId);
+		double cost = 0;
+		double duration = cd.endingTime-cd.startingTime;
+		//double charge = cd.initialSoc;
+		for(int i = 0; i<pricingProfile.length;i++) {
+			if(duration >= cpf.getProfileTimeStepInMin()*60) {
+				cost+=pricingProfile[i]*cpf.getProfileTimeStepInMin()*60/3600;
+			}else {
+				cost+=duration*pricingProfile[i]/3600;
+				break;
+			}
+			duration = duration-cpf.getProfileTimeStepInMin()*60;
+		}
+		return cost;
+	}
+	
+	public static double getCostBasedOnTimeAndKwUsageMax(chargingDetails cd,ChargerPricingProfile cpf, int timeId) {
+		return Math.max(getCostBasedOnKwUsage(cd,cpf,timeId), getCostBasedOnTimeUsage(cd,cpf,timeId));
+	}
+	
 	
 	public synchronized void writeDetails(chargingDetails cd, double cost, Id<Vehicle>vId) {
 		try {

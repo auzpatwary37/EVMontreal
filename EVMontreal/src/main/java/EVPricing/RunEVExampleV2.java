@@ -14,6 +14,7 @@ import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.EvModule;
+import org.matsim.contrib.ev.charging.ChargingHandler;
 import org.matsim.contrib.ev.fleet.ElectricVehicleSpecification;
 import org.matsim.contrib.ev.routing.EvNetworkRoutingProvider;
 import org.matsim.core.config.Config;
@@ -33,6 +34,9 @@ import org.matsim.vehicles.VehicleCapacity;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.Vehicles;
 
+import binding.EVOutOfBatteryChecker;
+import experienceSOC.ActivitySOCModule;
+import modeChoiceFix.SubTourPlanStrategyBinder;
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
 import urbanEV.UrbanEVConfigGroup;
@@ -73,10 +77,10 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--household"}, description = {"Optional Path to household file to load."}, defaultValue = "montreal_households.xml.gz")
   private String householdFileLoc;
   
-  @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "0.05")
+  @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "0.1")
   private Double scale;
   
-  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/testbasewithoutSoCupdateRevisedtestflat6")
+  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/TimeBasedPricingAllHomeChargersThreeLogics")
   private String output;
   
   @Option(names = {"--charger"}, description = {"Charger file location"}, defaultValue = "charger.xml")
@@ -91,7 +95,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--evpricing"}, description = {"Charger pricing file location"}, defaultValue = "pricingProfiles.xml")
   private String pricingEVFile;
   
-  @Option(names = {"--distanceForCharger"}, description = {"Maximum search radius for charger around activity"}, defaultValue = "30000.")
+  @Option(names = {"--distanceForCharger"}, description = {"Maximum search radius for charger around activity"}, defaultValue = "1000.0")
   private Double chargerDist;
   
   @Option(names = {"--thread"}, description = {"No of thread"}, defaultValue = "10")
@@ -171,6 +175,9 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 					.setScoringThisActivityAtAll(false));
 	//config.qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.fromVehiclesData);
 
+	SubTourPlanStrategyBinder.addStrategy(config, 0.05, 100); 
+	
+	
 	Scenario scenario = ScenarioUtils.loadScenario(config);
 	
 	scenario.getActivityFacilities().getFacilities().entrySet().forEach(f->{
@@ -251,7 +258,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	//controler.addOverridingModule(new EvModule());
 	controler.addOverridingModule(new UrbanEVModule());
 	//controler.addOverridingModule(new EVPriceModule());
-
+	
 	
 	
 	
@@ -272,17 +279,24 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 					
 					addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
 					this.addQSimComponentBinding(EvModule.EV_COMPONENT).to(ChargePricingEventHandler.class);
+					this.bind(EVOutOfBatteryChecker.class).asEagerSingleton();
+					this.addQSimComponentBinding(EvModule.EV_COMPONENT).to(EVOutOfBatteryChecker.class);
+					
+					
+//					addMobsimListenerBinding().to(EVOutOfBatteryChecker.class);
+//					addMobsimScopeEventHandlerBinding().to(EVOutOfBatteryChecker.class);
 				}
 				
 			});
 			addMobsimListenerBinding().to(TrialWithinday.class);
-//			addMobsimListenerBinding().to(EVOutOfBatteryChecker.class);
+			
 		}
 	});
     
     
 	controler.configureQSimComponents(components -> components.addNamedComponent(EvModule.EV_COMPONENT));
-
+	SubTourPlanStrategyBinder.configure(controler);
+	ActivitySOCModule.configure(controler);
 	controler.run();
     return Integer.valueOf(0);
   }

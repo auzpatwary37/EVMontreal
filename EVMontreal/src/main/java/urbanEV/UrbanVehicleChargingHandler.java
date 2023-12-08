@@ -22,6 +22,7 @@ package urbanEV;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.inject.Inject;
@@ -49,7 +50,6 @@ import org.matsim.contrib.ev.infrastructure.ChargingInfrastructure;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructures;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
 import org.matsim.core.events.MobsimScopeEventHandler;
-import org.matsim.core.utils.collections.Tuple;
 import org.matsim.vehicles.Vehicle;
 
 import com.google.common.collect.ImmutableListMultimap;
@@ -84,6 +84,8 @@ public class UrbanVehicleChargingHandler
 	private final ChargingInfrastructure chargingInfrastructure;
 	private final ElectricFleet electricFleet;
 	private final ImmutableListMultimap<Id<Link>, Charger> chargersAtLinks;
+	
+	private Map<Id<ElectricVehicle>,Id<Charger>> chargersToVehicleMap = new ConcurrentHashMap<>();
 
 	
 	
@@ -123,6 +125,9 @@ public class UrbanVehicleChargingHandler
 					}
 					charger.getLogic().addVehicle(ev, event.getTime());
 					
+					
+					this.chargersToVehicleMap.put(evId, charger.getId());
+					
 					Map<Id<Person>, chargingInfo> proceduresOnLink = this.chargingProcedures.get(event.getLinkId());
 					
 					if(proceduresOnLink != null && proceduresOnLink.containsKey(event.getPersonId())){
@@ -152,15 +157,25 @@ public class UrbanVehicleChargingHandler
 			chargingInfo tuple = chargingProcedures.get(event.getLinkId()).remove(event.getPersonId());
 			if (tuple != null) {
 				Id<ElectricVehicle> evId = tuple.vehicleId;
-				if(vehiclesAtChargers.remove(evId) != null){ //if null, vehicle is fully charged and de-plugged already or the vehicle never got plugged in and still in the queue (see handleEvent(ChargingEndedEvent) )
+//				if(vehiclesAtChargers.remove(evId) != null){ //if null, vehicle is fully charged and de-plugged already or the vehicle never got plugged in and still in the queue (see handleEvent(ChargingEndedEvent) )
+//					Id<Charger> chargerId = tuple.chargerId;
+//					Charger c = chargingInfrastructure.getChargers().get(chargerId);
+//					if(c.getLogic().getPluggedVehicles().contains(electricFleet.getElectricVehicles().get(evId)))c.getLogic().removeVehicle(electricFleet.getElectricVehicles().get(evId), event.getTime());
+//				}else {////________________changed code
+//					Id<Charger> chargerId = tuple.chargerId;
+//					Charger c = chargingInfrastructure.getChargers().get(chargerId);
+//					if(c.getLogic().getQueuedVehicles().contains(electricFleet.getElectricVehicles().get(evId)))c.getLogic().removeVehicle(electricFleet.getElectricVehicles().get(evId), event.getTime());
+//				}////________________________________________
+				
+				if(this.chargersToVehicleMap.remove(evId)!=null) {
+					vehiclesAtChargers.remove(evId);
 					Id<Charger> chargerId = tuple.chargerId;
 					Charger c = chargingInfrastructure.getChargers().get(chargerId);
-					if(c.getLogic().getPluggedVehicles().contains(electricFleet.getElectricVehicles().get(evId)))c.getLogic().removeVehicle(electricFleet.getElectricVehicles().get(evId), event.getTime());
-				}else {////________________changed code
-					Id<Charger> chargerId = tuple.chargerId;
-					Charger c = chargingInfrastructure.getChargers().get(chargerId);
-					if(c.getLogic().getQueuedVehicles().contains(electricFleet.getElectricVehicles().get(evId)))c.getLogic().removeVehicle(electricFleet.getElectricVehicles().get(evId), event.getTime());
-				}////________________________________________
+					c.getLogic().removeVehicle(electricFleet.getElectricVehicles().get(evId), event.getTime());
+				}else {
+					throw new IllegalArgumentException("Vehicle was never plugged in!!!!");
+				}
+				
 			} else {
 				throw new RuntimeException("there is something wrong with the charging procedure of person=" + event.getPersonId() + " on link= " + event.getLinkId());
 			}

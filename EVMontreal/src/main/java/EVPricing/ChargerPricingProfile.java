@@ -14,7 +14,8 @@ public class ChargerPricingProfile{
 	private final Id<Charger> chargerId;
 	private final String zoneId;
 	private Map<Integer,double[]> pricingProfile = new HashMap<>();
-	private double profileTimeStepInMin = 15;
+	private Map<Integer,double[]> pricingProfilePerHr = new HashMap<>();
+	private double profileTimeStepInMin = 30;
 	private Map<String,Object> attributes = new HashMap<>();
 	private Map<Integer,Boolean> chargerSwitch = new HashMap<>();//Assumed turned on : true by default
 	private Set<Id<Person>> accessibleTo = new HashSet<>();// if empty, we assume everyone can use it; if not empty only the person in the set can use it
@@ -52,6 +53,10 @@ public class ChargerPricingProfile{
 	
 	public void addHourlyPricingProfile(int hour, double[] pricingProfile) {
 		this.pricingProfile.put(hour, pricingProfile);
+	}
+	
+	public void addHourlyPricingProfilePerHr(int hour, double[] pricingProfile) {
+		this.pricingProfilePerHr.put(hour, pricingProfile);
 	}
 	
 	/**
@@ -105,6 +110,10 @@ public class ChargerPricingProfile{
 
 	public Map<Integer, double[]> getPricingProfile() {
 		return pricingProfile;
+	}
+	
+	public Map<Integer, double[]> getPricingProfilePerHr() {
+		return pricingProfilePerHr;
 	}
 
 	public void setPricingProfile(Map<Integer, double[]> pricingProfile) {

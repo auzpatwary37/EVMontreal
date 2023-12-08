@@ -101,6 +101,7 @@ public class TrialWithinday implements MobsimInitializedListener{
 			MobsimAgent mobsimagent = qsim.getAgents().get(plan.getPerson().getId());
 			Plan modifiablePlan = WithinDayAgentUtils.getModifiablePlan(mobsimagent);
 			Plan purePlan = (Plan) plan.getPerson().getAttributes().getAttribute("purePlan");
+			if(purePlan!=null) {
 			for (Id<Vehicle> ev : selectedEVPlans.get(plan)) {
 				ElectricVehicleSpecification electricVehicleSpecification = electricFleetSpecification.getVehicleSpecifications()
 					.get(getWrappedElectricVehicleId(ev));
@@ -122,20 +123,21 @@ public class TrialWithinday implements MobsimInitializedListener{
 					}
 			}
 		}
+		}
 
 		
 	}
 	
 	private boolean haveChargingAtStart(Plan plan) {
 		if(plan.getPlanElements().size()<9)return false;
-		if(((Activity)plan.getPlanElements().get(2)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER))return false;
+		if(!((Activity)plan.getPlanElements().get(2)).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER))return false;
 		if(((Activity)plan.getPlanElements().get(0)).getFacilityId().equals(((Activity)plan.getPlanElements().get(4)).getFacilityId()))return true;
 		return false;
 	}
 
 	private boolean haveChargingAtEnd(Plan plan) {
 		if(plan.getPlanElements().size()<9)return false;
-		if(((Activity)plan.getPlanElements().get(plan.getPlanElements().size()-3)).getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))return false;
+		if(!((Activity)plan.getPlanElements().get(plan.getPlanElements().size()-3)).getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))return false;
 		if(((Activity)plan.getPlanElements().get(plan.getPlanElements().size()-1)).getFacilityId().equals(((Activity)plan.getPlanElements().get(plan.getPlanElements().size()-5)).getFacilityId()))return true;
 		return false;
 	}

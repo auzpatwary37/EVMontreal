@@ -46,6 +46,14 @@ public class ChargerPricingProfileReader  extends DefaultHandler{
 			this.profiles.get(currentChargerId).addHourlyPricingProfile(Integer.parseInt(attributes.getValue("Hour")), pp);
 			this.profiles.get(currentChargerId).setSwitch(Integer.parseInt(attributes.getValue("Hour")), Boolean.parseBoolean(attributes.getValue("chargerSwitch")));
 		}
+		if(qName.equalsIgnoreCase("HourlyProfileHr")) {
+			String[] pricingProfileHr = attributes.getValue("profile").split(",");
+			double[] pp = new double[pricingProfileHr.length];
+			for(int i=0;i<pricingProfileHr.length;i++)pp[i] = Double.parseDouble(pricingProfileHr[i]);
+			this.profiles.get(currentChargerId).addHourlyPricingProfilePerHr(Integer.parseInt(attributes.getValue("Hour")), pp);
+			//this.profiles.get(currentChargerId).setSwitch(Integer.parseInt(attributes.getValue("Hour")), Boolean.parseBoolean(attributes.getValue("chargerSwitch")));
+		}
+		
 	}
 	
 	@Override 

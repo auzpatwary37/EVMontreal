@@ -79,6 +79,26 @@ public class ChargerPricingProfileWriter {
 					profile.appendChild(volume);
 				}
 				pricingProfile.appendChild(profile);
+				
+				Element profileHr=document.createElement("PricingProfileHr");
+				for(Entry<Integer, double[]> e:pp.getValue().getPricingProfilePerHr().entrySet()) {
+					Element volume=document.createElement("HourlyProfileHr");
+					volume.setAttribute("Hour", Integer.toString(e.getKey()));
+					String s = "";
+					sep = "";
+					if(e.getValue()==null) {
+						System.out.println("debug!!!");
+					}
+					for(double d:e.getValue()) {
+						s = s+sep+d;
+						sep = ",";
+					}
+					volume.setAttribute("profile", s);
+					//volume.setAttribute("chargerSwitch", Boolean.toString(pp.getValue().getChargerSwitch().get(e.getKey())));
+					profile.appendChild(volume);
+				}
+				pricingProfile.appendChild(profileHr);
+				
 
 				
 				for(String s:pp.getValue().getAttributes().keySet()) {

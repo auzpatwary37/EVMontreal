@@ -14,13 +14,15 @@ import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.fleet.ElectricFleet;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
 import org.matsim.core.api.experimental.events.EventsManager;
+import org.matsim.core.events.MobsimScopeEventHandler;
 import org.matsim.core.mobsim.framework.events.MobsimAfterSimStepEvent;
 import org.matsim.core.mobsim.framework.listeners.MobsimAfterSimStepListener;
 
 import com.google.inject.Inject;
 
-public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener{
-
+public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener,MobsimScopeEventHandler{
+	
+	
 	private final ElectricFleet Ev;
 	@Inject
 	private EventsManager manager;
@@ -39,7 +41,7 @@ public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener{
 			for(ElectricVehicle ev:this.Ev.getElectricVehicles().values()) {
 				if(ev.getBattery().getSoc()<=0) {
 					//PersonMoneyEvent ee = new PersonMoneyEvent(e.getSimulationTime(), vehicleOwners.get(ev.getId()), -1000, "punnishment", "EVOut");
-					PersonMoneyEvent ee = new PersonMoneyEvent(e.getSimulationTime(), Id.createPersonId(ev.getId().toString()), -1000, "punnishment", "EVOut");
+					PersonMoneyEvent ee = new PersonMoneyEvent(e.getSimulationTime(), Id.createPersonId(ev.getId().toString()), -5000.00, "punnishment", "EVOut");
 					manager.processEvent(ee);
 				}
 			}

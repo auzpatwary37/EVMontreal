@@ -77,6 +77,41 @@ public ChargerToXY (ChargingInfrastructureSpecification chargingInfrastructureSp
 public static List<XYDataContainer> getDataContainers(){ return dataContainers; }
 
 
+//@Override
+//public void handleEvent(ChargingEndEvent event) {
+//    List<Id<ElectricVehicle>> chargersList = crtChargers.get(event.getChargerId());
+//    if (chargersList != null) {
+//        chargersList.remove(event.getVehicleId());
+//    }
+//
+//    XYDataContainer dataContainer = new XYDataContainer(
+//            event.getTime(),
+//            event.getChargerId(),
+//            chargingInfrastructureSpecification.getChargerSpecifications().get(event.getChargerId()).getLinkId(),
+//            chargersList != null ? chargersList.size() : 0
+//    );
+//    this.dataContainers.add(dataContainer);
+//}
+//
+//@Override
+//public void handleEvent(ChargingStartEvent event) {
+//    this.crtChargers.compute(event.getChargerId(), (chargerId, chargersList) -> {
+//        if (chargersList == null) {
+//            chargersList = new ArrayList<>();
+//        }
+//        chargersList.add(event.getVehicleId());
+//        return chargersList;
+//    });
+//
+//    List<Id<ElectricVehicle>> chargersList = crtChargers.get(event.getChargerId());
+//    XYDataContainer dataContainer = new XYDataContainer(
+//            event.getTime(),
+//            event.getChargerId(),
+//            chargingInfrastructureSpecification.getChargerSpecifications().get(event.getChargerId()).getLinkId(),
+//            chargersList != null ? chargersList.size() : 0
+//    );
+//    this.dataContainers.add(dataContainer);
+//}
 
 
     @Override
@@ -95,7 +130,8 @@ public static List<XYDataContainer> getDataContainers(){ return dataContainers; 
     @Override
     public void handleEvent(ChargingStartEvent event) {
        this.crtChargers.compute(event.getChargerId(), (person, list) -> {
-            if (list == null) list = new ArrayList<>();
+    	   String s = event.getVehicleId().toString();
+    	   if (list == null) list = new ArrayList<>();
             list.add(event.getVehicleId());
             return list;
         });

@@ -95,7 +95,7 @@ public class Tutorial {
 		//Inputs
 		double evPercentage = 0.5; // Percentage of cars to take as EV
 		boolean assignChargersToEveryone = true;
-		double homeChargerPercentage = 0.5;
+		double homeChargerPercentage = 1.0;
 
 		String configIn = "config_with_calibrated_parameters.xml";// input MATSim Montreal Config without ev
 		String planInput = "prepared_population.xml.gz";// Population file without EV
@@ -111,8 +111,8 @@ public class Tutorial {
 		String resultOut = "Output";
 		String pricingProfileOutputLoc = "Output/pricingProfiles.xml";
 
-		double BatteryCapMin = 9; // Min Battery capacity
-		double BatteryCapMax = 40;// Max Battery Capacity
+		double BatteryCapMin = 10; // Min Battery capacity
+		double BatteryCapMax = 100;// Max Battery Capacity
 		//put the min and max same to make capacity non random
 
 		double socMIn = 5; // Min initial soc level.
@@ -124,10 +124,10 @@ public class Tutorial {
 		//ChargerTypes and power
 
 		Map<String,Double> cp = new HashMap<>();
-		cp.put("Level 1", 5.);
+		cp.put("Level 1", 10.0);
 		cp.put("Level 2", 20.);
-		cp.put("Fast", 40.);
-		cp.put("home", 5.);
+		cp.put("Fast", 50.);
+		cp.put("home", 10.);
 
 		//____________________________________________________
 		
@@ -260,11 +260,11 @@ public class Tutorial {
 
 			String cc = (String) p.getValue().getAttributes().getAttribute("carAvail");
 
-			if(cc.equals("always") && p.getValue().getSelectedPlan().getPlanElements().size()>1) {// have cars and have at least one leg 
+			if((cc.equals("always") || cc.equals("sometimes")) && p.getValue().getSelectedPlan().getPlanElements().size()>1) {// have cars and have at least one leg 
 				for(PlanElement pl:p.getValue().getSelectedPlan().getPlanElements()){
 					if(pl instanceof Leg) {
 						Leg leg = (Leg) pl;
-						if (leg.getMode().equals("car")) {
+//						if (leg.getMode().equals("car")) {
 							if(Math.random()<=evPercentage) {
 								Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), ev1);// create ev vehicle in the vehicles file.
 								Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
@@ -272,9 +272,16 @@ public class Tutorial {
 								vs.addVehicle(v);
 								
 								//Create vehicle in the ElectricVehicle file
-								Double b = (BatteryCapMin+(BatteryCapMax-BatteryCapMin)*random.nextDouble())*36e5;
-//								Double c = socMIn*36e5+(b-socMIn*36e5)*random.nextDouble();
-								Double c = socMIn*36e5+(b-socMIn*36e5)*0.05;
+//								Double b = (BatteryCapMin+(BatteryCapMax-BatteryCapMin)*random.nextDouble())*36e5;
+								Double b = ((BatteryCapMin+(BatteryCapMax-BatteryCapMin)/2)+((BatteryCapMax-BatteryCapMin)/4)*random.nextGaussian())*36e5;
+								if (b > BatteryCapMax*36e5) {
+									b= BatteryCapMax*36e5;
+								} else if (b < BatteryCapMin*36e5) {
+									b = BatteryCapMin*36e5;
+								}
+								Double c = socMIn*36e5+(b-socMIn*36e5)*random.nextDouble();
+//								Double c = socMIn*36e5+(b-socMIn*36e5)*0.5;
+//								Double c = (b*0.35);
 								ElectricVehicleSpecification s = ImmutableElectricVehicleSpecification.newBuilder()
 										.id(Id.create(p.getKey().toString(), ElectricVehicle.class))
 										.batteryCapacity(b.intValue())
@@ -310,7 +317,7 @@ public class Tutorial {
 								vs.addVehicle(v);
 							}
 							break;	
-						}
+//						}
 						
 					}
 				}
@@ -400,35 +407,35 @@ public class Tutorial {
 		
 		double[] nonLinear = null;
 		
-//Level 1 off peak hour
+		//Level 1 off peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = 2.00;
-		nonLinear[1] = 2.00;
-		nonLinear[2] = 2.00;
+		nonLinear[0] = 0.3;
+		nonLinear[1] = 0.3;
+		nonLinear[2] = 0.3;
 		
 		offPeakPricing.put("Level 1", nonLinear);
 		
 		//Level 2 off peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = 3.00;
-		nonLinear[1] = 3.00;
-		nonLinear[2] = 3.00;
+		nonLinear[0] = 0.6;
+		nonLinear[1] = 0.6;
+		nonLinear[2] = 0.6;
 		
 		offPeakPricing.put("Level 2", nonLinear);
 		
 		//Fast off peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = 5.00;
-		nonLinear[1] = 5.00;
-		nonLinear[2] = 5.00;
+		nonLinear[0] = 4.0;
+		nonLinear[1] = 4.0;
+		nonLinear[2] = 4.0;
 		
 		offPeakPricing.put("Fast", nonLinear);
 		
 		//home off peak hour
 		nonLinear = new double[3];
-		nonLinear[0] = 1.00;
-		nonLinear[1] = 1.00;
-		nonLinear[2] = 1.00;
+		nonLinear[0] = 0.15;
+		nonLinear[1] = 0.15;
+		nonLinear[2] = 0.15;
 		
 		offPeakPricing.put("home", nonLinear);
 		
@@ -484,10 +491,13 @@ public class Tutorial {
 			for(int i: peakTime) {
 				double[] pprofile = PeakPricing.get(c.getValue().getChargerType()).clone();
 				pp.addHourlyPricingProfile(i,applyMultiplier(pprofile,zoneMultiplier.get(zoneId)));
+				pp.addHourlyPricingProfilePerHr(i, applyMultiplier(pprofile,5));
+			
 			}
 			for(int i: offPeakTime) {
 				
 				pp.addHourlyPricingProfile(i, applyMultiplier(offPeakPricing.get(c.getValue().getChargerType()),zoneMultiplier.get(zoneId)));
+				pp.addHourlyPricingProfilePerHr(i, applyMultiplier(offPeakPricing.get(c.getValue().getChargerType()),5));
 			}
 			if(personsToChargerAssignment.get(pp.getChargerId())!=null) {
 			personsToChargerAssignment.get(pp.getChargerId()).forEach(e->{
@@ -501,7 +511,9 @@ public class Tutorial {
 		
 		new ChargerPricingProfileWriter(cpp).write(pricingProfileOutputLoc);
 		
-	//	ChargerPricingProfiles ppf = new ChargerPricingProfileReader().readChargerPricingProfiles(pricingProfileOutputLoc);
+//		ChargerPricingProfiles ppf = new ChargerPricingProfileReader().readChargerPricingProfiles(pricingProfileOutputLoc);
+//		
+//		new ChargerPricingProfileWriter(ppf).write(pricingProfileOutputLoc);
 		
 		for(Id<Charger> cId:csp.getChargerSpecifications().keySet()) {
 			if(cpp.getChargerPricingProfiles().get(cId)==null) {
@@ -623,6 +635,14 @@ public class Tutorial {
 		System.out.println("person deleted = " + personDeleted);
 		System.out.println("time in milisec = " +(System.currentTimeMillis() - t));
 		System.out.println();
+	}
+	
+	private static double[] multiply(double[] a, double d) {
+		double[] out = new double[a.length];
+		for(int i = 0;i<a.length;i++) {
+			out[i] = a[i]*d;
+		}
+		return out;
 	}
 	
 }
