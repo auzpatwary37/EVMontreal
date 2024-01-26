@@ -29,8 +29,8 @@ public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener,MobsimS
 	private final int chargeTimeStep;
 	
 	// the assumption is that the function looks like a*(exp(b*(soc-1))-1)
-	private double rangeAnxietyCoefficientA = 10;
-	private double rangeAnxietyCoefficientB = 5;
+	private double rangeAnxietyCoefficientA = .000001;
+	private double rangeAnxietyCoefficientB = 20;
 	
 //	private Map<Id<ElectricVehicle>,Id<Person>> vehicleOwners = new HashMap<>();
 
@@ -49,7 +49,7 @@ public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener,MobsimS
 //					PersonMoneyEvent ee = new PersonMoneyEvent(e.getSimulationTime(), Id.createPersonId(ev.getId().toString()), -5000.00, "punnishment", "EVOut");
 //					manager.processEvent(ee);
 //				}
-				double rangeAnxiety = this.rangeAnxietyCoefficientA*(Math.exp(this.rangeAnxietyCoefficientB*(ev.getBattery().getSoc()/ev.getBattery().getCapacity()-1))-1);
+				double rangeAnxiety = -1*this.rangeAnxietyCoefficientA*(Math.exp(this.rangeAnxietyCoefficientB*(-1*ev.getBattery().getSoc()/ev.getBattery().getCapacity()+1))-1);
 				PersonMoneyEvent ee = new PersonMoneyEvent(e.getSimulationTime(), Id.createPersonId(ev.getId().toString()), rangeAnxiety, "range anxiety", "EVOut");
 				manager.processEvent(ee);
 			}
