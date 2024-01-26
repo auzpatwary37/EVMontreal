@@ -27,6 +27,11 @@ public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener,MobsimS
 	@Inject
 	private EventsManager manager;
 	private final int chargeTimeStep;
+	
+	// the assumption is that the function looks like a*(exp(b*(soc-1))-1)
+	private double rangeAnxietyCoefficientA = 10;
+	private double rangeAnxietyCoefficientB = 5;
+	
 //	private Map<Id<ElectricVehicle>,Id<Person>> vehicleOwners = new HashMap<>();
 
 	@Inject
@@ -39,11 +44,14 @@ public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener,MobsimS
 	public void notifyMobsimAfterSimStep(@SuppressWarnings("rawtypes") MobsimAfterSimStepEvent e) {
 		if ((e.getSimulationTime() + 1) % chargeTimeStep == 0) {
 			for(ElectricVehicle ev:this.Ev.getElectricVehicles().values()) {
-				if(ev.getBattery().getSoc()<=0) {
-					//PersonMoneyEvent ee = new PersonMoneyEvent(e.getSimulationTime(), vehicleOwners.get(ev.getId()), -1000, "punnishment", "EVOut");
-					PersonMoneyEvent ee = new PersonMoneyEvent(e.getSimulationTime(), Id.createPersonId(ev.getId().toString()), -5000.00, "punnishment", "EVOut");
-					manager.processEvent(ee);
-				}
+//				if(ev.getBattery().getSoc()<=0) {
+//					//PersonMoneyEvent ee = new PersonMoneyEvent(e.getSimulationTime(), vehicleOwners.get(ev.getId()), -1000, "punnishment", "EVOut");
+//					PersonMoneyEvent ee = new PersonMoneyEvent(e.getSimulationTime(), Id.createPersonId(ev.getId().toString()), -5000.00, "punnishment", "EVOut");
+//					manager.processEvent(ee);
+//				}
+				double rangeAnxiety = this.rangeAnxietyCoefficientA*(Math.exp(this.rangeAnxietyCoefficientB*(ev.getBattery().getSoc()/ev.getBattery().getCapacity()-1))-1);
+				PersonMoneyEvent ee = new PersonMoneyEvent(e.getSimulationTime(), Id.createPersonId(ev.getId().toString()), rangeAnxiety, "range anxiety", "EVOut");
+				manager.processEvent(ee);
 			}
 		}
 	}
