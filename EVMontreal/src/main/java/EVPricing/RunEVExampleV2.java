@@ -80,7 +80,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "0.1")
   private Double scale;
   
-  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/TimeBasedPricingAllHomeChargersThreeLogics")
+  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/TimeBasedPricingAllHomeChargersAllLogicRevisedPunishment")
   private String output;
   
   @Option(names = {"--charger"}, description = {"Charger file location"}, defaultValue = "charger.xml")
@@ -98,7 +98,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--distanceForCharger"}, description = {"Maximum search radius for charger around activity"}, defaultValue = "1000.0")
   private Double chargerDist;
   
-  @Option(names = {"--thread"}, description = {"No of thread"}, defaultValue = "10")
+  @Option(names = {"--thread"}, description = {"No of thread"}, defaultValue = "20")
   private int thread;
   
   public static void main(String[] args) {

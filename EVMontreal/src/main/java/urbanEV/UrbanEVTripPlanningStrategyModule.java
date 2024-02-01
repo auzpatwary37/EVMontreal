@@ -769,7 +769,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				logicSwitch = "optimized";
 			}
 			
-//			logicSwitch= "optimized";
+//			logicSwitch= "activityDuration";
 			modifiablePlan.getAttributes().putAttribute("logicSwitch", logicSwitch);
 			List<Activity> pe;
 			switch(logicSwitch){

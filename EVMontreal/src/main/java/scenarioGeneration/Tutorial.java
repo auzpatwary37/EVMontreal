@@ -337,7 +337,7 @@ public class Tutorial {
 							.id(Id.create(d.getKey()+"_home", Charger.class))
 							.linkId(linkId)
 							.chargerType("home")
-							.plugCount(1)
+							.plugCount(10)
 							.plugPower(1000 * cp.get("home"))
 							.build();
 					Set<Id<Person>> pSet= new HashSet<>();

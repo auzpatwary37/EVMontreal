@@ -15,16 +15,17 @@ import EVPricing.ChargerPricingProfiles;
 
 public class readXml {
 	public static void main(String[] args) {
-		ChargerPricingProfiles cf = new ChargerPricingProfileReader().readChargerPricingProfiles("C:\\Users\\arsha\\git\\EVMontreal-2\\EVMontreal\\NewLogicwithRandomness\\pricingProfiles.xml");
+		ChargerPricingProfiles cf = new ChargerPricingProfileReader().readChargerPricingProfiles("C:\\Users\\arsha\\git\\EVMontreal\\EVMontreal\\ABMTrans\\pricingProfiles.xml");
 		for(Entry<Id<Charger>, ChargerPricingProfile> d:cf.getChargerPricingProfiles().entrySet()) {
-			for(Entry<Integer, double[]> dd:d.getValue().getPricingProfile().entrySet()) {
-				if(dd.getKey()>=4 && dd.getKey()<=16) {
+			for(Entry<Integer, double[]> dd:d.getValue().getPricingProfilePerHr().entrySet()) {
+//					getPricingProfile().entrySet()) {
+				if(dd.getKey()>=6 && dd.getKey()<=15) {
 					for(int i = 0;i<dd.getValue().length;i++){
 						dd.getValue()[i] = dd.getValue()[i]*0.25;
 					}
 					
 				}
-					if(dd.getKey()>=17 && dd.getKey()<=22) {
+					if(dd.getKey()>=16 && dd.getKey()<=22) {
 						for(int i = 0;i<dd.getValue().length;i++){
 							dd.getValue()[i] = dd.getValue()[i]*5.0;
 				}
@@ -34,7 +35,7 @@ public class readXml {
 		}
 		
 	
-		new ChargerPricingProfileWriter(cf).write("C:\\Users\\arsha\\git\\EVMontreal-2\\EVMontreal\\NewLogicwithRandomness\\pricingProfilesPriced.xml");
+		new ChargerPricingProfileWriter(cf).write("C:\\Users\\arsha\\git\\EVMontreal\\EVMontreal\\ABMTrans\\pricingProfilesPriced.xml");
 		
 		
 		

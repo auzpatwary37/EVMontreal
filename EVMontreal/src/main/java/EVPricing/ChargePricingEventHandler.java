@@ -238,7 +238,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 			int timeId = (int)(cd.startingTime/3600);
 			if(timeId>23)timeId = timeId-24;
 			//double[] pricingProfile = this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getPricingProfile().get(timeId);
-			double cost = getCostBasedOnTimeUsage(cd,this.pricingProfies.getChargerPricingProfiles().get(cd.charger),timeId);
+			double cost = getCostBasedOnTimeAndKwUsageMax(cd,this.pricingProfies.getChargerPricingProfiles().get(cd.charger),timeId);
 //			double charge = cd.initialSoc;
 //			for(int i = 0; i<pricingProfile.length;i++) {
 //				//System.out.println((cd.chargeDetails[i]-charge)*2.78e-7);
