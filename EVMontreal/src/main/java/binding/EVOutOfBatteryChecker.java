@@ -4,16 +4,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.matsim.api.core.v01.Id;
-import org.matsim.api.core.v01.events.PersonEntersVehicleEvent;
-import org.matsim.api.core.v01.events.PersonLeavesVehicleEvent;
-import org.matsim.api.core.v01.events.PersonMoneyEvent;
-import org.matsim.api.core.v01.events.handler.PersonEntersVehicleEventHandler;
-import org.matsim.api.core.v01.events.handler.PersonLeavesVehicleEventHandler;
+import org.matsim.api.core.v01.events.PersonScoreEvent;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.fleet.ElectricFleet;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
 import org.matsim.core.api.experimental.events.EventsManager;
+import org.matsim.core.config.groups.QSimConfigGroup;
 import org.matsim.core.events.MobsimScopeEventHandler;
 import org.matsim.core.mobsim.framework.events.MobsimAfterSimStepEvent;
 import org.matsim.core.mobsim.framework.listeners.MobsimAfterSimStepListener;
@@ -28,20 +25,30 @@ public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener,MobsimS
 	private EventsManager manager;
 	private final int chargeTimeStep;
 	
+
+	private Map<Id<Person>,Double>moneyToThrough = new HashMap<>();
+
+
+//	private Map<Id<ElectricVehicle>,Id<Person>> vehicleOwners = new HashMap<>();
+
 	// the assumption is that the function looks like a*(exp(b*(soc-1))-1)
 	private double rangeAnxietyCoefficientA = .000001;
 	private double rangeAnxietyCoefficientB = 20;
+	private double endTime = 0;
 	
-//	private Map<Id<ElectricVehicle>,Id<Person>> vehicleOwners = new HashMap<>();
-
 	@Inject
-	public EVOutOfBatteryChecker(ElectricFleet ev, EvConfigGroup evConfig) {
+	public EVOutOfBatteryChecker(ElectricFleet ev, EvConfigGroup evConfig, QSimConfigGroup qsim) {
 		this.Ev = ev;
 		this.chargeTimeStep = evConfig.getChargeTimeStep();
+		this.endTime =qsim.getEndTime().seconds();
 	}
 
 	@Override
 	public void notifyMobsimAfterSimStep(@SuppressWarnings("rawtypes") MobsimAfterSimStepEvent e) {
+		boolean throwUtility = false;
+		if(Double.compare(endTime, e.getSimulationTime())==0) {
+			throwUtility  = true;
+		}
 		if ((e.getSimulationTime() + 1) % chargeTimeStep == 0) {
 			for(ElectricVehicle ev:this.Ev.getElectricVehicles().values()) {
 //				if(ev.getBattery().getSoc()<=0) {
@@ -50,8 +57,15 @@ public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener,MobsimS
 //					manager.processEvent(ee);
 //				}
 				double rangeAnxiety = -1*this.rangeAnxietyCoefficientA*(Math.exp(this.rangeAnxietyCoefficientB*(-1*ev.getBattery().getSoc()/ev.getBattery().getCapacity()+1))-1);
-				PersonMoneyEvent ee = new PersonMoneyEvent(e.getSimulationTime(), Id.createPersonId(ev.getId().toString()), rangeAnxiety, "range anxiety", "EVOut");
-				manager.processEvent(ee);
+
+				//PersonMoneyEvent ee = new PersonMoneyEvent(e.getSimulationTime(), Id.createPersonId(ev.getId().toString()), rangeAnxiety, "range anxiety", "EVOut");
+				this.moneyToThrough.compute(Id.createPersonId(ev.getId().toString()),(k,v)->v==null?rangeAnxiety:v+rangeAnxiety);
+				if(throwUtility) {
+					PersonScoreEvent ee = new PersonScoreEvent(e.getSimulationTime(), Id.createPersonId(ev.getId().toString()), rangeAnxiety, "range anxiety");
+					manager.processEvent(ee);
+				}
+				
+
 			}
 		}
 	}

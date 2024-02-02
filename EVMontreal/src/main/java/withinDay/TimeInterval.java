@@ -12,8 +12,10 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class TimeInterval {
     public static void main(String[] args) {
+
         String inputFile = "C:\\Users\\arsha\\OneDrive\\Desktop\\ABMTrans REsults\\Time-based\\timebased.xlsx";
         String outputFile = "C:\\Users\\arsha\\OneDrive\\Desktop\\ABMTrans REsults\\Time-based\\Outputtimebased.xlsx";
+
 
         try {
             FileInputStream fileInputStream = new FileInputStream(new File(inputFile));
