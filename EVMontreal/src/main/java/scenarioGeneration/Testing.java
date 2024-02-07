@@ -36,6 +36,7 @@ public static void main(String[] args) {
 	
 	Population pop = PopulationUtils.readPopulation("");
 	
+	
 	Map<Id<Charger>,Set<Id<Person>>> personsToChargers = new HashMap<>();
 	Map<Id<Link>,Id<Charger>> chargers = new HashMap<>();
 	

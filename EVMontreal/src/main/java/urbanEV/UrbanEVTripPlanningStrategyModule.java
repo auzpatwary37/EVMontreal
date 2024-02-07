@@ -303,16 +303,16 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			int actOrder = 0;
 			for(PlanElement pl:modifiablePlan.getPlanElements()) {
 				if(pl instanceof Activity) {
-					if(((Map<Integer,Double>)modifiablePlan.getAttributes().getAttribute("actSOC")).get(actOrder)!=null) {
-						//Double soc = (Double)((Activity)pl).getAttributes().getAttribute("actSOC");
-						Double soc = ((Map<Integer,Double>)modifiablePlan.getAttributes().getAttribute("actSOC")).get(actOrder);
-						if(soc>= 0.3) {
+					//if(((Map<Integer,Double>)modifiablePlan.getAttributes().getAttribute("actSOC")).get(actOrder)!=null) {
+						Double soc = (Double)((Activity)pl).getAttributes().getAttribute("actSOC");
+//						Double soc = ((Map<Integer,Double>)modifiablePlan.getAttributes().getAttribute("actSOC")).get(actOrder);
+						if(soc !=null && soc>= 0.3) {
 							peIndex.add(in);	
 						}else {
 							hasCritical = true;
 							break;
 						}
-					}
+					//}
 					in++;
 					
 				}

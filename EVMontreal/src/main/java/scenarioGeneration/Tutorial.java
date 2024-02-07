@@ -98,7 +98,7 @@ public class Tutorial {
 		double homeChargerPercentage = 1.0;
 
 		String configIn = "config_with_calibrated_parameters.xml";// input MATSim Montreal Config without ev
-		String planInput = "prepared_population.xml.gz";// Population file without EV
+		String planInput = "output_plans.xml.gz";// Population file without EV
 		String networkInput = "montreal_network.xml.gz";// Input Network File
 		String chargerFileInput = "cleaned_station.csv";//Charger file with exactly same headers as given to me by Arsham but in .csv format. Save the excel as csv and input its file location
 
@@ -124,7 +124,7 @@ public class Tutorial {
 		//ChargerTypes and power
 
 		Map<String,Double> cp = new HashMap<>();
-		cp.put("Level 1", 10.0);
+		cp.put("Level 1", 12.0);
 		cp.put("Level 2", 20.);
 		cp.put("Fast", 50.);
 		cp.put("home", 10.);

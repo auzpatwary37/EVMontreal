@@ -1,6 +1,5 @@
 package experienceSOC;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -11,12 +10,15 @@ import org.matsim.api.core.v01.events.handler.ActivityStartEventHandler;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Plan;
-import org.matsim.api.core.v01.population.PlanElement;
 import org.matsim.contrib.ev.fleet.ElectricFleet;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
 import org.matsim.core.events.MobsimScopeEventHandler;
 import org.matsim.core.mobsim.framework.events.MobsimBeforeCleanupEvent;
+import org.matsim.core.mobsim.framework.events.MobsimBeforeSimStepEvent;
+import org.matsim.core.mobsim.framework.events.MobsimInitializedEvent;
 import org.matsim.core.mobsim.framework.listeners.MobsimBeforeCleanupListener;
+import org.matsim.core.mobsim.framework.listeners.MobsimBeforeSimStepListener;
+import org.matsim.core.mobsim.framework.listeners.MobsimInitializedListener;
 
 import com.google.inject.Inject;
 
@@ -35,10 +37,8 @@ public class ActivitySoc implements ActivityStartEventHandler,MobsimScopeEventHa
 			Id<ElectricVehicle> eId = Id.create(p.getId().toString(), ElectricVehicle.class);
 			if(this.electricFleet.getElectricVehicles().containsKey(eId)) {
 				ElectricVehicle ev = this.electricFleet.getElectricVehicles().get(eId);
-				//((Activity)p.getSelectedPlan().getPlanElements().get(0)).getAttributes().putAttribute(actSOCAttributeName, ev.getBattery().getSoc()/ev.getBattery().getCapacity());
+				((Activity)p.getSelectedPlan().getPlanElements().get(0)).getAttributes().putAttribute(actSOCAttributeName, ev.getBattery().getSoc()/ev.getBattery().getCapacity());
 				actOrder.put(p.getId(), 0);
-				if(p.getSelectedPlan().getAttributes().getAttribute("actSOC")==null)p.getSelectedPlan().getAttributes().putAttribute("actSOC", new HashMap<Integer,Double>());
-				((Map<Integer,Double>)p.getSelectedPlan().getAttributes().getAttribute("actSOC")).put(0, ev.getBattery().getSoc()/ev.getBattery().getCapacity());
 				
 			}
 		}
@@ -65,9 +65,7 @@ public class ActivitySoc implements ActivityStartEventHandler,MobsimScopeEventHa
 			}
 			ElectricVehicle ev = this.electricFleet.getElectricVehicles().get(eId);
 			Activity act = (Activity)this.scenario.getPopulation().getPersons().get(event.getPersonId()).getSelectedPlan().getPlanElements().get(actOrder.get(event.getPersonId()));
-			//act.getAttributes().putAttribute(actSOCAttributeName,ev.getBattery().getSoc()/ev.getBattery().getCapacity());
-			if(plan.getAttributes().getAttribute("actSOC")==null)plan.getAttributes().putAttribute("actSOC", new HashMap<Integer,Double>());
-			((Map<Integer,Double>)plan.getAttributes().getAttribute("actSOC")).put(actOrder.get(event.getPersonId()), ev.getBattery().getSoc()/ev.getBattery().getCapacity());
+			act.getAttributes().putAttribute(actSOCAttributeName,ev.getBattery().getSoc()/ev.getBattery().getCapacity());
 		}
 		
 	}
@@ -82,16 +80,11 @@ public class ActivitySoc implements ActivityStartEventHandler,MobsimScopeEventHa
 			Id<ElectricVehicle> eId = Id.create(p.getId().toString(), ElectricVehicle.class);
 			if(this.electricFleet.getElectricVehicles().containsKey(eId)) {
 				ElectricVehicle ev = this.electricFleet.getElectricVehicles().get(eId);
-				int actOrder = 0;
-				for(PlanElement pl:p.getSelectedPlan().getPlanElements()){
+				p.getSelectedPlan().getPlanElements().forEach(pl->{
 					if(pl instanceof Activity && ((Activity)pl).getStartTime().seconds()>this.scenario.getConfig().qsim().getEndTime().seconds()) {
-						//((Activity)pl).getAttributes().putAttribute("actSOC", ev.getBattery().getSoc()/ev.getBattery().getCapacity());
-						if(p.getSelectedPlan().getAttributes().getAttribute("actSOC")==null)p.getSelectedPlan().getAttributes().putAttribute("actSOC", new HashMap<Integer,Double>());
-						if(!((Map<Integer,Double>)p.getSelectedPlan().getAttributes().getAttribute("actSOC")).containsKey(actOrder))((Map<Integer,Double>)p.getSelectedPlan().getAttributes().getAttribute("actSOC")).put(actOrder, ev.getBattery().getSoc()/ev.getBattery().getCapacity());
-						
+						((Activity)pl).getAttributes().putAttribute("actSOC", ev.getBattery().getSoc()/ev.getBattery().getCapacity());
 					}
-					actOrder++;
-				}
+				});
 				
 			}
 		}

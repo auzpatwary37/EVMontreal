@@ -68,7 +68,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--facilities"}, description = {"Optional Path to facilities file to load."}, defaultValue = "montreal_facilities.xml.gz")
   private String facilitiesFileLoc;
   
-  @Option(names = {"--lastiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "200")
+  @Option(names = {"--lastiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "100")
   private int maxIterations;
   
   @Option(names = {"--firstiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "0")
@@ -80,7 +80,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "0.1")
   private Double scale;
   
-  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/TimeBasedPricingAllHomeChargersAllLogicRevisedPunishment")
+  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/TimeBasedBaseScenarioAllHomeChargersAllLogicRevisedPunishment")
   private String output;
   
   @Option(names = {"--charger"}, description = {"Charger file location"}, defaultValue = "charger.xml")
