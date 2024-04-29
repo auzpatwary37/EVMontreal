@@ -80,7 +80,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "0.1")
   private Double scale;
   
-  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/TimeBasedBaseScenarioAllHomeChargersAllLogicRevisedPunishment")
+  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/KWUsage&TimeBaseScenarioAllHomeChargersAllLogicRevisedPunishmentPricedHighCharger")
   private String output;
   
   @Option(names = {"--charger"}, description = {"Charger file location"}, defaultValue = "charger.xml")

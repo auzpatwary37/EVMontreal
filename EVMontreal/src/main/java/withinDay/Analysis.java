@@ -19,11 +19,11 @@ import org.matsim.core.utils.misc.OptionalTime;
 
 public class Analysis {
 	public static void main(String[] args) throws IOException {
-		Population population = PopulationUtils.readPopulation("data/100.plans.xml.gz");
+		Population population = PopulationUtils.readPopulation("C:\\Users\\arsha\\git\\EVMontreal\\EVMontreal\\ABMTrans\\output\\KWUsage&TimeBaseScenarioAllHomeChargersAllLogicRevisedPunishmentFlat\\output_plans.xml.gz");
 		Map<Integer,Double> soc = new HashMap<>();
 		Map<Integer,Integer> socount = new HashMap<>();
 		ElectricFleetSpecification evs = new ElectricFleetSpecificationImpl();
-		new ElectricFleetReader(evs).readFile("data/evehicle.xml");
+		new ElectricFleetReader(evs).readFile("C:\\Users\\arsha\\git\\EVMontreal\\EVMontreal\\ABMTrans\\evehicle.xml");
 		
 		population.getPersons().values().stream().forEach(p->{
 			p.getSelectedPlan().getPlanElements().stream().forEach(pl->{
@@ -43,7 +43,7 @@ public class Analysis {
 		});
 		soc.entrySet().forEach(e->e.setValue(e.getValue()/socount.get(e.getKey())));
 		
-		FileWriter fw = new FileWriter(new File("data/avgSoc.csv"));
+		FileWriter fw = new FileWriter(new File("C:\\\\Users\\\\arsha\\\\git\\\\EVMontreal\\\\EVMontreal\\\\ABMTrans\\\\output/avgSoc.csv"));
 		fw.append("hour,averageSOC\n");
 		fw.flush();
 		

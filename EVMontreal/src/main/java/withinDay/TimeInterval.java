@@ -13,14 +13,14 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 public class TimeInterval {
     public static void main(String[] args) {
 
-        String inputFile = "C:\\Users\\arsha\\OneDrive\\Desktop\\ABMTrans REsults\\Time-based\\timebased.xlsx";
-        String outputFile = "C:\\Users\\arsha\\OneDrive\\Desktop\\ABMTrans REsults\\Time-based\\Outputtimebased.xlsx";
+        String inputFile = "C:\\Users\\arsha\\Desktop\\Comparison\\100.chargingStatsPLow.xlsx";
+        String outputFile = "C:\\Users\\arsha\\Desktop\\Comparison\\100.chargingStatsPLow.xlsx";
 
 
         try {
             FileInputStream fileInputStream = new FileInputStream(new File(inputFile));
             Workbook workbook = new XSSFWorkbook(fileInputStream);
-            Sheet sheet = workbook.getSheetAt(2);
+            Sheet sheet = workbook.getSheetAt(1);
 
             List<Double> headers = getHeaders(sheet);
 

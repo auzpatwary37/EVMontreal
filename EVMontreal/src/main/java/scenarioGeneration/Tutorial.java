@@ -12,11 +12,6 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactoryConfigurationError;
-
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import org.matsim.api.core.v01.Coord;
@@ -60,8 +55,8 @@ import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
+import org.matsim.facilities.ActivityFacilities;
 import org.matsim.vehicles.EngineInformation;
-import org.matsim.vehicles.EngineInformation.FuelType;
 import org.matsim.vehicles.MatsimVehicleWriter;
 import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleType;
@@ -73,7 +68,6 @@ import com.google.common.collect.ImmutableList;
 
 import EVPricing.ChargePricingEventHandler;
 import EVPricing.ChargerPricingProfile;
-import EVPricing.ChargerPricingProfileReader;
 import EVPricing.ChargerPricingProfileWriter;
 import EVPricing.ChargerPricingProfiles;
 import urbanEV.EVUtils;
@@ -98,9 +92,10 @@ public class Tutorial {
 		double homeChargerPercentage = 1.0;
 
 		String configIn = "config_with_calibrated_parameters.xml";// input MATSim Montreal Config without ev
-		String planInput = "output_plans.xml.gz";// Population file without EV
+		String planInput = "prepared_population.xml.gz";// Population file without EV
 		String networkInput = "montreal_network.xml.gz";// Input Network File
 		String chargerFileInput = "cleaned_station.csv";//Charger file with exactly same headers as given to me by Arsham but in .csv format. Save the excel as csv and input its file location
+		String activityFacilityFileInput = "montreal_facilities.xml.gz";
 
 		String planOutput = "Output/plan.xml"; // Saving location of the EV included population
 		String vehicleOutput = "Output/vehicle.xml"; // Vehicle xml file write location
@@ -132,14 +127,20 @@ public class Tutorial {
 		//____________________________________________________
 		
 		
-
+		
 
 		Config config = ConfigUtils.createConfig();
 		config.network().setInputFile(resultOut);
 		ConfigUtils.loadConfig(config,configIn);
 		config.plans().setInputFile(planInput);
+		config.facilities().setInputFile(activityFacilityFileInput);
+		config.households().setInputFile(null);
+		config.transit().setTransitScheduleFile(null);
+		config.transit().setVehiclesFile(null);
 
 		Scenario scenario = ScenarioUtils.loadScenario(config);
+		ActivityFacilities fac = scenario.getActivityFacilities();
+		
 		checkPlanConsistancy(scenario.getPopulation());
 		Vehicles vs = scenario.getVehicles();
 		VehiclesFactory vf = vs.getFactory();
@@ -174,7 +175,7 @@ public class Tutorial {
 		
 
 		CoordinateTransformation tsf = TransformationFactory.getCoordinateTransformation(TransformationFactory.WGS84, "EPSG:32188");
-		Map<String,Coord> homeChargerLocations = new HashMap<>();
+		Map<String,Id<Link>> homeChargerLocations = new HashMap<>();
 		
 		//______________________________________________________________________
 		//Reading the charger csv file
@@ -293,7 +294,7 @@ public class Tutorial {
 								sp.addVehicleSpecification(s);
 								// Now insert a charger at the home location. 
 								p.getValue().getSelectedPlan().getPlanElements().stream().filter(pp->pp instanceof Activity)
-								.filter(a->((Activity)a).getType().equals("home")).forEach(a->homeChargerLocations.put(p.getKey().toString(),((Activity)a).getCoord()));
+								.filter(a->((Activity)a).getType().equals("home")).forEach(a->homeChargerLocations.put(p.getKey().toString(),fac.getFacilities().get(((Activity)a).getFacilityId()).getLinkId()));
 								
 								// check if have access to at least one charger
 								Set<Id<Link>> actLinkIds = new HashSet<>();
@@ -327,8 +328,8 @@ public class Tutorial {
 		Map<Id<Charger>,Set<Id<Person>>> personsToChargerAssignment = new HashMap<>();
 		if(assignChargersToEveryone) {
 			
-			for(Entry<String, Coord> d:homeChargerLocations.entrySet()) {
-				Id<Link> linkId = NetworkUtils.getNearestRightEntryLink(net, d.getValue()).getId();
+			for(Entry<String, Id<Link>> d:homeChargerLocations.entrySet()) {
+				Id<Link> linkId = d.getValue();
 				double m = Math.random();
 				
 				if(!chargerLinkIds.containsKey(linkId)) {
@@ -344,7 +345,7 @@ public class Tutorial {
 					pSet.add(Id.createPersonId(d.getKey()));
 					personsToChargerAssignment.put(c.getId(),pSet);
 					csp.addChargerSpecification(c);
-					chargerCoord.put(c.getId(),d.getValue());
+					chargerCoord.put(c.getId(),net.getLinks().get(d.getValue()).getCoord());
 					chargerLinkIds.put(linkId, c);
 					}
 					}else{

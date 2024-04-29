@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -46,8 +47,10 @@ import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.controler.MatsimServices;
 import org.matsim.core.events.MobsimScopeEventHandler;
 import org.matsim.core.mobsim.framework.events.MobsimAfterSimStepEvent;
+import org.matsim.core.mobsim.framework.events.MobsimBeforeCleanupEvent;
 import org.matsim.core.mobsim.framework.events.MobsimBeforeSimStepEvent;
 import org.matsim.core.mobsim.framework.listeners.MobsimAfterSimStepListener;
+import org.matsim.core.mobsim.framework.listeners.MobsimBeforeCleanupListener;
 import org.matsim.core.mobsim.framework.listeners.MobsimBeforeSimStepListener;
 import org.matsim.core.population.PersonUtils;
 import org.matsim.vehicles.Vehicle;
@@ -69,7 +72,7 @@ import com.google.inject.Inject;
 
 
 public class ChargePricingEventHandler implements ChargingStartEventHandler, ChargingEndEventHandler, LinkLeaveEventHandler,TransitDriverStartsEventHandler,
-PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTrafficEventHandler,VehicleLeavesTrafficEventHandler, MobsimScopeEventHandler, MobsimAfterSimStepListener,MobsimBeforeSimStepListener{
+PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTrafficEventHandler,VehicleLeavesTrafficEventHandler, MobsimScopeEventHandler, MobsimAfterSimStepListener,MobsimBeforeSimStepListener,MobsimBeforeCleanupListener{
 
 	
 
@@ -132,7 +135,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		
 		try {
 			fw = new FileWriter(new File(controler.getControlerIO().getIterationFilename(controler.getIterationNumber(), "charging.csv")));
-			fw.append("pId,chargerId,startingTime,EndingTime,duration,initialSOC,charge,finalSoC,cost\n");
+			fw.append("pId,chargerId,startingTime,EndingTime,duration,initialSOC,charge,finalSoC,total energy transmitted,cost\n");
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -154,6 +157,10 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		Plan plan = this.scenario.getPopulation().getPersons().get(pId).getSelectedPlan();
 		chargingDetails cd = this.personLists.get(pId.toString());
 		cd.endingTime = event.getTime();
+		int o = (int)(Math.floor(cd.endingTime-cd.startingTime)/(this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getProfileTimeStepInMin()*60));
+		//if(o>=cd.chargeDetails.length)o = cd.chargeDetails.length-1;
+		if(cd.chargeDetails.size()<o+1)cd.chargeDetails.add(cd.v.getBattery().getSoc());
+		else cd.chargeDetails.set(o, cd.v.getBattery().getSoc());
 //		String chargerType = this.chargingInfrastructure.getChargerSpecifications().get(cd.charger).getChargerType();
 //		double pricePerkWhr = this.price.get(chargerType);
 //		Double juleCharged= cd.v.getBattery().getSoc()-cd.initialSoc;//warning: unit Conversion
@@ -262,32 +269,84 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	
 	public static double getCostBasedOnKwUsage(chargingDetails cd,ChargerPricingProfile cpf, int timeId) {
 		double[] pricingProfile = cpf.getPricingProfile().get(timeId);
+		double time = 0;
 		double cost = 0;
 		double charge = cd.initialSoc;
-		for(int i = 0; i<pricingProfile.length;i++) {
-			//System.out.println((cd.chargeDetails[i]-charge)*2.78e-7);
-			if(cd.chargeDetails[i]>0)cost+=pricingProfile[i]*(cd.chargeDetails[i]-charge)*2.78e-7;
+		int i=0;
+		for(int t = 0;t<(cd.endingTime-cd.startingTime)/cpf.getProfileTimeStepInMin()/60;t++) {
+			if(time>60) {
+				time = 0;
+				timeId++;
+				if(cpf.getPricingProfile().get(timeId)!=null) {
+					pricingProfile = cpf.getPricingProfile().get(timeId);
+				}
+			}
+			if(cd.chargeDetails.get(t)>0) {
+				cost+=pricingProfile[i]*(cd.chargeDetails.get(t)-charge)*2.78e-7;
+			}
 			else break;
-			charge=cd.chargeDetails[i];
+			charge=cd.chargeDetails.get(t);
 			cd.finalSoC = charge;
+			if(i<pricingProfile.length-1)i++;
+			time+=cpf.getProfileTimeStepInMin();
 		}
+//		for(i = 0; i<pricingProfile.length;i++) {
+//			//System.out.println((cd.chargeDetails[i]-charge)*2.78e-7);
+//			if(time>60) {
+//				time = 0;
+//				timeId++;
+//				pricingProfile = cpf.getPricingProfile().get(timeId);
+//			}
+//			if(cd.chargeDetails[i]>0)cost+=pricingProfile[i]*(cd.chargeDetails[i]-charge)*2.78e-7;
+//			else break;
+//			charge=cd.chargeDetails[i];
+//			cd.finalSoC = charge;
+//			time+=cpf.getProfileTimeStepInMin();
+//		}
 		return cost;
 	}
 	
 	public static double getCostBasedOnTimeUsage(chargingDetails cd,ChargerPricingProfile cpf, int timeId) {
 		double[] pricingProfile = cpf.getPricingProfilePerHr().get(timeId);
 		double cost = 0;
+		double time = 0;
+		int i= 0;
 		double duration = cd.endingTime-cd.startingTime;
 		//double charge = cd.initialSoc;
-		for(int i = 0; i<pricingProfile.length;i++) {
-			if(duration >= cpf.getProfileTimeStepInMin()*60) {
-				cost+=pricingProfile[i]*cpf.getProfileTimeStepInMin()*60/3600;
-			}else {
-				cost+=duration*pricingProfile[i]/3600;
-				break;
+		for(int t = 0;t<(cd.endingTime-cd.startingTime)/cpf.getProfileTimeStepInMin()/60+1;t++) {
+			if(time>60) {
+				time = 0;
+				timeId++;
+				if(cpf.getPricingProfile().get(timeId)!=null) {
+					pricingProfile = cpf.getPricingProfile().get(timeId);
+				}
+				if(duration >= cpf.getProfileTimeStepInMin()*60) {
+					cost+=pricingProfile[i]*cpf.getProfileTimeStepInMin()*60/3600;
+				}else {
+					cost+=duration*pricingProfile[i]/3600;
+					break;
+				}
+				duration = duration-cpf.getProfileTimeStepInMin()*60;
+				if(i<pricingProfile.length-1)i++;
+				time+=cpf.getProfileTimeStepInMin();
 			}
-			duration = duration-cpf.getProfileTimeStepInMin()*60;
+			
 		}
+		
+//		for(i = 0; i<pricingProfile.length;i++) {
+//			if(time>60) {
+//				timeId++;
+//				pricingProfile = cpf.getPricingProfilePerHr().get(timeId);
+//			}
+//			if(duration >= cpf.getProfileTimeStepInMin()*60 || i<pricingProfile.length-1) {
+//				cost+=pricingProfile[i]*cpf.getProfileTimeStepInMin()*60/3600;
+//			}else {
+//				cost+=duration*pricingProfile[i]/3600;
+//				break;
+//			}
+//			duration = duration-cpf.getProfileTimeStepInMin()*60;
+//			time+=cpf.getProfileTimeStepInMin();
+//		}
 		return cost;
 	}
 	
@@ -331,8 +390,10 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		if((e.getSimulationTime()+1)%((EvConfigGroup)this.scenario.getConfig().getModules().get("ev")).getChargeTimeStep()==0) {
 			for(chargingDetails cd:this.personLists.values()) {
 				int o = (int)(Math.floor(e.getSimulationTime()-cd.startingTime)/(this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getProfileTimeStepInMin()*60));
-				if(o>=cd.chargeDetails.length)o = cd.chargeDetails.length-1;
-				cd.chargeDetails[o] = cd.v.getBattery().getSoc();
+				//if(o>=cd.chargeDetails.length)o = cd.chargeDetails.length-1;
+				if(cd.chargeDetails.size()<o+1)cd.chargeDetails.add(cd.v.getBattery().getSoc());
+				else cd.chargeDetails.set(o, cd.v.getBattery().getSoc());
+				
 			}
 		}
 		
@@ -349,16 +410,38 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		}
 		
 	}
+
+	@Override
+	public void notifyMobsimBeforeCleanup(MobsimBeforeCleanupEvent e) {
+		for(chargingDetails cd:this.personLists.values()) {
+			Id<Person> pId = this.personIdForEV.get(cd.v.getId());
+			Plan plan = this.scenario.getPopulation().getPersons().get(pId).getSelectedPlan();
+			//chargingDetails cd = this.personLists.get(pId.toString());
+			cd.endingTime = this.scenario.getConfig().qsim().getEndTime().seconds();
+			int o = (int)(Math.floor(cd.endingTime-cd.startingTime)/(this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getProfileTimeStepInMin()*60));
+			//if(o>=cd.chargeDetails.length)o = cd.chargeDetails.length-1;
+			if(cd.chargeDetails.size()<o+1)cd.chargeDetails.add(cd.v.getBattery().getSoc());
+			else cd.chargeDetails.set(o, cd.v.getBattery().getSoc());
+//			String chargerType = this.chargingInfrastructure.getChargerSpecifications().get(cd.charger).getChargerType();
+//			double pricePerkWhr = this.price.get(chargerType);
+//			Double juleCharged= cd.v.getBattery().getSoc()-cd.initialSoc;//warning: unit Conversion
+//			Double cost = pricePerkWhr*juleCharged/3600000;
+//			this.events.processEvent(new PersonMoneyEvent(event.getTime(), pId, cost*-1, this.ChargingCostName, cd.charger.toString()+"___"+chargerType));
+			this.chargePeopleForElectricity(cd, this.scenario.getConfig().qsim().getEndTime().seconds());
+			this.personLists.remove(pId.toString());
+			this.scenario.getPopulation().getPersons().get(pId).getAttributes().putAttribute("chargingIndicator", false);
+		}
+	}
 	
 	
 	
 }
 
 class chargingDetails{
-	public static String arrayToString(double[] a) {
+	public static String arrayToString(List<Double> objects) {
 		String out = "";
 		String sep = "";
-		for(double d:a) {
+		for(Double d:objects) {
 			out=out+sep+Double.toString(d);
 			sep = " ";
 		}
@@ -371,7 +454,7 @@ class chargingDetails{
 	public double endingTime;
 	public ElectricVehicle v;
 	public double initialSoc = 0;
-	public double[] chargeDetails;
+	public List<Double> chargeDetails;
 	public double finalSoC = 0;
 	
 	
@@ -380,12 +463,12 @@ class chargingDetails{
 		this.startingTime =startingTime;
 		this.v =  v;
 		this.initialSoc = v.getBattery().getSoc();
-		chargeDetails = new double[pricingStepSize];
+		chargeDetails = new ArrayList<>();
 	}
 	@Override
 	public String toString() {
 //		this.finalSoC = this.initialSoc+(this.chargeDetails[0]+this.chargeDetails[1]+this.chargeDetails[2]);
-		return this.charger+","+this.startingTime/3600+","+this.endingTime/3600+","+(this.endingTime-this.startingTime)+","+this.initialSoc+","+arrayToString(this.chargeDetails)+","+this.finalSoC;
+		return this.charger+","+this.startingTime+","+this.endingTime+","+(this.endingTime-this.startingTime)+","+this.initialSoc/3600000+","+arrayToString(this.chargeDetails)+","+this.finalSoC/3600000+","+(this.finalSoC-this.initialSoc)/3600000;
 	}
 	
 }
