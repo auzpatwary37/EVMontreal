@@ -17,12 +17,17 @@ import org.matsim.core.mobsim.framework.listeners.MobsimAfterSimStepListener;
 
 import com.google.inject.Inject;
 
+import urbanEV.UrbanEVConfigGroup;
+
 public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener,MobsimScopeEventHandler{
 	
 	
 	private final ElectricFleet Ev;
 	@Inject
 	private EventsManager manager;
+	@Inject
+	
+	
 	private final int chargeTimeStep;
 	
 
@@ -37,10 +42,12 @@ public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener,MobsimS
 	private double endTime = 0;
 	
 	@Inject
-	public EVOutOfBatteryChecker(ElectricFleet ev, EvConfigGroup evConfig, QSimConfigGroup qsim) {
+	public EVOutOfBatteryChecker(ElectricFleet ev, EvConfigGroup evConfig, UrbanEVConfigGroup urbanEvConfig, QSimConfigGroup qsim) {
 		this.Ev = ev;
 		this.chargeTimeStep = evConfig.chargeTimeStep;
 		this.endTime =qsim.getEndTime().seconds();
+		this.rangeAnxietyCoefficientA = urbanEvConfig.getRangeAnxietyConstA();
+		this.rangeAnxietyCoefficientB = urbanEvConfig.getRangeAnxietyConstB();
 	}
 
 	@Override

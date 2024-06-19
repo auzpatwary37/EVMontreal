@@ -33,6 +33,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import org.jcodec.common.logging.Logger;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
+import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.PopulationWriter;
 import org.matsim.contrib.ev.charging.ChargingEndEvent;
 import org.matsim.contrib.ev.charging.ChargingListener;
@@ -44,6 +45,8 @@ import org.matsim.contrib.ev.infrastructure.ChargerSpecification;
 import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.vehicles.Vehicle;
 
+import urbanEV.UrbanEVConfigGroup;
+
 public class ChargingWithQueueingLogic implements ChargingLogic {
 	private final ChargerSpecification charger;
 	private final ChargingStrategy chargingStrategy;
@@ -53,13 +56,15 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 	private final Map<Id<Vehicle>, ElectricVehicle> pluggedVehicles = new ConcurrentHashMap<>();//Collections.synchronizedMap(new LinkedHashMap<>())
 	private final Queue<ElectricVehicle> queuedVehicles = new ConcurrentLinkedQueue<>();
 	private final Map<Id<Vehicle>, ChargingListener> listeners = new ConcurrentHashMap<>();
+	private UrbanEVConfigGroup urbanEV;
 
 	public ChargingWithQueueingLogic(ChargerSpecification charger, ChargingStrategy chargingStrategy,
-			EventsManager eventsManager, Scenario scenario) {
+			EventsManager eventsManager, Scenario scenario, UrbanEVConfigGroup urbanEv) {
 		this.chargingStrategy = Objects.requireNonNull(chargingStrategy);
 		this.charger = Objects.requireNonNull(charger);
 		this.eventsManager = Objects.requireNonNull(eventsManager);
 		this.scenario = scenario;
+		this.urbanEV = urbanEv;
 	}
 
 	@Override
@@ -88,14 +93,14 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 			ev.getBattery().setCharge(ev.getBattery().getCharge()+ev.getChargingPower().calcChargingPower(charger) * chargePeriod);
 			//ev.getBattery().changeSoc(ev.getChargingPower().calcChargingPower(charger) * chargePeriod);
 //___________________________________________________comment these lines to not kick vehicles from queue_______________
-//			if (chargingStrategy.isChargingCompleted(ev)) {
-//				Person person = scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString()));
-//				ChargingEndEvent event = new ChargingEndEventUrbanEv(now, charger.getId(), ev.getId(),person);
-//				scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString())).getAttributes().putAttribute("charginatLogicIndicator", false);
-//				eventsManager.processEvent(event);
-//				listeners.remove(ev.getId()).notifyChargingEnded(ev, now);
-//				pluggedVehicles.remove(evEntry.getKey());
-//			}
+			if (chargingStrategy.isChargingCompleted(ev) && urbanEV.isAutomaticKickOutFromChargerQueue()) {
+				Person person = scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString()));
+				ChargingEndEvent event = new ChargingEndEventUrbanEv(now, charger.getId(), ev.getId(),now, person);
+				scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString())).getAttributes().putAttribute("charginatLogicIndicator", false);
+				eventsManager.processEvent(event);
+				listeners.remove(ev.getId()).notifyChargingEnded(ev, now);
+				pluggedVehicles.remove(evEntry.getKey());
+			}
 //________________________________________________________________________________________________
 		}
 

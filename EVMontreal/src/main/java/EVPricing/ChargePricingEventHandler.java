@@ -3,11 +3,8 @@ package EVPricing;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.reflect.Array;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,7 +36,6 @@ import org.matsim.contrib.ev.charging.ChargingStartEventHandler;
 import org.matsim.contrib.ev.fleet.ElectricFleet;
 import org.matsim.contrib.ev.fleet.ElectricFleetSpecification;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
-import org.matsim.contrib.ev.fleet.ElectricVehicleSpecification;
 import org.matsim.contrib.ev.infrastructure.Charger;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureSpecification;
 import org.matsim.core.api.experimental.events.EventsManager;
@@ -49,11 +45,13 @@ import org.matsim.core.mobsim.framework.events.MobsimAfterSimStepEvent;
 import org.matsim.core.mobsim.framework.events.MobsimBeforeSimStepEvent;
 import org.matsim.core.mobsim.framework.listeners.MobsimAfterSimStepListener;
 import org.matsim.core.mobsim.framework.listeners.MobsimBeforeSimStepListener;
-import org.matsim.core.population.PersonUtils;
 import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleUtils;
 
 import com.google.inject.Inject;
+
+import urbanEV.UrbanEVConfigGroup;
+import urbanEV.UrbanEVConfigGroup.PricingLogic;
 
 
 /**
@@ -82,6 +80,9 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	
 	@Inject
 	private ElectricFleetSpecification vehicleSpecifications;
+	
+	@Inject
+	private UrbanEVConfigGroup urbanEv;
 	
 	private ElectricFleet fleet;
 	
@@ -232,13 +233,29 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	 * @param cd
 	 * @param time
 	 */
+	@SuppressWarnings("deprecation")
 	void chargePeopleForElectricity(chargingDetails cd,double time) {
 		Id<Vehicle> vId = Id.createVehicleId(cd.v.getId().toString());
 		
 			int timeId = (int)(cd.startingTime/3600);
 			if(timeId>23)timeId = timeId-24;
 			//double[] pricingProfile = this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getPricingProfile().get(timeId);
-			double cost = getCostBasedOnTimeAndKwUsageMax(cd,this.pricingProfies.getChargerPricingProfiles().get(cd.charger),timeId);
+			
+			PricingLogic  pricingLogic = urbanEv.getPricingLogic();
+			
+			
+			double cost = 0;
+			
+			if(pricingLogic.equals(PricingLogic.TIME_BASED)) {
+				cost = getCostBasedOnTimeUsage(cd,this.pricingProfies.getChargerPricingProfiles().get(cd.charger),timeId);
+			}else if(pricingLogic.equals(PricingLogic.USAGE_BASED)) {
+				cost = getCostBasedOnKwUsage(cd,this.pricingProfies.getChargerPricingProfiles().get(cd.charger),timeId);
+			}else if(pricingLogic.equals(PricingLogic.COMBINED)) {
+				cost = getCostBasedOnTimeAndKwUsageMax(cd,this.pricingProfies.getChargerPricingProfiles().get(cd.charger),timeId);
+			}else {
+				cost = getCostBasedOnTimeUsage(cd,this.pricingProfies.getChargerPricingProfiles().get(cd.charger),timeId);
+			}
+			
 //			double charge = cd.initialSoc;
 //			for(int i = 0; i<pricingProfile.length;i++) {
 //				//System.out.println((cd.chargeDetails[i]-charge)*2.78e-7);

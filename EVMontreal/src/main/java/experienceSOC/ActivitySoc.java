@@ -65,7 +65,7 @@ public class ActivitySoc implements ActivityStartEventHandler,MobsimScopeEventHa
 			}
 			ElectricVehicle ev = this.electricFleet.getElectricVehicles().get(eId);
 			Activity act = (Activity)this.scenario.getPopulation().getPersons().get(event.getPersonId()).getSelectedPlan().getPlanElements().get(actOrder.get(event.getPersonId()));
-			act.getAttributes().putAttribute(actSOCAttributeName,ev.getBattery().getSoc()/ev.getBattery().getCapacity());
+			act.getAttributes().putAttribute(actSOCAttributeName,ev.getBattery().getSoc());
 		}
 		
 	}
@@ -82,7 +82,7 @@ public class ActivitySoc implements ActivityStartEventHandler,MobsimScopeEventHa
 				ElectricVehicle ev = this.electricFleet.getElectricVehicles().get(eId);
 				p.getSelectedPlan().getPlanElements().forEach(pl->{
 					if(pl instanceof Activity && ((Activity)pl).getStartTime().seconds()>this.scenario.getConfig().qsim().getEndTime().seconds()) {
-						((Activity)pl).getAttributes().putAttribute("actSOC", ev.getBattery().getSoc()/ev.getBattery().getCapacity());
+						((Activity)pl).getAttributes().putAttribute("actSOC", ev.getBattery().getSoc());
 					}
 				});
 				

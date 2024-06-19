@@ -68,6 +68,7 @@ import com.google.inject.Inject;
 import com.sun.istack.Nullable;
 
 import EVPricing.ChargerPricingProfiles;
+import urbanEV.UrbanEVConfigGroup.PersonChargingLogic;
 
 
 
@@ -121,9 +122,14 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	
 	@Inject
 	private TimeInterpretation time;
+	
+	@Inject
+	private UrbanEVConfigGroup urbanEV;
 
 
 	Config config;
+	
+	
 
 	@Inject 
 	private ChargerPricingProfiles chargerPricingProfiles;
@@ -778,28 +784,34 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			//			int indFirstEvLeg=  modifiablePlan.getPlanElements().indexOf(firstEvLeg);
 			//			actWhileCharging =  EditPlansReplan.findRealActBefore(plan,indFirstEvLeg);
 			//
-
-			double random = Math.random();
-			String logicSwitch = null;
-			if(random<=0.33) {
-				logicSwitch = "activityDuration";
-			}else if(random<=.67) {
-				logicSwitch = "experienceBased";
-			}else {
-				logicSwitch = "optimized";
+			
+			PersonChargingLogic  logic = urbanEV.getChargingLogic();
+			if(logic.equals(PersonChargingLogic.COMBINED_RANDOM)) {
+				double random = Math.random();
+				
+				if(random<=0.33) {
+					logic = PersonChargingLogic.DURATION_BASED;
+				}else if(random<=.67) {
+					logic = PersonChargingLogic.EXPERIENCE_BASED;
+				}else {
+					logic = PersonChargingLogic.OPTIMIZED;
+				}
 			}
 			
+
+			
+			
 //			logicSwitch= "activityDuration";
-			modifiablePlan.getAttributes().putAttribute("logicSwitch", logicSwitch);
+			modifiablePlan.getAttributes().putAttribute("logicSwitch", logic.toString());
 			List<Activity> pe;
-			switch(logicSwitch){
-			case "activityDuration":
+			switch(logic){
+			case PersonChargingLogic.DURATION_BASED:
 				pe = this.logicActivityDuration(modifiablePlan);
 				break;
-			case "experienceBased":
+			case PersonChargingLogic.EXPERIENCE_BASED:
 				pe = this.logicExperienceBased(modifiablePlan);
 				break;
-			case "optimized":
+			case PersonChargingLogic.OPTIMIZED:
 				pe = this.logicOptimized(modifiablePlan);
 				break;
 			default:

@@ -14,15 +14,12 @@ import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.EvModule;
-import org.matsim.contrib.ev.charging.ChargingHandler;
-import org.matsim.contrib.ev.fleet.ElectricVehicleSpecification;
 import org.matsim.contrib.ev.routing.EvNetworkRoutingProvider;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup.ActivityParams;
 import org.matsim.core.config.groups.PlansCalcRouteConfigGroup;
-import org.matsim.core.config.groups.QSimConfigGroup;
 import org.matsim.core.config.groups.StrategyConfigGroup;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
@@ -40,6 +37,8 @@ import modeChoiceFix.SubTourPlanStrategyBinder;
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
 import urbanEV.UrbanEVConfigGroup;
+import urbanEV.UrbanEVConfigGroup.PersonChargingLogic;
+import urbanEV.UrbanEVConfigGroup.PricingLogic;
 import urbanEV.UrbanEVModule;
 import urbanEV.UrbanEVTripPlanningStrategyModule;
 import urbanEV.UrbanVehicleChargingHandler;
@@ -110,7 +109,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   
   public Integer call() throws Exception {
     
-    Config config = ConfigUtils.loadConfig(this.config, new EvConfigGroup(), new UrbanEVConfigGroup());
+    Config config = ConfigUtils.loadConfig(this.config,new EvConfigGroup(), new UrbanEVConfigGroup());
     
     config.plans().setInputFile(this.planFile);
     config.households().setInputFile(this.householdFileLoc);
@@ -135,10 +134,18 @@ public final class RunEVExampleV2 implements Callable<Integer> {
     
  
 	((EvConfigGroup)config.getModules().get("ev")).timeProfiles = true;
-	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(true);
-	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(chargerDist);
-	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaximumChargingProceduresPerAgent(2);
-	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.3);
+	UrbanEVConfigGroup urbanEv = ((UrbanEVConfigGroup)config.getModules().get("urbanEV"));
+	urbanEv.setPluginBeforeStartingThePlan(true);
+	urbanEv.setMaxDistanceBetweenActAndCharger_m(chargerDist);
+	urbanEv.setMaximumChargingProceduresPerAgent(2);
+	urbanEv.setCriticalRelativeSOC(0.3);
+	urbanEv.setAutomaticKickOutFromChargerQueue(true);
+	urbanEv.setChargerPricingFileLocation(pricingEVFile);
+	urbanEv.setChargingLogic(PersonChargingLogic.OPTIMIZED);
+	urbanEv.setPricingLogic(PricingLogic.TIME_BASED);
+	urbanEv.setRangeAnxietyConstA(.00001);
+	urbanEv.setRangeAnxietyConstB(20);
+	
 	((EvConfigGroup)config.getModules().get("ev")).chargersFile = chargerFile;
 	//((EvConfigGroup)config.getModules().get("ev"))this.evehicleFile);
 	
@@ -262,32 +269,12 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	
 	
 	
-	ChargerPricingProfiles pricingProfiles = new ChargerPricingProfileReader().readChargerPricingProfiles(this.pricingEVFile);
 
 	
 	controler.addOverridingModule(new AbstractModule() {
 		@Override
 		public void install() {
-			bind(ChargerPricingProfiles.class).toInstance(pricingProfiles);
 			addRoutingModuleBinding(TransportMode.car).toProvider(new EvNetworkRoutingProvider(TransportMode.car));
-			installQSimModule(new AbstractQSimModule() {
-				@Override
-				protected void configureQSim() {
-					//bind(VehicleChargingHandler.class).asEagerSingleton();
-					bind(ChargePricingEventHandler.class).asEagerSingleton();
-					//addMobsimScopeEventHandlerBinding().to(VehicleChargingHandler.class);
-					
-					addMobsimScopeEventHandlerBinding().to(ChargePricingEventHandler.class);
-					this.addQSimComponentBinding(EvModule.EV_COMPONENT).to(ChargePricingEventHandler.class);
-					this.bind(EVOutOfBatteryChecker.class).asEagerSingleton();
-					this.addQSimComponentBinding(EvModule.EV_COMPONENT).to(EVOutOfBatteryChecker.class);
-					
-					
-//					addMobsimListenerBinding().to(EVOutOfBatteryChecker.class);
-//					addMobsimScopeEventHandlerBinding().to(EVOutOfBatteryChecker.class);
-				}
-				
-			});
 			addMobsimListenerBinding().to(TrialWithinday.class);
 			
 		}

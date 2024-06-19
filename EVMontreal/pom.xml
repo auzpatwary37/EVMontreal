@@ -25,8 +25,8 @@
 <!--		!! matsim-examples is currently on a more modern version since I want to modernize some things there. kai, apr'21 !!-->
 		
 		<matsim.version>15.0</matsim.version> <!-- 18.05.2021-->
-		<maven.compiler.source>19</maven.compiler.source>
-		<maven.compiler.target>19</maven.compiler.target>
+		<maven.compiler.source>21</maven.compiler.source>
+		<maven.compiler.target>21</maven.compiler.target>
 	
    </properties>
   
@@ -39,7 +39,7 @@
     <artifactId>maven-compiler-plugin</artifactId>
     <version>3.8.0</version>
     <configuration>
-        <release>19</release> 
+        <release>21</release> 
     </configuration>
 </plugin>
 

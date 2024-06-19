@@ -36,6 +36,7 @@ import org.matsim.core.mobsim.qsim.AbstractQSimModule;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 
+import binding.ChargerPricingModule;
 import binding.ChargingInfrastructureModule;
 import binding.ChargingModule;
 import binding.ElectricFleetModule;
@@ -65,6 +66,7 @@ public class UrbanEVModule extends AbstractModule {
 		install(new ChargingModule());
 		install(new DischargingModule());
 		install(new EvStatsModule());
+		install(new ChargerPricingModule());
 		addPlanStrategyBinding(UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName).toProvider(EvTripPlanningStrategyProvider.class);
 		
 		

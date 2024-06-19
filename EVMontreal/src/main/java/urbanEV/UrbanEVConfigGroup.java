@@ -38,6 +38,45 @@ public class UrbanEVConfigGroup extends ReflectiveConfigGroup {
         super(GROUP_NAME);
 
     }
+    
+    private static final String PRICING_LOGIC = "pricingLogic";
+    private static final String CHARGING_LOGIC = "chargingLogic";
+    private static final String AUTOMATIC_KICK_OUT_FROM_CHARGER_QUEUE = "automaticKickOutFromChargerQueue";
+    private static final String RANGE_ANXIETY_CONST_A = "rangeAnxietyConstA";
+    private static final String RANGE_ANXIETY_CONST_B = "rangeAnxietyConstB";
+    private static final String CHARGER_PRICING_FILE_LOCATION = "chargerPricingFileLocation";
+
+    /**
+     * Determines which pricing logic to use. Choose from Usage-Based Pricing, Time-Based Pricing and Combined Pricing. in usage based people a
+     * are charged for the power they have used. In time based they are charged based on the time they are plugged in. In combined both are calculated and 
+     * the max of the two is payable. 
+     */
+    private PricingLogic pricingLogic = PricingLogic.USAGE_BASED;
+    /**
+     * Determines the logic people will follow while replanning for charging. Choose from Experience-Based Charging, Duration-Based Charging, Optimized Charging or 
+     * Combined Random Charging. In the experience based one, people plan charging based on their experience based soc at each activity. In duration based, people 
+     * tend to choose the activity with more duration to charge. In optimized, people randomly choose different activities to charge around and the matsim system 
+     * picks the optimal plan. Finally, the random combined combine the different charging logics with uniform probability for each person, creating a heterogeneous charging behavior.  
+     */
+    private PersonChargingLogic chargingLogic = PersonChargingLogic.EXPERIENCE_BASED;
+    
+    /**
+     * This variable controls if vehicles are automatically kicked out from chargers if charging is complete. 
+     */
+    private boolean automaticKickOutFromChargerQueue = false;
+    /**
+     * coefficient of the range anxiety function.
+     */
+    private double rangeAnxietyConstA = 0.00001;
+    /**
+     * Coefficient of the range anxiety function. 
+     */
+    private double rangeAnxietyConstB = 20;
+    /**
+     * Location for the charger pricing file.
+     */
+    private String chargerPricingFileLocation = null;
+
 
     private static final String MAXIMUM_CHARGING_PROCEDURES = "maximumChargingProceduresPerAgent";
     /**
@@ -77,8 +116,71 @@ public class UrbanEVConfigGroup extends ReflectiveConfigGroup {
      */
 
     private static final String PLUGIN_BEFORE_STARTING_THE_PLAN = "pluginBeforeTheStartingThePlan";
+    
+    
 
     //-------------------------------------------------------------------------------------------
+    
+    //@StringGetter(PRICING_LOGIC)
+    public PricingLogic getPricingLogic() {
+        return pricingLogic;
+    }
+
+    //@StringSetter(PRICING_LOGIC)
+    public void setPricingLogic(PricingLogic pricingLogic) {
+        this.pricingLogic = pricingLogic;
+    }
+
+    //@StringGetter(CHARGING_LOGIC)
+    public PersonChargingLogic getChargingLogic() {
+        return chargingLogic;
+    }
+
+    //@StringSetter(CHARGING_LOGIC)
+    public void setChargingLogic(PersonChargingLogic chargingLogic) {
+        this.chargingLogic = chargingLogic;
+    }
+
+    //@StringGetter(AUTOMATIC_KICK_OUT_FROM_CHARGER_QUEUE)
+    public boolean isAutomaticKickOutFromChargerQueue() {
+        return automaticKickOutFromChargerQueue;
+    }
+
+    //@StringSetter(AUTOMATIC_KICK_OUT_FROM_CHARGER_QUEUE)
+    public void setAutomaticKickOutFromChargerQueue(boolean automaticKickOutFromChargerQueue) {
+        this.automaticKickOutFromChargerQueue = automaticKickOutFromChargerQueue;
+    }
+
+    //@StringGetter(RANGE_ANXIETY_CONST_A)
+    public double getRangeAnxietyConstA() {
+        return rangeAnxietyConstA;
+    }
+
+    //@StringSetter(RANGE_ANXIETY_CONST_A)
+    public void setRangeAnxietyConstA(double rangeAnxietyConstA) {
+        this.rangeAnxietyConstA = rangeAnxietyConstA;
+    }
+
+    //@StringGetter(RANGE_ANXIETY_CONST_B)
+    public double getRangeAnxietyConstB() {
+        return rangeAnxietyConstB;
+    }
+
+    //@StringSetter(RANGE_ANXIETY_CONST_B)
+    public void setRangeAnxietyConstB(double rangeAnxietyConstB) {
+        this.rangeAnxietyConstB = rangeAnxietyConstB;
+    }
+
+    //@StringGetter(CHARGER_PRICING_FILE_LOCATION)
+    public String getChargerPricingFileLocation() {
+        return chargerPricingFileLocation;
+    }
+
+    //@StringSetter(CHARGER_PRICING_FILE_LOCATION)
+    public void setChargerPricingFileLocation(String chargerPricingFileLocation) {
+        this.chargerPricingFileLocation = chargerPricingFileLocation;
+    }
+
 
     //	@StringGetter(MAXIMUM_CHARGING_PROCEDURES)
     public int getMaximumChargingProceduresPerAgent() {
@@ -141,4 +243,47 @@ public class UrbanEVConfigGroup extends ReflectiveConfigGroup {
      this.pluginBeforeStartingThePlan = pluginBeforeStartingThePlan;
     }
 
+   public static enum PricingLogic {
+        USAGE_BASED("Usage-Based Pricing"),
+        TIME_BASED("Time-Based Pricing"),
+        COMBINED("Combined Pricing");
+
+        private final String description;
+
+        PricingLogic(String description) {
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        @Override
+        public String toString() {
+            return description;
+        }
+    }
+    
+    public static enum PersonChargingLogic {
+        EXPERIENCE_BASED("Experience-Based Charging"),
+        OPTIMIZED("Optimized Charging"),
+        DURATION_BASED("Duration-Based Charging"),
+        COMBINED_RANDOM("Combined Random Charging");
+
+        private final String description;
+
+        PersonChargingLogic(String description) {
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        @Override
+        public String toString() {
+            return description;
+        }
+    }
+    
 }

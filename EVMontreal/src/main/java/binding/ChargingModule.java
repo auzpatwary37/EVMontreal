@@ -22,7 +22,6 @@ package binding;
 
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.contrib.ev.EvModule;
-import org.matsim.contrib.ev.charging.ChargeUpToMaxSocStrategy;
 import org.matsim.contrib.ev.charging.ChargingHandler;
 import org.matsim.contrib.ev.charging.ChargingLogic;
 import org.matsim.contrib.ev.charging.ChargingPower;
@@ -33,6 +32,8 @@ import org.matsim.core.mobsim.qsim.AbstractQSimModule;
 
 import com.google.inject.Inject;
 import com.google.inject.Provider;
+
+import urbanEV.UrbanEVConfigGroup;
 
 /**
  * @author Michal Maciejewski (michalm)
@@ -46,11 +47,14 @@ public class ChargingModule extends AbstractModule {
 			
 			@Inject
 			private Scenario scenario;
+			
+			@Inject
+			private UrbanEVConfigGroup urbanEVConfig;
 
 			@Override
 			public ChargingLogic.Factory get() {
 				return charger -> new ChargingWithQueueingLogic(charger, new ChargeUptoFixedSocStrategy(charger, 1.,1.0),
-						eventsManager,scenario);
+						eventsManager,scenario, urbanEVConfig);
 			}
 		});
 
