@@ -24,14 +24,12 @@ import org.matsim.core.config.groups.StrategyConfigGroup;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
-import org.matsim.core.mobsim.qsim.AbstractQSimModule;
 import org.matsim.core.replanning.strategies.DefaultPlanStrategiesModule.DefaultStrategy;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.vehicles.VehicleCapacity;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.Vehicles;
 
-import binding.EVOutOfBatteryChecker;
 import experienceSOC.ActivitySOCModule;
 import modeChoiceFix.SubTourPlanStrategyBinder;
 import picocli.CommandLine;

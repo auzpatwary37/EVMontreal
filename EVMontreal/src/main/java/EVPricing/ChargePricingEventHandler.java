@@ -154,6 +154,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		Id<Person> pId = this.personIdForEV.get(event.getVehicleId());
 		Plan plan = this.scenario.getPopulation().getPersons().get(pId).getSelectedPlan();
 		chargingDetails cd = this.personLists.get(pId.toString());
+		//TODO: maybe better to update the final state of charge in the cd when the charging ends??? Ashraf June 2024. 
 		cd.endingTime = event.getTime();
 //		String chargerType = this.chargingInfrastructure.getChargerSpecifications().get(cd.charger).getChargerType();
 //		double pricePerkWhr = this.price.get(chargerType);
@@ -349,7 +350,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 			for(chargingDetails cd:this.personLists.values()) {
 				int o = (int)(Math.floor(e.getSimulationTime()-cd.startingTime)/(this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getProfileTimeStepInMin()*60));
 				if(o>=cd.chargeDetails.length)o = cd.chargeDetails.length-1;
-				cd.chargeDetails[o] = cd.v.getBattery().getSoc();
+				cd.chargeDetails[o] = cd.v.getBattery().getCharge();
 			}
 		}
 		
@@ -396,7 +397,7 @@ class chargingDetails{
 		this.charger = chargerId;
 		this.startingTime =startingTime;
 		this.v =  v;
-		this.initialSoc = v.getBattery().getSoc();
+		this.initialSoc = v.getBattery().getCharge();
 		chargeDetails = new double[pricingStepSize];
 	}
 	@Override

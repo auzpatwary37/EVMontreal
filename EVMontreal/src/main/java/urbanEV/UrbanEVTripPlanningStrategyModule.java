@@ -1179,7 +1179,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				}
 			}
 			//TODO: fix the issue, the required 
-			reqCharge = (pseudoVehicle.getBattery().getCapacity() - pseudoVehicle.getBattery().getSoc())*this.factorOfSafety;
+			reqCharge = (pseudoVehicle.getBattery().getCapacity() - pseudoVehicle.getBattery().getCharge())*this.factorOfSafety;
 			if(reqCharge<=0)reqCharge = pseudoVehicle.getBattery().getCapacity();
 			double chargeTime = reqCharge/pseudoVehicle.getChargingPower().calcChargingPower(selectedCharger);
 			double randomChargeTime = chargeTime + MatsimRandom.getRandom().nextGaussian()*chargeTime*cov;//
@@ -1558,7 +1558,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				if (modesWithVehicles.contains(leg.getMode()) && VehicleUtils.getVehicleId(modifiablePlan.getPerson(), leg.getMode()).equals(originalVehicleId)) {
 					lastLegWithVehicle = leg;
 					emulateVehicleDischarging(pseudoVehicle, leg);
-					if (pseudoVehicle.getBattery().getSoc() <= capacityThreshold) {
+					if (pseudoVehicle.getBattery().getCharge() <= capacityThreshold) {
 						return leg;
 					}
 				}
