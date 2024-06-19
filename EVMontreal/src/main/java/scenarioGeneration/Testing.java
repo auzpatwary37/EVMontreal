@@ -10,10 +10,11 @@ import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Population;
-import org.matsim.contrib.ev.fleet.ElectricFleetReader;
 import org.matsim.contrib.ev.fleet.ElectricFleetSpecification;
 import org.matsim.contrib.ev.fleet.ElectricFleetSpecificationImpl;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
+import org.matsim.contrib.ev.fleet.ElectricVehicleSpecificationImpl;
+import org.matsim.contrib.ev.fleet.ElectricVehicleSpecifications;
 import org.matsim.contrib.ev.infrastructure.Charger;
 import org.matsim.contrib.ev.infrastructure.ChargerReader;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureSpecification;
@@ -22,6 +23,9 @@ import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.router.TripStructureUtils;
 import org.matsim.core.router.TripStructureUtils.StageActivityHandling;
 import org.matsim.core.utils.io.IOUtils;
+import org.matsim.vehicles.MatsimVehicleReader;
+import org.matsim.vehicles.VehicleUtils;
+import org.matsim.vehicles.Vehicles;
 
 
 public class Testing {
@@ -30,9 +34,10 @@ public static void main(String[] args) {
 	new ChargerReader(chargingInfrastructureSpecification).parse(
 			IOUtils.getFileUrl(""));
 	
+	Vehicles vehicles = VehicleUtils.createVehiclesContainer();
+	new MatsimVehicleReader(vehicles).readFile("");
 	ElectricFleetSpecification fleetSpecification = new ElectricFleetSpecificationImpl();
-	new ElectricFleetReader(fleetSpecification).parse(
-			IOUtils.getFileUrl(""));
+	ElectricVehicleSpecificationImpl.createAndAddVehicleSpecificationsFromMatsimVehicles(fleetSpecification, vehicles.getVehicles().values());
 	
 	Population pop = PopulationUtils.readPopulation("");
 	

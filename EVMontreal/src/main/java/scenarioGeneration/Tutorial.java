@@ -12,11 +12,6 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactoryConfigurationError;
-
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import org.matsim.api.core.v01.Coord;
@@ -37,10 +32,7 @@ import org.matsim.contrib.ev.EvModule;
 import org.matsim.contrib.ev.charging.VehicleChargingHandler;
 import org.matsim.contrib.ev.fleet.ElectricFleetSpecification;
 import org.matsim.contrib.ev.fleet.ElectricFleetSpecificationImpl;
-import org.matsim.contrib.ev.fleet.ElectricFleetWriter;
-import org.matsim.contrib.ev.fleet.ElectricVehicle;
-import org.matsim.contrib.ev.fleet.ElectricVehicleSpecification;
-import org.matsim.contrib.ev.fleet.ImmutableElectricVehicleSpecification;
+import org.matsim.contrib.ev.fleet.ElectricVehicleSpecificationImpl;
 import org.matsim.contrib.ev.infrastructure.Charger;
 import org.matsim.contrib.ev.infrastructure.ChargerSpecification;
 import org.matsim.contrib.ev.infrastructure.ChargerWriter;
@@ -60,7 +52,6 @@ import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
-import org.matsim.vehicles.EngineInformation;
 import org.matsim.vehicles.EngineInformation.FuelType;
 import org.matsim.vehicles.MatsimVehicleWriter;
 import org.matsim.vehicles.Vehicle;
@@ -73,7 +64,6 @@ import com.google.common.collect.ImmutableList;
 
 import EVPricing.ChargePricingEventHandler;
 import EVPricing.ChargerPricingProfile;
-import EVPricing.ChargerPricingProfileReader;
 import EVPricing.ChargerPricingProfileWriter;
 import EVPricing.ChargerPricingProfiles;
 import urbanEV.EVUtils;
@@ -90,6 +80,7 @@ import urbanEV.UrbanVehicleChargingHandler;
  *
  */
 public class Tutorial {
+	@SuppressWarnings("deprecation")
 	public static void main(String[] args){
 
 		//Inputs
@@ -111,11 +102,10 @@ public class Tutorial {
 		String resultOut = "Output";
 		String pricingProfileOutputLoc = "Output/pricingProfiles.xml";
 
-		double BatteryCapMin = 10; // Min Battery capacity
-		double BatteryCapMax = 100;// Max Battery Capacity
+		//Set of battery capacity available in the new version. Have to create different vehicle type for each. We set 
 		//put the min and max same to make capacity non random
 
-		double socMIn = 5; // Min initial soc level.
+		double socMIn = .3; // 0 to 1.
 		double chargeAtStartOfDayAboveSocMin = 1;
 		boolean multipleZone = false;// set this to false for one zone and true for multiple zones
 		String zoneFile = "zones.csv";// Modify zones details in this file (zoneId,X,Y,PricingMultiplier) do not change the header in the file, just the values 
@@ -149,11 +139,14 @@ public class Tutorial {
 		VehicleUtils.setHbefaTechnology(ev1.getEngineInformation(),"electricity");
 		vs.addVehicleType(ev1);
 		EVUtils.setChargerTypes(ev1.getEngineInformation(), ImmutableList.copyOf(cp.keySet()));
-		EVUtils.setInitialEnergy(ev1.getEngineInformation(), socMIn+chargeAtStartOfDayAboveSocMin);
+		VehicleUtils.setEnergyCapacity(ev1.getEngineInformation(), 50);
+		
+		
+		//EVUtils.setInitialEnergy(ev1.getEngineInformation(), socMIn+chargeAtStartOfDayAboveSocMin);
 
 		//Create a vehicleType without ev
 		VehicleType noEV = vf.createVehicleType(Id.create("nonEv", VehicleType.class));
-		VehicleUtils.setHbefaTechnology(ev1.getEngineInformation(),EngineInformation.FuelType.gasoline.toString());
+		VehicleUtils.setHbefaTechnology(noEV.getEngineInformation(), FuelType.gasoline.toString());
 		vs.addVehicleType(noEV);
 
 		//Crate container for electric vehicle specification
@@ -252,78 +245,35 @@ public class Tutorial {
 		
 
 		Random random = new Random();
-		scenario.getPopulation().getPersons().entrySet().forEach(p->{
-
-//		PersonUtils.setCarAvail(p.getValue(),"always"); requested by rena Feb 1, 2022.
-//		PersonUtils.getCarAvail(p.getValue());
-
-
+		scenario.getPopulation().getPersons().entrySet().stream().forEach(p->{
 			String cc = (String) p.getValue().getAttributes().getAttribute("carAvail");
-
-			if((cc.equals("always") || cc.equals("sometimes")) && p.getValue().getSelectedPlan().getPlanElements().size()>1) {// have cars and have at least one leg 
+			if((cc.equals("always") || cc.equals("sometimes")) && p.getValue().getSelectedPlan().getPlanElements().size()>1) {// have cars and have at least one leg
 				for(PlanElement pl:p.getValue().getSelectedPlan().getPlanElements()){
 					if(pl instanceof Leg) {
 						Leg leg = (Leg) pl;
-//						if (leg.getMode().equals("car")) {
-							if(Math.random()<=evPercentage) {
-								Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), ev1);// create ev vehicle in the vehicles file.
-								Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
-								vMap.put(v.getId(), v);
-								vs.addVehicle(v);
-								
-								//Create vehicle in the ElectricVehicle file
-//								Double b = (BatteryCapMin+(BatteryCapMax-BatteryCapMin)*random.nextDouble())*36e5;
-								Double b = ((BatteryCapMin+(BatteryCapMax-BatteryCapMin)/2)+((BatteryCapMax-BatteryCapMin)/4)*random.nextGaussian())*36e5;
-								if (b > BatteryCapMax*36e5) {
-									b= BatteryCapMax*36e5;
-								} else if (b < BatteryCapMin*36e5) {
-									b = BatteryCapMin*36e5;
-								}
-								Double c = socMIn*36e5+(b-socMIn*36e5)*random.nextDouble();
-//								Double c = socMIn*36e5+(b-socMIn*36e5)*0.5;
-//								Double c = (b*0.35);
-								ElectricVehicleSpecification s = ImmutableElectricVehicleSpecification.newBuilder()
-										.id(Id.create(p.getKey().toString(), ElectricVehicle.class))
-										.batteryCapacity(b.intValue())
-										.initialSoc(c.intValue())
-										.chargerTypes(ImmutableList.copyOf(cp.keySet()))
-										.vehicleType(ev1.getId().toString())
-										.build();
-								
-								sp.addVehicleSpecification(s);
-								// Now insert a charger at the home location. 
-								p.getValue().getSelectedPlan().getPlanElements().stream().filter(pp->pp instanceof Activity)
-								.filter(a->((Activity)a).getType().equals("home")).forEach(a->homeChargerLocations.put(p.getKey().toString(),((Activity)a).getCoord()));
-								
-								// check if have access to at least one charger
-								Set<Id<Link>> actLinkIds = new HashSet<>();
-								p.getValue().getSelectedPlan().getPlanElements().stream().filter(pp->pp instanceof Activity)
-								.forEach(a->actLinkIds.add(((Activity)a).getLinkId()));
-								boolean haveAccessToCharger = false;
-								for(Id<Link> lIds:actLinkIds) {
-									if(chargerLinkIds.containsKey(lIds)) {
-										haveAccessToCharger = true;
-										break;
-									}
-								}
-//								if(haveAccessToCharger == false) {
-//									homeChargerLocations.put(p.getKey().toString(), ((Activity)p.getValue().getSelectedPlan().getPlanElements().get(0)).getCoord());
-//								}
-								
-							}else {
-								Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), noEV);// Create a non EV vehicle
-								Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
-								vMap.put(v.getId(), v);
-								vs.addVehicle(v);
-							}
-							break;	
-//						}
-						
+						if (leg.getMode().equals("car")) {
+						if(Math.random()<=evPercentage) {
+							Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), ev1);// create ev vehicle in the vehicles file.
+							Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
+							vMap.put(v.getId(), v);
+							vs.addVehicle(v);
+							VehicleUtils.setHbefaTechnology(ev1.getEngineInformation(), cc);
+							Double c = socMIn+(1-socMIn)*random.nextDouble();
+							v.getAttributes().putAttribute(ElectricVehicleSpecificationImpl.INITIAL_SOC, c);					
+						}else {
+							Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), noEV);// Create a non EV vehicle
+							Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
+							vMap.put(v.getId(), v);
+							vs.addVehicle(v);
+						}
+						break;	
+					}
 					}
 				}
-
 			}
 		});
+		
+
 		Map<Id<Charger>,Set<Id<Person>>> personsToChargerAssignment = new HashMap<>();
 		if(assignChargersToEveryone) {
 			
@@ -526,12 +476,11 @@ public class Tutorial {
 		new MatsimVehicleWriter(vs).writeFile(vehicleOutput);
 		
 
-		new ElectricFleetWriter(sp.getVehicleSpecifications().values().stream()).write(evVehicleOutput);
+		
 
 		EvConfigGroup evgroup = new EvConfigGroup();
-		evgroup.setChargersFile(chargerOutput);
-		evgroup.setVehiclesFile(evVehicleOutput);
-		evgroup.setTimeProfiles(false);
+		evgroup.chargersFile = chargerOutput;
+		evgroup.timeProfiles = true;
 		config.removeModule(evgroup.getName());
 		config.addModule(evgroup);
 

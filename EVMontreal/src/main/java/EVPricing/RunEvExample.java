@@ -94,7 +94,7 @@ public class RunEvExample {
 	public void run(URL configUrl) {
 		Config config = ConfigUtils.loadConfig(configUrl, new EvConfigGroup(), new UrbanEVConfigGroup());
 		config.plans().setInputFile("plan.xml");
-		((EvConfigGroup)config.getModules().get("ev")).setTimeProfiles(true);
+		((EvConfigGroup)config.getModules().get("ev")).timeProfiles = true;
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(false);
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(500);
 		((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaximumChargingProceduresPerAgent(2);

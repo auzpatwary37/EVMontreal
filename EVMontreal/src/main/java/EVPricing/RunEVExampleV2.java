@@ -134,13 +134,13 @@ public final class RunEVExampleV2 implements Callable<Integer> {
     config.qsim().setStorageCapFactor(this.scale.doubleValue() * 1.4D);
     
  
-	((EvConfigGroup)config.getModules().get("ev")).setTimeProfiles(true);
+	((EvConfigGroup)config.getModules().get("ev")).timeProfiles = true;
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setPluginBeforeStartingThePlan(true);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaxDistanceBetweenActAndCharger_m(chargerDist);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setMaximumChargingProceduresPerAgent(2);
 	((UrbanEVConfigGroup)config.getModules().get("urbanEV")).setCriticalRelativeSOC(0.3);
-	((EvConfigGroup)config.getModules().get("ev")).setChargersFile(this.chargerFile);
-	((EvConfigGroup)config.getModules().get("ev")).setVehiclesFile(this.evehicleFile);
+	((EvConfigGroup)config.getModules().get("ev")).chargersFile = chargerFile;
+	//((EvConfigGroup)config.getModules().get("ev"))this.evehicleFile);
 	
 //    UrbanEVConfigGroup urbanEVConfigGroup = new UrbanEVConfigGroup();
 //    config.addModule(urbanEVConfigGroup);

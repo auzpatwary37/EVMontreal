@@ -10,7 +10,6 @@ import java.util.Map.Entry;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.Population;
-import org.matsim.contrib.ev.fleet.ElectricFleetReader;
 import org.matsim.contrib.ev.fleet.ElectricFleetSpecification;
 import org.matsim.contrib.ev.fleet.ElectricFleetSpecificationImpl;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
@@ -23,7 +22,7 @@ public class Analysis {
 		Map<Integer,Double> soc = new HashMap<>();
 		Map<Integer,Integer> socount = new HashMap<>();
 		ElectricFleetSpecification evs = new ElectricFleetSpecificationImpl();
-		new ElectricFleetReader(evs).readFile("data/evehicle.xml");
+		//new ElectricFleetReader(evs).readFile("data/evehicle.xml");
 		
 		population.getPersons().values().stream().forEach(p->{
 			p.getSelectedPlan().getPlanElements().stream().forEach(pl->{

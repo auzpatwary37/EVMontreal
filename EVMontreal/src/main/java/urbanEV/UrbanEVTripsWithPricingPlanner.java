@@ -3,7 +3,6 @@ package urbanEV;
 import static java.util.stream.Collectors.toList;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,21 +26,22 @@ import org.matsim.contrib.ev.fleet.ElectricVehicleSpecification;
 import org.matsim.contrib.ev.infrastructure.ChargerSpecification;
 import org.matsim.core.gbl.MatsimRandom;
 import org.matsim.core.mobsim.framework.MobsimAgent;
-import org.matsim.core.mobsim.qsim.agents.WithinDayAgentUtils;
-import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.router.PlanRouter;
 import org.matsim.core.router.TripRouter;
 import org.matsim.core.router.TripStructureUtils;
-import org.matsim.core.utils.misc.OptionalTime;
+import org.matsim.core.utils.timing.TimeInterpretation;
 import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleUtils;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-
-import urbanEV.UrbanEVTripsPlanner.PersonContainer2;
+import com.google.inject.Inject;
 
 public class UrbanEVTripsWithPricingPlanner extends UrbanEVTripsPlanner{
+	
+	@Inject
+	private TimeInterpretation time;
+	
 	private int numberOfPlansToSavePerPerson = 4;
 	public static final double cov = 1.2;
 	public static final String ifBrokenActivity = "ifBroken";
@@ -125,7 +125,7 @@ public class UrbanEVTripsWithPricingPlanner extends UrbanEVTripsPlanner{
 
 			// now we choose duration of the charging and place to break the activity
 			ElectricVehicle pseudoVehicle = ElectricVehicleImpl.create(electricVehicleSpecification, driveConsumptionFactory, auxConsumptionFactory, chargingPowerFactory);
-			pseudoVehicle.getBattery().setSoc(pseudoVehicle.getBattery().getCapacity());
+			pseudoVehicle.getBattery().setCharge(pseudoVehicle.getBattery().getCapacity());
 			//double charge = pseudoVehicle.getChargingPower().calcChargingPower(selectedCharger) * chargingDuration;
 			double reqCharge = 0;
 			for(int i = modifiablePlan.getPlanElements().indexOf(leg);i<modifiablePlan.getPlanElements().size();i++) {
@@ -146,8 +146,7 @@ public class UrbanEVTripsWithPricingPlanner extends UrbanEVTripsPlanner{
 			if(chargeAtStart) {
 				Activity pluginTripOrigin = findRealOrChargingActBefore(mobsimagent, modifiablePlan.getPlanElements().indexOf(actWhileCharging));
 				this.planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, pluginTripOrigin, actWhileCharging, chargingLink, tripRouter);
-				double beforeActStartTime = TripRouter.calcEndOfPlanElement(pluginTripOrigin.getEndTime().seconds(), 
-						modifiablePlan.getPlanElements().get(ind-1), config);
+				double beforeActStartTime = actWhileCharging.getStartTime().seconds();
 				double beforeActEndTime = beforeActStartTime+randomChargeTime; 
 				Activity actBeforeBreak = scenario.getPopulation().getFactory().createActivityFromCoord(actWhileCharging.getType(), actWhileCharging.getCoord());
 				actBeforeBreak.setEndTime(beforeActEndTime);
@@ -177,7 +176,7 @@ public class UrbanEVTripsWithPricingPlanner extends UrbanEVTripsPlanner{
 				this.planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, actBeforeBreak, actAfterBreak, chargingLink, tripRouter);
 				Leg plugoutLeg = activityWhileChargingFinder.getNextLegOfRoutingModeAfterActivity(ImmutableList.copyOf(modifiablePlan.getPlanElements()), actWhileCharging, routingMode);
 				Activity plugoutTripDestination = findRealOrChargingActAfter(mobsimagent, modifiablePlan.getPlanElements().indexOf(plugoutLeg));
-				planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, actAfterBreak, plugoutTripDestination, chargingLink, tripRouter, PlanRouter.calcEndOfActivity(actBeforeBreak, modifiablePlan, config));
+				planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, actAfterBreak, plugoutTripDestination, chargingLink, tripRouter, time.decideOnActivityEndTimeAlongPlan(actBeforeBreak, modifiablePlan).seconds());
 			}
 			
 			
@@ -221,7 +220,7 @@ public class UrbanEVTripsWithPricingPlanner extends UrbanEVTripsPlanner{
 
 			TripRouter tripRouter = tripRouterProvider.get();
 			planPluginTrip(modifiablePlan, routingMode, electricVehicleSpecification, pluginTripOrigin, actWhileCharging, chargingLink, tripRouter);
-			planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, plugoutTripOrigin, plugoutTripDestination, chargingLink, tripRouter, PlanRouter.calcEndOfActivity(plugoutTripOrigin, modifiablePlan, config));
+			planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, plugoutTripOrigin, plugoutTripDestination, chargingLink, tripRouter, time.decideOnActivityEndTimeAlongPlan(plugoutTripOrigin, modifiablePlan).seconds());
 		}
 		if(!isConsistant(modifiablePlan)) {
 			System.out.println("Plan is not consistant!!! Debug!!!");
@@ -304,7 +303,7 @@ public class UrbanEVTripsWithPricingPlanner extends UrbanEVTripsPlanner{
 //					}
 					
 					
-					pseudoVehicle.getBattery().changeSoc(pseudoVehicle.getChargingPower().calcChargingPower(chargerSpecification) * chargingDuration);
+					pseudoVehicle.getBattery().setCharge(pseudoVehicle.getBattery().getCharge()+pseudoVehicle.getChargingPower().calcChargingPower(chargerSpecification) * chargingDuration);
 				}
 			} else throw new IllegalArgumentException();
 		}

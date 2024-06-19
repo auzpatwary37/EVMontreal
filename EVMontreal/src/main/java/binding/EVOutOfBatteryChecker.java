@@ -39,7 +39,7 @@ public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener,MobsimS
 	@Inject
 	public EVOutOfBatteryChecker(ElectricFleet ev, EvConfigGroup evConfig, QSimConfigGroup qsim) {
 		this.Ev = ev;
-		this.chargeTimeStep = evConfig.getChargeTimeStep();
+		this.chargeTimeStep = evConfig.chargeTimeStep;
 		this.endTime =qsim.getEndTime().seconds();
 	}
 

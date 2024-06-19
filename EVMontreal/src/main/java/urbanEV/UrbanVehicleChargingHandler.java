@@ -79,7 +79,7 @@ public class UrbanVehicleChargingHandler
 	public static final String PLUGOUT_INTERACTION = PlanCalcScoreConfigGroup.createStageActivityType(
 			PLUGOUT_IDENTIFIER);
 	private final Map<Id<Person>, Id<Vehicle>> lastVehicleUsed = new ConcurrentHashMap<>();
-	private final Map<Id<ElectricVehicle>, Id<Charger>> vehiclesAtChargers = new ConcurrentHashMap<>();
+	private final Map<Id<Vehicle>, Id<Charger>> vehiclesAtChargers = new ConcurrentHashMap<>();
 
 	private final ChargingInfrastructure chargingInfrastructure;
 	private final ElectricFleet electricFleet;

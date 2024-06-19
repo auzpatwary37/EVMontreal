@@ -328,7 +328,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 
 	@Override
 	public void notifyMobsimAfterSimStep(MobsimAfterSimStepEvent e) {
-		if((e.getSimulationTime()+1)%((EvConfigGroup)this.scenario.getConfig().getModules().get("ev")).getChargeTimeStep()==0) {
+		if((e.getSimulationTime()+1)%((EvConfigGroup)this.scenario.getConfig().getModules().get("ev")).chargeTimeStep==0) {
 			for(chargingDetails cd:this.personLists.values()) {
 				int o = (int)(Math.floor(e.getSimulationTime()-cd.startingTime)/(this.pricingProfies.getChargerPricingProfiles().get(cd.charger).getProfileTimeStepInMin()*60));
 				if(o>=cd.chargeDetails.length)o = cd.chargeDetails.length-1;

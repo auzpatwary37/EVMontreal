@@ -9,7 +9,7 @@
         <geotools.version>24-SNAPSHOT</geotools.version>
         
         		<!--release:-->
-		<matsim.version>14.0-PR1512</matsim.version>
+
 
 <!--		in IDE for a possible 13.1-->
 <!--		<matsim.version>13.1-SNAPSHOT</matsim.version>-->
@@ -24,9 +24,9 @@
 
 <!--		!! matsim-examples is currently on a more modern version since I want to modernize some things there. kai, apr'21 !!-->
 		
-		<matsim.version>14.0-PR1512</matsim.version> <!-- 18.05.2021-->
-		<maven.compiler.source>14</maven.compiler.source>
-		<maven.compiler.target>14</maven.compiler.target>
+		<matsim.version>15.0</matsim.version> <!-- 18.05.2021-->
+		<maven.compiler.source>19</maven.compiler.source>
+		<maven.compiler.target>19</maven.compiler.target>
 	
    </properties>
   
@@ -39,7 +39,7 @@
     <artifactId>maven-compiler-plugin</artifactId>
     <version>3.8.0</version>
     <configuration>
-        <release>14</release> 
+        <release>19</release> 
     </configuration>
 </plugin>
 
@@ -153,7 +153,7 @@
 			<artifactId>matsim</artifactId>
 			<version>${matsim.version}</version>
 		</dependency>
-		<dependency>
+		<!--<dependency>
 			<groupId>org.matsim.contrib</groupId>
 			<artifactId>roadpricing</artifactId>
 			<version>${matsim.version}</version>
@@ -168,7 +168,7 @@
 			<groupId>org.matsim.contrib</groupId>
 			<artifactId>signals</artifactId>
 			<version>${matsim.version}</version>
-		</dependency>
+		</dependency>-->
 		<dependency>
 			<groupId>org.matsim.contrib</groupId>
 			<artifactId>ev</artifactId>

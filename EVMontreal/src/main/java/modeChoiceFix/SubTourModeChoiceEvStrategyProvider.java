@@ -32,6 +32,7 @@ import org.matsim.core.replanning.PlanStrategyImpl.Builder;
 import org.matsim.core.replanning.modules.ReRoute;
 import org.matsim.core.replanning.selectors.RandomPlanSelector;
 import org.matsim.core.router.TripRouter;
+import org.matsim.core.utils.timing.TimeInterpretation;
 import org.matsim.facilities.ActivityFacilities;
 
 public class SubTourModeChoiceEvStrategyProvider implements Provider<PlanStrategy> {
@@ -41,12 +42,13 @@ public class SubTourModeChoiceEvStrategyProvider implements Provider<PlanStrateg
 	@Inject private SubtourModeChoiceConfigGroup subtourModeChoiceConfigGroup;
 	@Inject private ActivityFacilities facilities;
 	@Inject private PermissibleModesCalculator permissibleModesCalculator;
+	@Inject private TimeInterpretation time;
 
 	@Override
 	public PlanStrategy get() {
 		PlanStrategyImpl.Builder builder = new Builder(new RandomPlanSelector<>());
 		builder.addStrategyModule(new SubtourModeChoiceEv(globalConfigGroup, subtourModeChoiceConfigGroup, permissibleModesCalculator));
-		builder.addStrategyModule(new ReRoute(facilities, tripRouterProvider, globalConfigGroup));
+		builder.addStrategyModule(new ReRoute(facilities, tripRouterProvider, globalConfigGroup,time));
 		return builder.build();
 	}
 

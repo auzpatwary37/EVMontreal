@@ -22,9 +22,7 @@ package binding;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -35,7 +33,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import org.jcodec.common.logging.Logger;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
-import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.PopulationWriter;
 import org.matsim.contrib.ev.charging.ChargingEndEvent;
 import org.matsim.contrib.ev.charging.ChargingListener;
@@ -45,6 +42,7 @@ import org.matsim.contrib.ev.charging.ChargingStrategy;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
 import org.matsim.contrib.ev.infrastructure.ChargerSpecification;
 import org.matsim.core.api.experimental.events.EventsManager;
+import org.matsim.vehicles.Vehicle;
 
 public class ChargingWithQueueingLogic implements ChargingLogic {
 	private final ChargerSpecification charger;
@@ -52,9 +50,9 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 	private final EventsManager eventsManager;
 	private final Scenario scenario;
 	private PopulationWriter popWriter;
-	private final Map<Id<ElectricVehicle>, ElectricVehicle> pluggedVehicles = new ConcurrentHashMap<>();//Collections.synchronizedMap(new LinkedHashMap<>())
+	private final Map<Id<Vehicle>, ElectricVehicle> pluggedVehicles = new ConcurrentHashMap<>();//Collections.synchronizedMap(new LinkedHashMap<>())
 	private final Queue<ElectricVehicle> queuedVehicles = new ConcurrentLinkedQueue<>();
-	private final Map<Id<ElectricVehicle>, ChargingListener> listeners = new ConcurrentHashMap<>();
+	private final Map<Id<Vehicle>, ChargingListener> listeners = new ConcurrentHashMap<>();
 
 	public ChargingWithQueueingLogic(ChargerSpecification charger, ChargingStrategy chargingStrategy,
 			EventsManager eventsManager, Scenario scenario) {
@@ -83,11 +81,12 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 //			}
 //		}
 		
-		for(Entry<Id<ElectricVehicle>, ElectricVehicle> evEntry:new HashMap<>(pluggedVehicles).entrySet()) {
+		for(Entry<Id<Vehicle>, ElectricVehicle> evEntry:new HashMap<>(pluggedVehicles).entrySet()) {
 			ElectricVehicle ev = evEntry.getValue();
 			// with fast charging, we charge around 4% of SOC per minute,
 			// so when updating SOC every 10 seconds, SOC increases by less then 1%
-			ev.getBattery().changeSoc(ev.getChargingPower().calcChargingPower(charger) * chargePeriod);
+			ev.getBattery().setCharge(ev.getBattery().getCharge()+ev.getChargingPower().calcChargingPower(charger) * chargePeriod);
+			//ev.getBattery().changeSoc(ev.getChargingPower().calcChargingPower(charger) * chargePeriod);
 //___________________________________________________comment these lines to not kick vehicles from queue_______________
 //			if (chargingStrategy.isChargingCompleted(ev)) {
 //				Person person = scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString()));
@@ -127,7 +126,7 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 	@Override
 	public synchronized void removeVehicle(ElectricVehicle ev, double now) {
 		if (pluggedVehicles.remove(ev.getId()) != null) {// successfully removed
-			ChargingEndEvent event = new ChargingEndEventUrbanEv(now, charger.getId(), ev.getId(),scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString())));
+			ChargingEndEvent event = new ChargingEndEventUrbanEv(now, charger.getId(), ev.getId(),ev.getBattery().getCharge(),scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString())));
 			scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString())).getAttributes().putAttribute("charginatLogicIndicator", false);
 			eventsManager.processEvent(event);
 			listeners.remove(ev.getId()).notifyChargingEnded(ev, now);
@@ -153,7 +152,7 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 		if (pluggedVehicles.put(ev.getId(), ev) != null) {
 			throw new IllegalArgumentException();
 		}
-		eventsManager.processEvent(new ChargingStartEvent(now, charger.getId(), ev.getId(), charger.getChargerType()));
+		eventsManager.processEvent(new ChargingStartEvent(now, charger.getId(), ev.getId(), charger.getChargerType(), ev.getBattery().getCharge()));
 		//scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString())).getAttributes().putAttribute("charginatLogicIndicator", true);
 		listeners.get(ev.getId()).notifyChargingStarted(ev, now);
 	}
