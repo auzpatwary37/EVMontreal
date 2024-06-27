@@ -25,7 +25,7 @@ public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener,MobsimS
 	private final ElectricFleet Ev;
 	@Inject
 	private EventsManager manager;
-	@Inject
+	
 	
 	
 	private final int chargeTimeStep;

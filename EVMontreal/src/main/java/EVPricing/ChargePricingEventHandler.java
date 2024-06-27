@@ -156,6 +156,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 		chargingDetails cd = this.personLists.get(pId.toString());
 		//TODO: maybe better to update the final state of charge in the cd when the charging ends??? Ashraf June 2024. 
 		cd.endingTime = event.getTime();
+		cd.finalSoC = this.fleet.getElectricVehicles().get(event.getVehicleId()).getBattery().getSoc();
 //		String chargerType = this.chargingInfrastructure.getChargerSpecifications().get(cd.charger).getChargerType();
 //		double pricePerkWhr = this.price.get(chargerType);
 //		Double juleCharged= cd.v.getBattery().getSoc()-cd.initialSoc;//warning: unit Conversion
@@ -256,7 +257,6 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 			}else {
 				cost = getCostBasedOnTimeUsage(cd,this.pricingProfies.getChargerPricingProfiles().get(cd.charger),timeId);
 			}
-			
 //			double charge = cd.initialSoc;
 //			for(int i = 0; i<pricingProfile.length;i++) {
 //				//System.out.println((cd.chargeDetails[i]-charge)*2.78e-7);

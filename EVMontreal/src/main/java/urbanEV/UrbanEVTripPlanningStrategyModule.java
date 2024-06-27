@@ -58,6 +58,7 @@ import org.matsim.core.utils.timing.TimeInterpretation;
 import org.matsim.facilities.ActivityFacility;
 import org.matsim.facilities.FacilitiesUtils;
 import org.matsim.facilities.Facility;
+import org.matsim.vehicles.PersonVehicles;
 import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleUtils;
 import org.matsim.vehicles.Vehicles;
@@ -184,7 +185,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	protected Set<Id<Vehicle>> getUsedEV(Plan plan) {
 		return TripStructureUtils.getLegs(plan).stream().filter(leg->leg.getMode().equals("car")||leg.getMode().equals("car_passenger"))
 				.map(leg -> getVehicleId(plan.getPerson(), leg.getMode()))
-				.filter(vehicleId -> isEV(vehicleId))
+				.filter(vehicleId -> this.electricFleetSpecification.getVehicleSpecifications().containsKey(vehicleId))
 				.collect(toSet());
 		
 		
@@ -211,11 +212,8 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		return vehicleIds.get(mode);
 	}
 	public static Map<String, Id<Vehicle>> getVehicleIds(Person person) {
-		Object a=person.getAttributes().getAttribute("vehicles");
-		if(a instanceof Integer) {
-			System.out.println("Error here!!!");
-		}
-		var vehicleIds = (Map<String, Id<Vehicle>>) a;
+		PersonVehicles a=(PersonVehicles) person.getAttributes().getAttribute("vehicles");
+		var vehicleIds = a.getModeVehicles();
 		if (vehicleIds == null) {
 			throw new RuntimeException("Could not retrieve vehicle id from person: " + person.getId().toString() +
 					". \nIf you are not using config.qsim().getVehicleSource() with 'defaultVehicle' or 'modeVehicleTypesFromVehiclesData' you have to provide " +
@@ -805,13 +803,13 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			modifiablePlan.getAttributes().putAttribute("logicSwitch", logic.toString());
 			List<Activity> pe;
 			switch(logic){
-			case PersonChargingLogic.DURATION_BASED:
+			case DURATION_BASED:
 				pe = this.logicActivityDuration(modifiablePlan);
 				break;
-			case PersonChargingLogic.EXPERIENCE_BASED:
+			case EXPERIENCE_BASED:
 				pe = this.logicExperienceBased(modifiablePlan);
 				break;
-			case PersonChargingLogic.OPTIMIZED:
+			case OPTIMIZED:
 				pe = this.logicOptimized(modifiablePlan);
 				break;
 			default:
@@ -1470,14 +1468,14 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		Activity pluginAct =PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
 				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);
 		//		Activity pluginAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER, chargingLink.getCoord());
-		pluginAct.setStartTime(now);
+		//pluginAct.setStartTime(now);
 		pluginAct.setLinkId(chargingLink.getId());
-		pluginAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER).getTypicalDuration().seconds());
+		//pluginAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER).getTypicalDuration().seconds());
 
 		trip.add(pluginAct);
 
 		now = time.decideOnActivityEndTime(pluginAct, now).seconds();
-		pluginAct.setEndTime(now);
+		//pluginAct.setEndTime(now);
 
 		//add walk leg to destination
 		routedSegment = tripRouter.calcRoute(TransportMode.walk, chargerFacility, toFacility, now, plan.getPerson(),null);
@@ -1499,7 +1497,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	public void finishReplanning() {
 		long t = System.currentTimeMillis();
 		// TODO Auto-generated method stub
-		this.plans.parallelStream().forEach(p->this.execute(p));
+		//this.plans.parallelStream().forEach(p->this.execute(p));
+		for(Plan p:this.plans) {
+			this.execute(p);
+		}
 		log.info("total time for replanning"+this.plans.size()+"plans = "+(System.currentTimeMillis()-t));
 	}
 
@@ -1601,7 +1602,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 					//					}
 
 
-					pseudoVehicle.getBattery().setCharge(pseudoVehicle.getBattery().getCharge()+ pseudoVehicle.getChargingPower().calcChargingPower(chargerSpecification) * chargingDuration);
+					pseudoVehicle.getBattery().setCharge(Math.max(Math.min(pseudoVehicle.getBattery().getCharge()+ pseudoVehicle.getChargingPower().calcChargingPower(chargerSpecification) * chargingDuration,pseudoVehicle.getBattery().getCapacity()),0));
 				}
 			} else throw new IllegalArgumentException();
 		}
@@ -1640,7 +1641,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			//			double consumption = driveEnergyConsumption.calcEnergyConsumption(l, travelT, linkEnterTime)
 			//					+ auxEnergyConsumption.calcEnergyConsumption(leg.getDepartureTime().seconds(), travelT, l.getId());
 			double consumption = driveConsumption + auxConsumption;
-			ev.getBattery().setCharge(ev.getBattery().getCharge()-consumption);
+			ev.getBattery().setCharge(Math.max(ev.getBattery().getCharge()-consumption,0));
 			linkEnterTime += travelT;
 		}
 	}
@@ -1701,10 +1702,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		Activity pluginAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
 				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);//This is how to add a aplugin activity
 		pluginAct.setLinkId(chargingLink.getId());
-		pluginAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER).getTypicalDuration().seconds());
-		pluginAct.setStartTime(now);
+		//pluginAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER).getTypicalDuration().seconds());
+		//pluginAct.setStartTime(now);
 		now = time.decideOnElementEndTime(pluginAct, now).seconds();
-		pluginAct.setEndTime(now);
+		//pluginAct.setEndTime(now);
 		plan.getPlanElements().add(2, pluginAct);
 		TripRouter.insertTrip(plan, newFirstAct,routeToCharger,pluginAct);
 		//add walk leg to destination
@@ -1810,10 +1811,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);// this is how to plan a plugout activity
 		//Activity plugOutAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER, chargingLink.getCoord());
 		plugOutAct.setLinkId(chargingLink.getId());
-		plugOutAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER).getTypicalDuration().seconds());
+		//plugOutAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER).getTypicalDuration().seconds());
 
 		trip.add(plugOutAct);
-		plugOutAct.setStartTime(now);
+		//plugOutAct.setStartTime(now);
 		now = time.decideOnActivityEndTime(plugOutAct, now).seconds();
 
 		//add leg to destination
@@ -1835,10 +1836,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 		//insert trip
 		TripRouter.insertTrip(plan, origin, trip, destination);
-		destination.setStartTime(now);
+		if(!destination.getType().contains("interaction"))destination.setStartTime(now);
 		//reset activity end time
 		if (!plan.getPlanElements().get(plan.getPlanElements().size() - 1).equals(destination)) {
-			destination.setEndTime(time.decideOnActivityEndTime(destination, now).seconds());
+			if(!destination.getType().contains("interaction"))destination.setEndTime(time.decideOnActivityEndTime(destination, now).seconds());
 		}
 	}
 
@@ -1878,10 +1879,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);// this is how to plan a plugout activity
 		//Activity plugOutAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER, chargingLink.getCoord());
 		plugOutAct.setLinkId(chargingLink.getId());
-		plugOutAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER).getTypicalDuration().seconds());
+		//plugOutAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER).getTypicalDuration().seconds());
 
 		trip.add(plugOutAct);
-		plugOutAct.setStartTime(now);
+		//plugOutAct.setStartTime(now);
 		now = time.decideOnElementEndTime(plugOutAct, now).seconds();
 
 		//add leg to destination

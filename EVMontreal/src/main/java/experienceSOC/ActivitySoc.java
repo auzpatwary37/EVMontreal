@@ -51,6 +51,15 @@ public class ActivitySoc implements ActivityStartEventHandler,MobsimScopeEventHa
 
 	@Override
 	public void handleEvent(ActivityStartEvent event) {
+		if(event.getActType().contains("interaction")) {
+			if(actOrder.containsKey(event.getPersonId())) {
+				int current = actOrder.get(event.getPersonId());
+				actOrder.put(event.getPersonId(), current+2);
+			}else {
+				actOrder.put(event.getPersonId(), 0);
+			}
+			return;
+		}
 		Plan plan = this.scenario.getPopulation().getPersons().get(event.getPersonId()).getSelectedPlan();
 		
 		

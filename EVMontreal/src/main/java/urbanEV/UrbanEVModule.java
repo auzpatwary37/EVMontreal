@@ -27,6 +27,8 @@ import java.util.Set;
 import org.matsim.contrib.ev.EvModule;
 
 import org.matsim.contrib.ev.discharging.DischargingModule;
+import org.matsim.contrib.ev.fleet.ElectricFleetModule;
+import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureModule;
 import org.matsim.contrib.ev.stats.EvStatsModule;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.groups.QSimConfigGroup;
@@ -37,9 +39,7 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 
 import binding.ChargerPricingModule;
-import binding.ChargingInfrastructureModule;
 import binding.ChargingModule;
-import binding.ElectricFleetModule;
 import urbanEV.analysis.ActsWhileChargingAnalyzer;
 import urbanEV.analysis.ChargerToXY;
 

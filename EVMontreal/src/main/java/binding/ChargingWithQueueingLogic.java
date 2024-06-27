@@ -90,7 +90,7 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 			ElectricVehicle ev = evEntry.getValue();
 			// with fast charging, we charge around 4% of SOC per minute,
 			// so when updating SOC every 10 seconds, SOC increases by less then 1%
-			ev.getBattery().setCharge(ev.getBattery().getCharge()+ev.getChargingPower().calcChargingPower(charger) * chargePeriod);
+			ev.getBattery().setCharge(Math.min(ev.getBattery().getCharge()+ev.getChargingPower().calcChargingPower(charger) * chargePeriod,ev.getBattery().getCapacity()));
 			//ev.getBattery().changeSoc(ev.getChargingPower().calcChargingPower(charger) * chargePeriod);
 //___________________________________________________comment these lines to not kick vehicles from queue_______________
 			if (chargingStrategy.isChargingCompleted(ev) && urbanEV.isAutomaticKickOutFromChargerQueue()) {

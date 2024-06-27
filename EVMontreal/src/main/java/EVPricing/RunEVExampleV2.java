@@ -20,6 +20,7 @@ import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup.ActivityParams;
 import org.matsim.core.config.groups.PlansCalcRouteConfigGroup;
+import org.matsim.core.config.groups.QSimConfigGroup.VehiclesSource;
 import org.matsim.core.config.groups.StrategyConfigGroup;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
@@ -53,13 +54,13 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--plan"}, description = {"Optional Path to plan file to load."}, defaultValue = "plan.xml")
   private String planFile;
   
-  @Option(names = {"--network"}, description = {"Optional Path to network file to load."}, defaultValue = "montreal_network.xml.gz")
+  @Option(names = {"--network"}, description = {"Optional Path to network file to load."}, defaultValue = "montreal_network.xml")
   private String networkFileLoc;
   
-  @Option(names = {"--ts"}, description = {"Optional Path to transit schedule file to load."}, defaultValue = "montreal_transit_schedules.xml.gz")
+  @Option(names = {"--ts"}, description = {"Optional Path to transit schedule file to load."}, defaultValue = "montreal_transit_schedules.xml")
   private String tsFileLoc;
   
-  @Option(names = {"--tv"}, description = {"Optional Path to transit vehicle file to load."}, defaultValue = "montreal_transit_vehicles.xml.gz")
+  @Option(names = {"--tv"}, description = {"Optional Path to transit vehicle file to load."}, defaultValue = "montreal_transit_vehicles.xml")
   private String tvFileLoc;
   
   @Option(names = {"--facilities"}, description = {"Optional Path to facilities file to load."}, defaultValue = "montreal_facilities.xml.gz")
@@ -71,13 +72,13 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--firstiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "0")
   private int minIterations;
   
-  @Option(names = {"--household"}, description = {"Optional Path to household file to load."}, defaultValue = "montreal_households.xml.gz")
+  @Option(names = {"--household"}, description = {"Optional Path to household file to load."}, defaultValue = "households.xml.gz")
   private String householdFileLoc;
   
-  @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "0.1")
+  @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "1.00")
   private Double scale;
   
-  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/TimeBasedBaseScenarioAllHomeChargersAllLogicRevisedPunishment")
+  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/NewVersionTest")
   private String output;
   
   @Option(names = {"--charger"}, description = {"Charger file location"}, defaultValue = "charger.xml")
@@ -121,10 +122,12 @@ public final class RunEVExampleV2 implements Callable<Integer> {
     config.controler().setLastIteration(this.maxIterations);
     config.controler().setFirstIteration(this.minIterations);
     //addStrategy(config, "SubtourModeChoice", null, 0.1D, (int)0.65 * this.maxIterations);
+    config.strategy().clearStrategySettings();
     addStrategy(config, UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName, null, 0.85D, (int).75 * this.maxIterations);
     addStrategy(config, "ChangeExpBeta", null, 0.25D, this.maxIterations);
     addStrategy(config, DefaultStrategy.TimeAllocationMutator_ReRoute, null, 0.05D, (int)0.7*this.maxIterations);
     addStrategy(config, DefaultStrategy.ReRoute, null, 0.05D, (int)0.8*this.maxIterations);
+    
     config.controler().setOutputDirectory(this.output);
     config.controler().setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
     config.qsim().setFlowCapFactor(this.scale.doubleValue() * 1.2D);
@@ -132,12 +135,13 @@ public final class RunEVExampleV2 implements Callable<Integer> {
     
  
 	((EvConfigGroup)config.getModules().get("ev")).timeProfiles = true;
+	((EvConfigGroup)config.getModules().get("ev")).chargeTimeStep = 5;
 	UrbanEVConfigGroup urbanEv = ((UrbanEVConfigGroup)config.getModules().get("urbanEV"));
 	urbanEv.setPluginBeforeStartingThePlan(true);
 	urbanEv.setMaxDistanceBetweenActAndCharger_m(chargerDist);
 	urbanEv.setMaximumChargingProceduresPerAgent(2);
 	urbanEv.setCriticalRelativeSOC(0.3);
-	urbanEv.setAutomaticKickOutFromChargerQueue(true);
+	urbanEv.setAutomaticKickOutFromChargerQueue(false);
 	urbanEv.setChargerPricingFileLocation(pricingEVFile);
 	urbanEv.setChargingLogic(PersonChargingLogic.OPTIMIZED);
 	urbanEv.setPricingLogic(PricingLogic.TIME_BASED);
@@ -181,7 +185,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	//config.qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.fromVehiclesData);
 
 	SubTourPlanStrategyBinder.addStrategy(config, 0.05, 100); 
-	
+//config.qsim().setVehiclesSource(VehiclesSource.fromVehiclesData);
 	
 	Scenario scenario = ScenarioUtils.loadScenario(config);
 	

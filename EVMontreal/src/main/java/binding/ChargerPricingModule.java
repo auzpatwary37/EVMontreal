@@ -21,8 +21,7 @@ public class ChargerPricingModule extends AbstractModule {
 		@Inject
 		private UrbanEVConfigGroup urbanEvCfg;
 			
-		@Inject
-		private Scenario scenario;
+		
 
 		@Override
 		public void install() {

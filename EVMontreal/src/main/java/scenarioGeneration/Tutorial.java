@@ -89,8 +89,8 @@ public class Tutorial {
 		double homeChargerPercentage = 1.0;
 
 		String configIn = "config_with_calibrated_parameters.xml";// input MATSim Montreal Config without ev
-		String planInput = "output_plans.xml.gz";// Population file without EV
-		String networkInput = "montreal_network.xml.gz";// Input Network File
+		String planInput = "population_with_locations_linkId.xml.gz";// Population file without EV
+		String networkInput = "montreal_network.xml";// Input Network File
 		String chargerFileInput = "cleaned_station.csv";//Charger file with exactly same headers as given to me by Arsham but in .csv format. Save the excel as csv and input its file location
 
 		String planOutput = "Output/plan.xml"; // Saving location of the EV included population
@@ -128,6 +128,7 @@ public class Tutorial {
 		config.network().setInputFile(resultOut);
 		ConfigUtils.loadConfig(config,configIn);
 		config.plans().setInputFile(planInput);
+		
 
 		Scenario scenario = ScenarioUtils.loadScenario(config);
 		checkPlanConsistancy(scenario.getPopulation());
@@ -257,9 +258,27 @@ public class Tutorial {
 							Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
 							vMap.put(v.getId(), v);
 							vs.addVehicle(v);
-							VehicleUtils.setHbefaTechnology(ev1.getEngineInformation(), cc);
+							//VehicleUtils.setHbefaTechnology(ev1.getEngineInformation(), "electricity");
 							Double c = socMIn+(1-socMIn)*random.nextDouble();
-							v.getAttributes().putAttribute(ElectricVehicleSpecificationImpl.INITIAL_SOC, c);					
+							v.getAttributes().putAttribute(ElectricVehicleSpecificationImpl.INITIAL_SOC, c);
+							// Now insert a charger at the home location. 
+							p.getValue().getSelectedPlan().getPlanElements().stream().filter(pp->pp instanceof Activity)
+							.filter(a->((Activity)a).getType().equals("home")).forEach(a->homeChargerLocations.put(p.getKey().toString(),((Activity)a).getCoord()));
+							
+							// check if have access to at least one charger
+							Set<Id<Link>> actLinkIds = new HashSet<>();
+							p.getValue().getSelectedPlan().getPlanElements().stream().filter(pp->pp instanceof Activity)
+							.forEach(a->actLinkIds.add(((Activity)a).getLinkId()));
+							boolean haveAccessToCharger = false;
+							for(Id<Link> lIds:actLinkIds) {
+								if(chargerLinkIds.containsKey(lIds)) {
+									haveAccessToCharger = true;
+									break;
+								}
+							}
+							if(haveAccessToCharger == false) {
+								homeChargerLocations.put(p.getKey().toString(), ((Activity)p.getValue().getSelectedPlan().getPlanElements().get(0)).getCoord());
+							}
 						}else {
 							Vehicle v = vf.createVehicle(Id.createVehicleId(p.getKey().toString()), noEV);// Create a non EV vehicle
 							Map<Id<Vehicle>,Vehicle> vMap = new HashMap<>();
