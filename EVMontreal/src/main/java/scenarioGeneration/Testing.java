@@ -14,7 +14,6 @@ import org.matsim.contrib.ev.fleet.ElectricFleetSpecification;
 import org.matsim.contrib.ev.fleet.ElectricFleetSpecificationImpl;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
 import org.matsim.contrib.ev.fleet.ElectricVehicleSpecificationImpl;
-import org.matsim.contrib.ev.fleet.ElectricVehicleSpecifications;
 import org.matsim.contrib.ev.infrastructure.Charger;
 import org.matsim.contrib.ev.infrastructure.ChargerReader;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureSpecification;

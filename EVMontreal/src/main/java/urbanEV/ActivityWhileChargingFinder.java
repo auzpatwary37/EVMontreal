@@ -20,7 +20,14 @@
 
 package urbanEV;
 
-import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import javax.annotation.Nullable;
+
 import org.apache.log4j.Logger;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.Leg;
@@ -31,9 +38,7 @@ import org.matsim.core.router.TripStructureUtils;
 import org.matsim.core.utils.collections.Tuple;
 import org.matsim.withinday.utils.EditPlans;
 
-import javax.annotation.Nullable;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.google.common.base.Preconditions;
 
 public class ActivityWhileChargingFinder {
 

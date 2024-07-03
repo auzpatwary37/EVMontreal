@@ -25,7 +25,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.matsim.contrib.ev.EvModule;
-
 import org.matsim.contrib.ev.discharging.DischargingModule;
 import org.matsim.contrib.ev.fleet.ElectricFleetModule;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureModule;

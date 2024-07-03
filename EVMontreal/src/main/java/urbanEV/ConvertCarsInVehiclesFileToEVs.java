@@ -20,11 +20,14 @@
 
 package urbanEV;
 
-import org.matsim.api.core.v01.Id;
-import org.matsim.api.core.v01.TransportMode;
-import org.matsim.vehicles.*;
-
 import java.util.Arrays;
+
+import org.matsim.api.core.v01.Id;
+import org.matsim.vehicles.MatsimVehicleReader;
+import org.matsim.vehicles.MatsimVehicleWriter;
+import org.matsim.vehicles.VehicleType;
+import org.matsim.vehicles.VehicleUtils;
+import org.matsim.vehicles.Vehicles;
 
 public class ConvertCarsInVehiclesFileToEVs {
 

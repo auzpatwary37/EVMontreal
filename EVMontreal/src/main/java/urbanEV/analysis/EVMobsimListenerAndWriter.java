@@ -1,20 +1,18 @@
 package urbanEV.analysis;
 
-import com.google.inject.Inject;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.List;
+
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
-import org.matsim.api.core.v01.network.Network;
-import org.matsim.contrib.ev.discharging.DriveDischargingHandler;
-import org.matsim.contrib.ev.stats.ChargerPowerCollector;
 import org.matsim.core.controler.IterationCounter;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
 import org.matsim.core.mobsim.framework.events.MobsimBeforeCleanupEvent;
 import org.matsim.core.mobsim.framework.listeners.MobsimBeforeCleanupListener;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.List;
+import com.google.inject.Inject;
 
 public class EVMobsimListenerAndWriter implements MobsimBeforeCleanupListener {
 

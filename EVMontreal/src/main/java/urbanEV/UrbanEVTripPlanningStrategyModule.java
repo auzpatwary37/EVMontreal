@@ -48,7 +48,6 @@ import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.population.routes.NetworkRoute;
 import org.matsim.core.replanning.ReplanningContext;
 import org.matsim.core.router.LinkWrapperFacility;
-import org.matsim.core.router.PlanRouter;
 import org.matsim.core.router.SingleModeNetworksCache;
 import org.matsim.core.router.StageActivityTypeIdentifier;
 import org.matsim.core.router.TripRouter;
