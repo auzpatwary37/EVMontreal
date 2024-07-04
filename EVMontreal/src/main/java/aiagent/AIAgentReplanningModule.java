@@ -42,6 +42,7 @@ import org.matsim.core.router.TripRouter;
 import org.matsim.core.router.TripStructureUtils;
 import org.matsim.core.router.util.TravelTime;
 import org.matsim.core.utils.timing.TimeInterpretation;
+import org.matsim.vehicles.VehicleUtils;
 import org.matsim.vehicles.Vehicles;
 
 import com.google.gson.Gson;
@@ -65,6 +66,8 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 	private Set<Plan> plans = null;
 	private Gson gson;
 	private final Set<String> allowedMode = new HashSet<>();
+	public static final String AIReplanningStategyName = "AIEvReplanning";
+	public static final int maxTry = 5;
 	
 	@Inject
 	protected Provider<TripRouter> tripRouterProvider;
@@ -163,13 +166,23 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 	public void finishReplanning() {
 		for(Plan plan:plans) {
 			makeChargingNotStaged(plan);
-			PlanGson pg = PlanGson.createPlanGson(plan);
-			String aiString = aiChatClient.getResponse(Prompt.HARDCODED_PROMOPT_EV_CHARGING, "json```\n"+gson.toJson(pg)+"\n```");
-			int begin = aiString.indexOf("```"); 
-			int end = aiString.lastIndexOf("```");
-			String jsonString = aiString.substring(begin,end).replace("```", "");
-			PlanGson pgOut = gson.fromJson(jsonString, PlanGson.class);
-			Plan planOut = pgOut.getPlan();
+			Plan planOut = null;
+			String userMsg = Prompt.HARDCODED_PROMOPT_EV_CHARGING;
+			
+			for(int i=0; i<maxTry;i++) {
+				List<ErrorMessage> errors = new ArrayList<>();
+				PlanGson pg = PlanGson.createPlanGson(plan);
+				userMsg = userMsg+"json```\n"+gson.toJson(pg)+"\n```";
+				if(i>0)userMsg = errors.get(0).errorMessage;
+				String aiString = aiChatClient.getResponse(Prompt.DEAFULT_SYSTEM_MSG, userMsg);
+				int begin = aiString.indexOf("```"); 
+				int end = aiString.lastIndexOf("```");
+				String jsonString = aiString.substring(begin,end).replace("```", "");
+				PlanGson pgOut = gson.fromJson(jsonString, PlanGson.class);
+				planOut = pgOut.getPlan();
+				boolean ifOkay = identifyChargingActivityAndInsertChargingLink(planOut,plan,errors);
+				if(ifOkay)break;
+			}
 			makeChargingStaged(planOut);
 			PopulationUtils.copyFromTo(planOut, plan);
 		}
@@ -184,6 +197,8 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 		Id<Link> linkIdForCharger = null;
 		List<String> actsWhileCharging = new ArrayList<>();
 		List<String> oldActs = new ArrayList<>();
+		ElectricVehicleSpecification electricVehicleSpecification = electricFleetSpecification.getVehicleSpecifications()
+				.get(VehicleUtils.getVehicleId(plan.getPerson(), TransportMode.car));
 		
 		for(PlanElement pe:originalPlan.getPlanElements()) {
 			if(pe instanceof Activity && !TripStructureUtils.isStageActivityType(((Activity)pe).getType())) {
@@ -195,8 +210,11 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 		int i = 0;
 		int a = 0;
 		
+		double time = 0;
 		for(PlanElement pe:plan.getPlanElements()) {
 			if(pe instanceof Activity) {// while charging is happening, there has to be only one link id for both the plugin and plugout event 
+				Activity act = ((Activity)pe);
+				if(act.getEndTime().isDefined())time = act.getEndTime().seconds();
 				if(((Activity)pe).getType().contains(PLUGIN)) {
 					if(ifCharging) {
 						msgs.add(new ErrorMessage("Cannot have two consecutive plugin event!"));
@@ -210,8 +228,11 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 						return false;
 					}
 					
+					ChargerSpecification charger = this.selectChargerNearToLink(plan.getPerson().getId(), act.getLinkId(), 
+							electricVehicleSpecification, this.scenario.getNetwork(), time);
 					
-					
+					act.setLinkId(charger.getLinkId());
+					linkIdForCharger = charger.getLinkId();
 					ifCharging = true;
 					
 				}else if(((Activity)pe).getType().contains(PLUGOUT)) {
@@ -232,7 +253,7 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 						msgs.add(new ErrorMessage("Charging must be performed while performing other activities. Activities while charging list is empty!!!"));
 						return false;
 					}
-					
+					act.setLinkId(linkIdForCharger);
 					ifCharging = false;
 					actsWhileCharging.clear();
 				}else {

@@ -30,6 +30,7 @@ import org.matsim.vehicles.VehicleCapacity;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.Vehicles;
 
+import aiagent.AIAgentReplanningModule;
 import experienceSOC.ActivitySOCModule;
 import modeChoiceFix.SubTourPlanStrategyBinder;
 import picocli.CommandLine;
@@ -123,6 +124,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
     //addStrategy(config, "SubtourModeChoice", null, 0.1D, (int)0.65 * this.maxIterations);
     config.strategy().clearStrategySettings();
     addStrategy(config, UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName, null, 0.85D, (int).75 * this.maxIterations);
+    addStrategy(config, AIAgentReplanningModule.AIReplanningStategyName, null, 0.85D, (int).75 * this.maxIterations);
     addStrategy(config, "ChangeExpBeta", null, 0.25D, this.maxIterations);
     addStrategy(config, DefaultStrategy.TimeAllocationMutator_ReRoute, null, 0.05D, (int)0.7*this.maxIterations);
     addStrategy(config, DefaultStrategy.ReRoute, null, 0.05D, (int)0.8*this.maxIterations);

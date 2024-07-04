@@ -37,6 +37,8 @@ import org.matsim.core.mobsim.qsim.AbstractQSimModule;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 
+import aiagent.AIAgentReplanningModule;
+import aiagent.AIAgentStrategyProvider;
 import binding.ChargerPricingModule;
 import binding.ChargingModule;
 import urbanEV.analysis.ActsWhileChargingAnalyzer;
@@ -67,7 +69,7 @@ public class UrbanEVModule extends AbstractModule {
 		install(new EvStatsModule());
 		install(new ChargerPricingModule());
 		addPlanStrategyBinding(UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName).toProvider(EvTripPlanningStrategyProvider.class);
-		
+		addPlanStrategyBinding(AIAgentReplanningModule.AIReplanningStategyName).toProvider(AIAgentStrategyProvider.class);
 		
 		//bind custom EVFleet stuff
 //		bind(MATSimVehicleWrappingEVSpecificationProvider.class).in(Singleton.class);
