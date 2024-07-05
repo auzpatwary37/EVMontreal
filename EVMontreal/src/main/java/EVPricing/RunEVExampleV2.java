@@ -123,7 +123,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
     config.controler().setFirstIteration(this.minIterations);
     //addStrategy(config, "SubtourModeChoice", null, 0.1D, (int)0.65 * this.maxIterations);
     config.strategy().clearStrategySettings();
-    addStrategy(config, UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName, null, 0.85D, (int).75 * this.maxIterations);
+    //addStrategy(config, UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName, null, 0.85D, (int).75 * this.maxIterations);
     addStrategy(config, AIAgentReplanningModule.AIReplanningStategyName, null, 0.85D, (int).75 * this.maxIterations);
     addStrategy(config, "ChangeExpBeta", null, 0.25D, this.maxIterations);
     addStrategy(config, DefaultStrategy.TimeAllocationMutator_ReRoute, null, 0.05D, (int)0.7*this.maxIterations);
@@ -176,7 +176,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	//TODO actually, should also work with all AccessEgressTypes but we have to check (write JUnit test)
 	config.plansCalcRoute().setAccessEgressType(PlansCalcRouteConfigGroup.AccessEgressType.none);
 
-	//register charging interaction activities for car
+	//register charging interaction activities for car//TODO: investigate further.
 	config.planCalcScore().addActivityParams(
 			new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGOUT_INTERACTION)
 					.setScoringThisActivityAtAll(false));
