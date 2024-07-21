@@ -115,6 +115,7 @@ public class UrbanEVModule extends AbstractModule {
 		//bind urban ev planning stuff
 //		addMobsimListenerBinding().to(UrbanEVTripsPlanner.class);
 		bind(UrbanEVTripPlanningStrategyModule.class).asEagerSingleton();
+		bind(AIAgentReplanningModule.class).asEagerSingleton();
 		//TODO find a better solution for this
 		Collection<String> whileChargingActTypes = configGroup.getWhileChargingActivityTypes().isEmpty() ? config.planCalcScore().getActivityTypes() : configGroup.getWhileChargingActivityTypes();
 		bind(ActivityWhileChargingFinder.class).toInstance(new ActivityWhileChargingFinder(whileChargingActTypes, configGroup.getMinWhileChargingActivityDuration_s()));

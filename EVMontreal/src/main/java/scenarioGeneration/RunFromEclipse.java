@@ -8,15 +8,16 @@ public class RunFromEclipse {
 	public static void main(String[] args) {
 		
 		String[] args2 = new String[] {
-				"--config","1_percent/config.xml",
-				"--tv","montreal_transit_vehicles.xml.gz",
-				"--ts","montreal_transit_schedules.xml.gz",
+				"--config","data/1p daily/config_with_calibrated_parameters.xml",
+				"--tv","montreal_transit_vehicles.xml",
+				"--ts","montreal_transit_schedules.xml",
 				"--facilities","montreal_facilities.xml.gz",
 				"--plan","plan.xml",
-				"--evpricing","1_percent/pricingProfiles.xml",
-				"--evehicle","evehicle.xml",
-				"--thread","10",
-				"--output", "1_percent/dumb8_10"
+				"--evpricing","data/1p daily/pricingProfiles.xml",
+				"--vehicles","vehicle.xml",
+				"--thread","1",
+				"--output", "output/1_percent/aiagent",
+				"--lastiterations","60"
 			};
 		RunEVExampleV2.main(args2);
 		

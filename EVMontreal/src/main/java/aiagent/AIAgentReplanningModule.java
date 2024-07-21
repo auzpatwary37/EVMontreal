@@ -1,5 +1,10 @@
 package aiagent;
 
+import static java.util.stream.Collectors.toSet;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,6 +37,7 @@ import org.matsim.contrib.ev.infrastructure.ChargerSpecification;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureSpecification;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
+import org.matsim.core.controler.MatsimServices;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
 import org.matsim.core.gbl.MatsimRandom;
 import org.matsim.core.network.NetworkUtils;
@@ -42,6 +48,8 @@ import org.matsim.core.router.TripRouter;
 import org.matsim.core.router.TripStructureUtils;
 import org.matsim.core.router.util.TravelTime;
 import org.matsim.core.utils.timing.TimeInterpretation;
+import org.matsim.vehicles.PersonVehicles;
+import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleUtils;
 import org.matsim.vehicles.Vehicles;
 
@@ -53,7 +61,9 @@ import EVPricing.ChargerPricingProfiles;
 import apikeys.APIKeys;
 import gsonprocessor.ActivityGson;
 import gsonprocessor.PlanElementGson;
+import gsonprocessor.PlanElementGsonDeserializer;
 import gsonprocessor.PlanGson;
+import gsonprocessor.PlanSchema;
 import nlprocessor.GsonTrial.PlanElementDeserializer;
 import rest.ChatCompletionClient;
 import rest.Prompt;
@@ -117,10 +127,15 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 	
 	@Inject
 	private UrbanEVConfigGroup urbanEV;
+	
+	@Inject
+	private MatsimServices controler;
 
 
 	Config config;
 	
+	public FileWriter fw = null;
+	public int unsuccessfulReplanning = 0;
 	
 
 	@Inject 
@@ -129,28 +144,37 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 	@Inject
 	AIAgentReplanningModule(Config config){
 		this.config = config;
+		
 	}
 	
 	public static ChatCompletionClient getChatClient() {
 		return new ChatCompletionClient.Builder()
 		.setChatAPI_URL("https://api.openai.com/v1/chat/completions")//http://localhost:1234/v1/chat/completions
 		.setEmbeddingAPI_URL("http://localhost:1234/v1/embeddings")
-		.setModelName("gpt-3.5-turbo")
+		.setModelName("gpt-4-turbo")
 		.setauthorization(APIKeys.GPT_KEY)
 		.setOrganization(APIKeys.ORGANIZATION_ID)
 		.setProject(APIKeys.PROJECT_ID)
+		.setTools(List.of(PlanSchema.getPlanGsonSchemaAsFunctionTool()))
 		.setIfStream(false)
 		.setMaxToken(4096)
 		.setTemperature(.7)
+		.setToolChoice("required")
 		.build();
 	}
 
 	@Override
 	public void prepareReplanning(ReplanningContext replanningContext) {
-		
+		try {
+			String fileLoc = controler.getControlerIO().getIterationFilename(replanningContext.getIteration(),"ai_call.txt");
+			this.fw =  new FileWriter(new File(fileLoc));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		plans = new HashSet<>();
 		GsonBuilder gsonBuilder = new GsonBuilder()
-				.registerTypeAdapter(PlanElement.class, new PlanElementDeserializer());
+				.registerTypeAdapter(PlanElementGson.class, new PlanElementGsonDeserializer());
 		gsonBuilder.serializeNulls();
 	    gsonBuilder.serializeSpecialFloatingPointValues();
 	    gsonBuilder.setPrettyPrinting();
@@ -159,40 +183,139 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 	    allowedMode.add(TransportMode.pt);
 	    allowedMode.add(TransportMode.car);
 	    allowedMode.add(TransportMode.bike);
+	    this.plans.clear();
+	    unsuccessfulReplanning = 0;
 	    
+	}
+	public static Id<Vehicle> getVehicleId(Person person, String mode) {
+		Map<String, Id<Vehicle>> vehicleIds = getVehicleIds(person);
+		if (!vehicleIds.containsKey(mode)) {
+			throw new RuntimeException("Could not retrieve vehicle id from person: " + person.getId().toString() + " for mode: " + mode +
+					". \nIf you are not using config.qsim().getVehicleSource() with 'defaultVehicle' or 'modeVehicleTypesFromVehiclesData' you have to provide " +
+					"a vehicle for each mode for each person. Attach a map of mode:String -> id:Id<Vehicle> with key 'vehicles' as person attribute to each person." +
+					"\n VehicleUtils.insertVehicleIdIntoAttributes does this for you."
+			);
+		}
+		return vehicleIds.get(mode);
+	}
+	
+	public static Map<String, Id<Vehicle>> getVehicleIds(Person person) {
+		PersonVehicles a=(PersonVehicles) person.getAttributes().getAttribute("vehicles");
+		var vehicleIds = a.getModeVehicles();
+		if (vehicleIds == null) {
+			throw new RuntimeException("Could not retrieve vehicle id from person: " + person.getId().toString() +
+					". \nIf you are not using config.qsim().getVehicleSource() with 'defaultVehicle' or 'modeVehicleTypesFromVehiclesData' you have to provide " +
+					"a vehicle for each mode for each person. Attach a map of mode:String -> id:Id<Vehicle> with key 'vehicles' as person attribute to each person." +
+					"\n VehicleUtils.insertVehicleIdIntoAttributes does this for you.");
+		}
+		return vehicleIds;
+	}
+	protected Set<Id<Vehicle>> getUsedEV(Plan plan) {
+		return TripStructureUtils.getLegs(plan).stream().filter(leg->leg.getMode().equals("car")||leg.getMode().equals("car_passenger"))
+				.map(leg -> getVehicleId(plan.getPerson(), leg.getMode()))
+				.filter(vehicleId -> this.electricFleetSpecification.getVehicleSpecifications().containsKey(vehicleId))
+				.collect(toSet());
+		
+		
+		
+		//		Set<Id<Vehicle>> vs = new HashSet<>();
+		//		TripStructureUtils.getLegs(plan).stream().forEach(l->{
+		//			if(l.getMode().equals("car")&&l.getMode().equals("car_passenger")) {
+		//				Id<Vehicle> v = VehicleUtils.getVehicleId(plan.getPerson(), l.getMode());
+		//				if(isEV(v))vs.add(v);
+		//			}
+		//		});
+		//		return vs;
 	}
 
 	@Override
 	public void handlePlan(Plan plan) {
-		this.plans.add(plan);
+		if(!this.getUsedEV(plan).isEmpty()) {
+			this.plans.add(plan);
+		}
 	}
 
 	@Override
 	public void finishReplanning() {
+		int ii = 0;
 		for(Plan plan:plans) {
 			ChatCompletionClient aiChatClient = getChatClient();
 			makeChargingNotStaged(plan);
 			Plan planOut = null;
-			String userMsg = Prompt.HARDCODED_PROMOPT_EV_CHARGING;
-			
+			String userMsg = Prompt.promptStartAndEndActivityWithExample;
+			PlanGson pgOut = null;
+			String aiString = null;
+			List<ErrorMessage> errors = new ArrayList<>();
 			for(int i=0; i<maxTry;i++) {
-				List<ErrorMessage> errors = new ArrayList<>();
+				
 				PlanGson pg = PlanGson.createPlanGson(plan);
-				userMsg = userMsg+"json```\n"+gson.toJson(pg)+"\n```";
-				if(i>0)userMsg = errors.get(0).errorMessage;
-				String aiString = aiChatClient.getResponse(Prompt.DEAFULT_SYSTEM_MSG, userMsg).getToolCalls().get(0).getFunction().getArguments();
-				PlanGson pgOut = gson.fromJson(aiString, PlanGson.class);
-				planOut = identifyChargingActivityAndInsertChargingLink(pgOut,plan,errors);
+				String gsonPlan = gson.toJson(pg);
+				
+				userMsg = userMsg+"json```\n"+gsonPlan+"\n```";
+				if(i>0) {
+					userMsg  ="";
+					for(ErrorMessage e:errors){
+						userMsg = userMsg+e.errorMessage;
+					}
+					;
+				}
+				System.out.println();
+				aiString = aiChatClient.getResponse(Prompt.prompt_system_evAgent, userMsg).getToolCalls().get(0).getFunction().getArguments();
+				try {
+					fw.append(gsonPlan);
+					fw.append(aiString);
+					fw.flush();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				try {
+					pgOut = gson.fromJson(aiString, PlanGson.class);
+					if(pgOut==null) {
+						errors.add(new ErrorMessage("Wrong gson syntax. Could not convert."));
+					}
+				}catch (Exception e) {
+					// TODO Auto-generated catch block
+					//System.out.println("Wrong gson syntax. Could not convert.");
+					errors.add(new ErrorMessage("Wrong gson syntax. Could not convert."));
+				}
+				
+				if(pgOut!=null)planOut = identifyChargingActivityAndInsertChargingLink(pgOut,plan,errors);
 				if(planOut!=null)break;
 			}
-			makeChargingStaged(planOut);
-			PopulationUtils.copyFromTo(planOut, plan);
+			if(planOut==null) {
+				unsuccessfulReplanning++;
+				System.out.println("Total unsuccessful replanning = "+ unsuccessfulReplanning);	
+				makeChargingStaged(plan);
+			}else {
+				makeChargingStaged(planOut);
+				PopulationUtils.copyFromTo(planOut, plan);
+				plan.getAttributes().putAttribute("IfAiGenerated", true);
+			}
+			ii++;
+			if(ii%10==0)System.out.println(ii+" plans finished out of "+this.plans.size());
 		}
 	}
+	
+	public static void main(String[] args) {
+		String aiString = "{\"activitiesAndLegs\":[{\"id\":\"home___0\",\"activityType\":\"home\",\"endTime\":43200.0,\"carLocation\":\"home_home515682\"},{\"mode\":\"car\"},{\"id\":\"plugin___0\",\"activityType\":\"plugin\",\"endTime\":45000.0,\"carLocation\":\"charger\"},{\"mode\":\"walk\"},{\"id\":\"work___0\",\"activityType\":\"work\",\"endTime\":82800.0,\"carLocation\":\"charger\"},{\"mode\":\"walk\"},{\"id\":\"plugout___0\",\"activityType\":\"plugout\",\"endTime\":84600.0,\"carLocation\":\"charger\"},{\"mode\":\"car\"},{\"id\":\"home___1\",\"activityType\":\"home\",\"endTime\":97200.0,\"carLocation\":\"home_home515682\"}]}";
+		GsonBuilder gsonBuilder = new GsonBuilder()
+				.registerTypeAdapter(PlanElement.class, new PlanElementDeserializer());
+		gsonBuilder.serializeNulls();
+	    gsonBuilder.serializeSpecialFloatingPointValues();
+	    gsonBuilder.setPrettyPrinting();
+	    Gson gson = gsonBuilder.create(); 
+	    PlanGson pgOut = gson.fromJson(aiString, PlanGson.class);
+	    //planOut = identifyChargingActivityAndInsertChargingLink(pgOut,plan,errors);
+	    
+	}
+	
 	/**
 	 * will return if the charging events were consistent and proper charger insertion was possible
 	 * @param plan
 	 * @return
+	 * TODO: Order check, existence of all old activity check. 
 	 */
 	public Plan identifyChargingActivityAndInsertChargingLink(PlanGson planGson, Plan originalPlan, List<ErrorMessage> msgs) {
 		
@@ -211,7 +334,7 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 				actsWithId.put(a.getType()+"___"+actOrder.get(a.getType()), a);
 			}
 		}
-		
+		int numEv = 0;
 		for(PlanElementGson peG:planGson.activitiesAndLegs) {
 			if(peG instanceof ActivityGson) {
 				ActivityGson ag = (ActivityGson)peG;
@@ -221,13 +344,21 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 					ag.coord = actsWithId.get(ag.id).getCoord();
 				}else {
 					if(ag.activityType.equals(PLUGIN) || ag.activityType.equals(PLUGOUT)) {
+						numEv++;
 						//set a dummy link id to create the activity. 
 						ag.linkId = "atCharger";
 					}else {
-						throw new IllegalArgumentException("Unknown activity!!!");
+						msgs.add(new ErrorMessage(ag.id+" is not present in the original given plan. You cannot insert new activity other than plug in and plugout."));
+						return null;
 					}
+					
 				}
 			}
+		}
+		
+		if(numEv==0) {
+			msgs.add(new ErrorMessage("No plugin or plugout charger in the given plan!!! Your task was to include plugin and plugout in the given plan"));
+			return null;
 		}
 		
 		Plan plan = planGson.getPlan();
@@ -238,13 +369,13 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 		Map<String,Activity> oldActs = new HashMap<>();
 		Map<String,Integer> actOccurance = new HashMap<>();
 		ElectricVehicleSpecification electricVehicleSpecification = electricFleetSpecification.getVehicleSpecifications()
-				.get(VehicleUtils.getVehicleId(plan.getPerson(), TransportMode.car));
+				.get(VehicleUtils.getVehicleId(originalPlan.getPerson(), TransportMode.car));
 		
 		for(PlanElement pe:originalPlan.getPlanElements()) {
 			if(pe instanceof Activity && !TripStructureUtils.isStageActivityType(((Activity)pe).getType())) {
 				actOccurance.compute(((Activity)pe).getType(), (k,v)->v==null?0:v+1);
 				oldActs.put(((Activity)pe).getType()+"___"+actOccurance.get(((Activity)pe).getType()),((Activity)pe));
-			}else {
+			}else if(pe instanceof Leg){
 				this.allowedMode.add(((Leg)pe).getMode());
 			}
 		}
@@ -254,6 +385,7 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 		int a = 0;
 		
 		double time = 0;
+		
 		for(PlanElement pe:plan.getPlanElements()) {
 			if(pe instanceof Activity) {// while charging is happening, there has to be only one link id for both the plugin and plugout event 
 				Activity act = ((Activity)pe);
@@ -271,10 +403,22 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 						return null;
 					}
 					
-					ChargerSpecification charger = this.selectChargerNearToLink(plan.getPerson().getId(), act.getLinkId(), 
+					
+					Activity nextAct = (Activity)plan.getPlanElements().get(i+2);
+					if(nextAct.getType().equals(PLUGOUT)) {
+						msgs.add(new ErrorMessage("Charging must be performed while performing other activities. Activities while charging list is empty!!!"));
+						return null;
+					}
+					
+					ChargerSpecification charger = this.selectChargerNearToLink(originalPlan.getPerson().getId(), nextAct.getLinkId(), 
 							electricVehicleSpecification, this.scenario.getNetwork(), time);
 					
-					act.setLinkId(charger.getLinkId());
+					if(charger!=null) {
+						act.setLinkId(charger.getLinkId());
+					}else {
+						msgs.add(new ErrorMessage("No charger found within 1000m of the following activity to the plugin activity. Choose a different activity."));
+						return null;
+					}
 					linkIdForCharger = charger.getLinkId();
 					ifCharging = true;
 					
@@ -300,15 +444,11 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 					ifCharging = false;
 					actsWhileCharging.clear();
 				}else {
-					if(!oldActs.get(a).equals(((Activity)pe).getType())) {
-						msgs.add(new ErrorMessage("Missing activities or wrong activity order from the original plan!!!"));
-						return null;
-					}
 					if(ifCharging) {
-						actsWhileCharging.add(((Activity)pe).getType());
+						actsWhileCharging.add(act.getType());
 					}
-					a++;
 				}
+				
 			}else {
 				Leg leg = (Leg)pe;
 				if(!this.allowedMode.contains(leg.getMode())) {
@@ -409,4 +549,5 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 
 			}
 		}
+
 }
