@@ -20,17 +20,17 @@
 
 package urbanEV;
 
-import org.matsim.core.config.ReflectiveConfigGroup;
-
 import java.util.HashSet;
 import java.util.Set;
+
+import org.matsim.core.config.ReflectiveConfigGroup;
 
 
 //TODO add decriptions
 public class UrbanEVConfigGroup extends ReflectiveConfigGroup {
 
     //TODO should we rename the entire package from UrbanEV to EVChargingPreplanning or something similar?
-    static final String GROUP_NAME = "urbanEV" ;
+    public static final String GROUP_NAME = "urbanEV" ;
 
 
 

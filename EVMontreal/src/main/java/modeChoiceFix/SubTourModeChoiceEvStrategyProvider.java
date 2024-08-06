@@ -23,6 +23,7 @@ package modeChoiceFix;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
+
 import org.matsim.core.config.groups.GlobalConfigGroup;
 import org.matsim.core.config.groups.SubtourModeChoiceConfigGroup;
 import org.matsim.core.population.algorithms.PermissibleModesCalculator;

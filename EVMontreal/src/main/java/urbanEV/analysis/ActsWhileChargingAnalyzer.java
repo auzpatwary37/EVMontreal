@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.commons.collections.list.SynchronizedList;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.matsim.api.core.v01.Id;
@@ -85,7 +84,7 @@ public class ActsWhileChargingAnalyzer implements ActivityStartEventHandler, Act
             containers.get(event.getPersonId()).acts.add(event.getActType());
 
         }
-        else if (event.getActType().contains(UrbanVehicleChargingHandler.PLUGIN_INTERACTION)){
+        if (event.getActType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)){
             String chargingActAndTime = event.getActType()+ event.getTime();
             containers.get(event.getPersonId()).acts.add(chargingActAndTime);
 

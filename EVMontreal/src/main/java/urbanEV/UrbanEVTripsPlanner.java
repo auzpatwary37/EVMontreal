@@ -76,7 +76,6 @@ import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.population.routes.NetworkRoute;
 import org.matsim.core.router.LinkWrapperFacility;
-import org.matsim.core.router.PlanRouter;
 import org.matsim.core.router.SingleModeNetworksCache;
 import org.matsim.core.router.StageActivityTypeIdentifier;
 import org.matsim.core.router.TripRouter;
@@ -396,11 +395,11 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 					}
 				}
 			} else if (planElement instanceof Activity) {
-				if (((Activity) planElement).getType().contains(UrbanVehicleChargingHandler.PLUGIN_INTERACTION)) {
+				if (((Activity) planElement).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)) {
 					Leg legToCharger = (Leg) modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(planElement) - 1);
 					chargingBegin = legToCharger.getDepartureTime().seconds() + legToCharger.getTravelTime().seconds();
 
-				} else if (((Activity) planElement).getType().contains(UrbanVehicleChargingHandler.PLUGOUT_INTERACTION)) {
+				} else if (((Activity) planElement).getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER)) {
 
 					Leg legFromCharger = (Leg) modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(planElement) + 1);
 					if (chargingBegin == null) throw new IllegalStateException();
@@ -748,8 +747,8 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 			if (planElements.get(ii) instanceof Activity) {
 				Activity act = (Activity) planElements.get(ii);
 				if (!StageActivityTypeIdentifier.isStageActivity(act.getType()) ||
-						act.getType().contains(UrbanVehicleChargingHandler.PLUGIN_INTERACTION) ||
-						act.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_INTERACTION)) {
+						act.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
+						act.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER)) {
 					prevAct = act;
 				}
 			}
@@ -772,8 +771,8 @@ class UrbanEVTripsPlanner implements MobsimInitializedListener {
 			if (planElements.get(ii) instanceof Activity) {
 				Activity act = (Activity) planElements.get(ii);
 				if (!StageActivityTypeIdentifier.isStageActivity(act.getType()) ||
-						act.getType().contains(UrbanVehicleChargingHandler.PLUGIN_INTERACTION) ||
-						act.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_INTERACTION)) {
+						act.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
+						act.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER)) {
 					theIndex = ii;
 				}
 			}

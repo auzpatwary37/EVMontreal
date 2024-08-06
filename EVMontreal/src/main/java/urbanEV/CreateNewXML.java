@@ -1,8 +1,7 @@
 package urbanEV;
 
-import com.fasterxml.jackson.databind.node.TextNode;
-import org.matsim.contrib.ev.infrastructure.ChargerSpecification;
-import org.w3c.dom.*;
+import java.io.File;
+import java.util.List;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -12,8 +11,11 @@ import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
-import java.io.File;
-import java.util.List;
+
+import org.matsim.contrib.ev.infrastructure.ChargerSpecification;
+import org.w3c.dom.Attr;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
 public  class CreateNewXML {
     private final List<ChargerSpecification> chargers;

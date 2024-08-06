@@ -48,11 +48,12 @@ import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.population.routes.NetworkRoute;
 import org.matsim.core.replanning.ReplanningContext;
 import org.matsim.core.router.LinkWrapperFacility;
-import org.matsim.core.router.PlanRouter;
 import org.matsim.core.router.SingleModeNetworksCache;
 import org.matsim.core.router.StageActivityTypeIdentifier;
 import org.matsim.core.router.TripRouter;
 import org.matsim.core.router.TripStructureUtils;
+import org.matsim.core.router.TripStructureUtils.StageActivityHandling;
+import org.matsim.core.router.TripStructureUtils.Trip;
 import org.matsim.core.router.util.TravelTime;
 import org.matsim.core.utils.timing.TimeInterpretation;
 import org.matsim.facilities.ActivityFacility;
@@ -241,6 +242,18 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				this.purePlan.put(plan.getPerson().getId(), new ArrayList<>());
 				plan.getPerson().getAttributes().putAttribute("purePlan", plan);
 			}
+			//_______________________________________________________________________
+			
+			Plan originalPlan = (Plan)plan.getPerson().getAttributes().getAttribute("originalPlan");
+			if(originalPlan==null) {
+				originalPlan = PopulationUtils.createPlan();
+				PopulationUtils.copyFromTo(plan, originalPlan, true);
+				plan.getPerson().getAttributes().putAttribute("originalPlan",originalPlan);
+			}else {
+				PopulationUtils.copyFromTo(originalPlan, plan, true);
+			}
+			
+			//____________________________________________________
 			boolean unique = true;
 			for(Plan pl : this.purePlan.get(plan.getPerson().getId())) {
 				if(this.planEquals(plan, pl)) {
@@ -305,36 +318,33 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		int in = 0;
 		boolean hasCritical = false;
 
-
+		List<Activity> acts = TripStructureUtils.getActivities(planElements, StageActivityHandling.ExcludeStageActivities);
 		if (size > 0) {
-			int actOrder = 0;
-			for(PlanElement pl:modifiablePlan.getPlanElements()) {
-				if(pl instanceof Activity) {
-					//if(((Map<Integer,Double>)modifiablePlan.getAttributes().getAttribute("actSOC")).get(actOrder)!=null) {
-						Double soc = (Double)((Activity)pl).getAttributes().getAttribute("actSOC");
-//						Double soc = ((Map<Integer,Double>)modifiablePlan.getAttributes().getAttribute("actSOC")).get(actOrder);
-						if(soc !=null && soc>= 0.3) {
-							peIndex.add(in);	
-						}else {
-							hasCritical = true;
-							break;
-						}
-					//}
-					in++;
-					
+			
+			for(Activity a:acts) {
+
+				//if(((Map<Integer,Double>)modifiablePlan.getAttributes().getAttribute("actSOC")).get(actOrder)!=null) {
+				Double soc = (Double)a.getAttributes().getAttribute("actSOC");
+				//						Double soc = ((Map<Integer,Double>)modifiablePlan.getAttributes().getAttribute("actSOC")).get(actOrder);
+				if(soc !=null && soc>= 0.3) {
+					peIndex.add(in);	
+				}else {
+					hasCritical = true;
+					break;
 				}
-				actOrder++;
+				//}
+				in++;
 			}
 			if(hasCritical==false)peIndex.clear();
 
 			PlanElement firstElement = planElements.get(0);
 			if (firstElement instanceof Activity) {
-				Activity firstActivity = (Activity) planElements.get(0);
+				Activity firstActivity = acts.get(0);
 
 				Activity secondActivity = null;
-				secondActivity = (Activity) planElements.get(2);
+				secondActivity = acts.get(1);
 				Activity thirdActivity = null;
-				if(size>4)thirdActivity = (Activity) planElements.get(4);
+				if(acts.size()>2)thirdActivity = (Activity) acts.get(2);
 				boolean isSecondPlugin = secondActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);
 				boolean isThirdNotSameAsFirst = isSecondPlugin && !thirdActivity.getFacilityId().equals(firstActivity.getFacilityId());
 
@@ -342,7 +352,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 						firstActivity.getStartTime().seconds() >= this.dumbChargingStartTime &&
 						firstActivity.getStartTime().isDefined() &&
 						firstActivity.getStartTime().seconds() <= this.dumbChargingEndTime;  //Do we really need to check the end of activity?
-						if ((!isSecondPlugin || isThirdNotSameAsFirst) && isThirdNotSameAsFirst && isFirstWithinTimeRange && planElements.indexOf(evCarLegs.get(0))==1) {
+						if ((!isSecondPlugin || isThirdNotSameAsFirst) && isFirstWithinTimeRange && planElements.indexOf(evCarLegs.get(0))==1) {
 							if (peIndex.contains(0)) {
 								pe.add(firstActivity);
 							}
@@ -350,39 +360,20 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			}
 
 
-
+			boolean ifCharging = false;
 
 			// Iterate over the plan elements to find the desired activities
-			for (int i = 1; i < size - 1; i++) {
-				PlanElement currentElement = planElements.get(i);
+			for (int i = 1; i < acts.size() - 1; i++) {
+				
 
+					
+					
+				
+					Activity currentActivity = acts.get(i);
 
-
-				if (currentElement instanceof Activity) {
-
-					Activity currentActivity = (Activity) currentElement;
-
-
-
+					if(currentActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER))ifCharging = true;
+					else if(currentActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))ifCharging =false;
 					// Check if the current activity is already surrounded by plugin and plugout activities
-					boolean isSurroundedByPluginOrPlugout = false;
-
-
-
-					//			        Activity prevActivity = ((Activity) currentActivity).get(i - 2);
-					Activity prevActivity = (Activity) planElements.get(i - 2);
-					//			        Activity nextActivity = ((Category) currentActivity).get(i + 2);
-					Activity nextActivity = (Activity) planElements.get(i + 2);
-
-
-
-					if (prevActivity != null && nextActivity != null &&
-							(prevActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
-									//										prevActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER) ||
-									//										nextActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
-									nextActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))) {
-						isSurroundedByPluginOrPlugout = true;
-					}
 
 
 
@@ -403,22 +394,22 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 
 							// Add the current activity to the pe list if it meets all the criteria
-							if (!isSurroundedByPluginOrPlugout && isNotPluginOrPlugout && isWithinTimeRange) {
+							if (!ifCharging && isNotPluginOrPlugout && isWithinTimeRange) {
 								if (peIndex.contains(i)) {
 									pe.add(currentActivity);
 								}
 							}
-				}
+				
 			}
 
 
 
 			// Check the last activity separately
 			if (size > 1) {
-				Activity lastActivity = (Activity)planElements.get(size - 1);
-				Activity secondLastActivity = (Activity)planElements.get(size - 3);
+				Activity lastActivity = acts.get(acts.size() - 1);
+				Activity secondLastActivity = acts.get(acts.size() - 2);
 				Activity thirdLastActivity = null;
-				if(size>3)thirdLastActivity = (Activity)planElements.get(size - 5);
+				if(acts.size()>2)thirdLastActivity = acts.get(size - 3);
 
 				boolean isSecondLastPlugout = secondLastActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
 				boolean isLastWithinTimeRange = lastActivity.getStartTime().isDefined() &&
@@ -562,10 +553,11 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 			// Check the last activity separately
 			if (size > 1) {
-				Activity lastActivity = (Activity)planElements.get(size - 1);
-				Activity secondLastActivity = (Activity)planElements.get(size - 3);
+				List<Activity> acts = TripStructureUtils.getActivities(planElements, StageActivityHandling.ExcludeStageActivities);
+				Activity lastActivity = acts.get(acts.size() - 1);
+				Activity secondLastActivity = acts.get(acts.size() - 2);
 				Activity thirdLastActivity = null;
-				if(size>3)thirdLastActivity = (Activity)planElements.get(size - 5);
+				if(acts.size()>2)thirdLastActivity = (Activity)planElements.get(acts.size() - 3);
 
 				boolean isSecondLastPlugout = secondLastActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
 				boolean isLastWithinTimeRange = lastActivity.getStartTime().isDefined() &&
@@ -611,13 +603,14 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 
 			PlanElement firstElement = planElements.get(0);
+			List<Activity> acts = TripStructureUtils.getActivities(planElements, StageActivityHandling.ExcludeStageActivities);
 			if (firstElement instanceof Activity) {
-				Activity firstActivity = (Activity) planElements.get(0);
+				Activity firstActivity = (Activity) acts.get(0);
 
 				Activity secondActivity = null;
-				secondActivity = (Activity) planElements.get(2);
+				secondActivity = (Activity) acts.get(1);
 				Activity thirdActivity = null;
-				if(size>4)thirdActivity = (Activity) planElements.get(4);
+				if(acts.size()>2)thirdActivity = (Activity) acts.get(2);
 				boolean isSecondPlugin = secondActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);
 				boolean isThirdNotSameAsFirst = isSecondPlugin && !thirdActivity.getFacilityId().equals(firstActivity.getFacilityId());
 
@@ -625,7 +618,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 						firstActivity.getStartTime().seconds() >= this.dumbChargingStartTime;
 //						firstActivity.getStartTime().isDefined() &&
 //						firstActivity.getStartTime().seconds() <= this.dumbChargingEndTime;  //Do we really need to check the end of activity?
-						if ((!isSecondPlugin || isThirdNotSameAsFirst) && isThirdNotSameAsFirst && isFirstWithinTimeRange && planElements.indexOf(evCarLegs.get(0))==1) {
+						if ((!isSecondPlugin || isThirdNotSameAsFirst)  && isFirstWithinTimeRange && planElements.indexOf(evCarLegs.get(0))==1) {
 
 							pe.add(firstActivity);
 
@@ -633,39 +626,16 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			}
 
 
-
+			boolean isCharging = false;
 
 			// Iterate over the plan elements to find the desired activities
-			for (int i = 1; i < size - 1; i++) {
-				PlanElement currentElement = planElements.get(i);
+			for (int i = 1; i < acts.size() - 1; i++) {
+			
+					Activity currentActivity = acts.get(i);
 
+					if(currentActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER))isCharging = true;
+					if(currentActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))isCharging = false;
 
-
-				if (currentElement instanceof Activity) {
-
-					Activity currentActivity = (Activity) currentElement;
-
-
-
-					// Check if the current activity is already surrounded by plugin and plugout activities
-					boolean isSurroundedByPluginOrPlugout = false;
-
-
-
-					//			        Activity prevActivity = ((Activity) currentActivity).get(i - 2);
-					Activity prevActivity = (Activity) planElements.get(i - 2);
-					//			        Activity nextActivity = ((Category) currentActivity).get(i + 2);
-					Activity nextActivity = (Activity) planElements.get(i + 2);
-
-
-
-					if (prevActivity != null && nextActivity != null &&
-							(prevActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
-									//										prevActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER) ||
-									//										nextActivity.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
-									nextActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER))) {
-						isSurroundedByPluginOrPlugout = true;
-					}
 
 
 
@@ -686,29 +656,32 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 
 							// Add the current activity to the pe list if it meets all the criteria
-							if (!isSurroundedByPluginOrPlugout && isNotPluginOrPlugout && isWithinTimeRange) {
+							if (!isCharging && isNotPluginOrPlugout && isWithinTimeRange) {
 
 								pe.add(currentActivity);
 
 							}
-				}
+				
 			}
 
 
 
 			// Check the last activity separately
 			if (size > 1) {
-				Activity lastActivity = (Activity)planElements.get(size - 1);
-				Activity secondLastActivity = (Activity)planElements.get(size - 3);
+				Activity lastActivity = acts.get(acts.size()-1);
+				Activity secondLastActivity = acts.get(acts.size()-2);
 				Activity thirdLastActivity = null;
-				if(size>3)thirdLastActivity = (Activity)planElements.get(size - 5);
+				if(acts.size()>3)thirdLastActivity = acts.get(acts.size()-3);
 
 				boolean isSecondLastPlugout = secondLastActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
 				boolean isLastWithinTimeRange = lastActivity.getStartTime().isDefined() &&
 						lastActivity.getStartTime().seconds() >= this.dumbChargingStartTime;
 	//					lastActivity.getStartTime().isDefined() &&
 //						lastActivity.getStartTime().seconds() <= this.dumbChargingEndTime;   
-						boolean isThirdLastNotSameAsLast = isSecondLastPlugout && !thirdLastActivity.getFacilityId().equals(lastActivity.getFacilityId());
+						boolean isThirdLastNotSameAsLast = true;
+						//if(lastActivity.getFacilityId()!=null && thirdLastActivity.getFacilityId()!=null) {
+							isThirdLastNotSameAsLast = isSecondLastPlugout && !thirdLastActivity.getFacilityId().equals(lastActivity.getFacilityId());
+						//}
 						if ((!isSecondLastPlugout || isThirdLastNotSameAsLast) && isLastWithinTimeRange && ((Leg) planElements.get(size-2)).getMode().equals(TransportMode.car)) {
 
 							pe.add(lastActivity);
@@ -904,6 +877,9 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		//         }
 		
 		cleanActSOC(modifiablePlan);
+		if(!this.checkModeConsistency(modifiablePlan)) {
+			System.out.println("Modes are not consistant!!!!");
+		}
 	}
 
 
@@ -1077,7 +1053,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 				Activity a = (Activity)pe;
 				if(a.equals(act))continue;
-				if(act.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER) && a.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)
+				if(act.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER) || a.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)
 						) {
 					if(a.getLinkId().equals(act.getLinkId())) {
 						return false;
@@ -1465,13 +1441,14 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 
 		//add plugin act
 
-		Activity pluginAct =PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
-				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);
+//		Activity pluginAct =PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
+//				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);
+		Activity pluginAct = PopulationUtils.createActivityFromCoordAndLinkId(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER, chargingLink.getCoord(), chargingLink.getId());
 		//		Activity pluginAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER, chargingLink.getCoord());
 		//pluginAct.setStartTime(now);
 		pluginAct.setLinkId(chargingLink.getId());
 		//pluginAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER).getTypicalDuration().seconds());
-
+		pluginAct.setMaximumDuration(5*60);
 		trip.add(pluginAct);
 
 		now = time.decideOnActivityEndTime(pluginAct, now).seconds();
@@ -1480,7 +1457,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		//add walk leg to destination
 		routedSegment = tripRouter.calcRoute(TransportMode.walk, chargerFacility, toFacility, now, plan.getPerson(),null);
 		Leg egress = (Leg) routedSegment.get(0);
-		TripStructureUtils.setRoutingMode(egress, routingMode);// should not it be walk???
+		TripStructureUtils.setRoutingMode(egress, TransportMode.walk);// should not it be walk???
 		trip.add(egress);
 		now = now+time.decideOnLegTravelTime(egress).seconds();
 
@@ -1653,8 +1630,8 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			if (planElements.get(ii) instanceof Activity) {
 				Activity act = (Activity) planElements.get(ii);
 				if (!StageActivityTypeIdentifier.isStageActivity(act.getType()) ||
-						act.getType().contains(UrbanVehicleChargingHandler.PLUGIN_INTERACTION) ||
-						act.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_INTERACTION)) {
+						act.getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) ||
+						act.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER)) {
 					theIndex = ii;
 				}
 			}
@@ -1699,9 +1676,11 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		//add plugin act
 
 		//Activity pluginAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER, chargingLink.getCoord());
-		Activity pluginAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
-				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);//This is how to add a aplugin activity
+//		Activity pluginAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
+//				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER);//This is how to add a aplugin activity
+		Activity pluginAct = PopulationUtils.createActivityFromCoordAndLinkId( UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER, chargingLink.getCoord(), chargingLink.getId());
 		pluginAct.setLinkId(chargingLink.getId());
+		pluginAct.setMaximumDuration(5*60);
 		//pluginAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER).getTypicalDuration().seconds());
 		//pluginAct.setStartTime(now);
 		now = time.decideOnElementEndTime(pluginAct, now).seconds();
@@ -1718,7 +1697,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 		actWhileCharging.setStartTime(now);
 		actWhileCharging.setEndTime(time.decideOnActivityEndTime(actWhileCharging, now).seconds());
 		Leg egress = (Leg) routeFromChargerToAct.get(0);
-		TripStructureUtils.setRoutingMode(egress, routingMode);
+		TripStructureUtils.setRoutingMode(egress, TransportMode.walk);
 		return now;
 	}
 
@@ -1802,17 +1781,19 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				now, plan.getPerson(),null);
 		Leg accessLeg = (Leg) routedSegment.get(0);
 		now = now + time.decideOnLegTravelTime(accessLeg).seconds();
-		TripStructureUtils.setRoutingMode(accessLeg, routingMode);//TODO: Should not the routing mode here be walk???
+		TripStructureUtils.setRoutingMode(accessLeg, TransportMode.walk);//TODO: Should not the routing mode here be walk???
 		trip.add(accessLeg);
 
 		//add plugout act
 
-		Activity plugOutAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
-				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);// this is how to plan a plugout activity
+//		Activity plugOutAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
+//				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);// this is how to plan a plugout activity
+		
+		Activity plugOutAct = PopulationUtils.createActivityFromCoordAndLinkId(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER, chargingLink.getCoord(), chargingLink.getId());
 		//Activity plugOutAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER, chargingLink.getCoord());
 		plugOutAct.setLinkId(chargingLink.getId());
 		//plugOutAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER).getTypicalDuration().seconds());
-
+		plugOutAct.setMaximumDuration(5*60);
 		trip.add(plugOutAct);
 		//plugOutAct.setStartTime(now);
 		now = time.decideOnActivityEndTime(plugOutAct, now).seconds();
@@ -1842,6 +1823,17 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			if(!destination.getType().contains("interaction"))destination.setEndTime(time.decideOnActivityEndTime(destination, now).seconds());
 		}
 	}
+	public static boolean checkModeConsistency(Plan plan) {
+		for(Trip tr:TripStructureUtils.getTrips(plan.getPlanElements())){
+			String mainMode = TripStructureUtils.getRoutingModeIdentifier().identifyMainMode(tr.getTripElements());
+			if(tr.getOriginActivity().getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER) && !mainMode.equals("car")) {
+				return false;
+			}else if(tr.getDestinationActivity().getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) && !mainMode.equals("car")) {
+				return false;
+			}
+		}
+		return true;
+	}
 
 	/**
 	 * 
@@ -1870,17 +1862,18 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				now, plan.getPerson(),null);
 		Leg accessLeg = (Leg) routedSegment.get(0);
 		now = time.decideOnElementEndTime(accessLeg, now).seconds();
-		TripStructureUtils.setRoutingMode(accessLeg, routingMode);//TODO: Should not the routing mode here be walk???
+		TripStructureUtils.setRoutingMode(accessLeg, TransportMode.walk);//TODO: Should not the routing mode here be walk???
 		trip.add(accessLeg);
 
 		//add plugout act
 
-		Activity plugOutAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
-				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);// this is how to plan a plugout activity
+//		Activity plugOutAct = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(chargingLink.getCoord(),
+//				chargingLink.getId(), routingMode + UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);// this is how to plan a plugout activity
+		Activity plugOutAct = PopulationUtils.createActivityFromCoordAndLinkId(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER, chargingLink.getCoord(), chargingLink.getId());
 		//Activity plugOutAct = PopulationUtils.createActivityFromCoord(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER, chargingLink.getCoord());
 		plugOutAct.setLinkId(chargingLink.getId());
 		//plugOutAct.setMaximumDuration(config.planCalcScore().getActivityParams(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER).getTypicalDuration().seconds());
-
+		plugOutAct.setMaximumDuration(5*60);
 		trip.add(plugOutAct);
 		//plugOutAct.setStartTime(now);
 		now = time.decideOnElementEndTime(plugOutAct, now).seconds();

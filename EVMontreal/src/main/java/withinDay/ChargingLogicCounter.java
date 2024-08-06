@@ -3,7 +3,6 @@ package withinDay;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Population;
 import org.matsim.core.population.PopulationUtils;
-import org.matsim.core.population.io.PopulationReader;
 
 public class ChargingLogicCounter {
 	public static void main(String[] args) {

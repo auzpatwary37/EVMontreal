@@ -1,6 +1,5 @@
 package binding;
 
-import org.matsim.api.core.v01.Scenario;
 import org.matsim.contrib.ev.EvConfigGroup;
 import org.matsim.contrib.ev.EvModule;
 import org.matsim.core.controler.AbstractModule;
@@ -39,6 +38,7 @@ public class ChargerPricingModule extends AbstractModule {
 				this.addQSimComponentBinding(EvModule.EV_COMPONENT).to(ChargePricingEventHandler.class);
 				this.bind(EVOutOfBatteryChecker.class).asEagerSingleton();
 				this.addQSimComponentBinding(EvModule.EV_COMPONENT).to(EVOutOfBatteryChecker.class);
+				
 			}
 		});
 		}

@@ -170,11 +170,24 @@ public final class ChooseRandomLegModeForSubtourEv implements PlanAlgorithm {
 				
 				applyChange(whatToDo, plan);
 		}
+		if(!checkModeConsistency(plan)) {
+			logger.debug("modes became inconsistant!!!");
+		}
 	}
-	
+	public static boolean checkModeConsistency(Plan plan) {
+		for(Trip tr:TripStructureUtils.getTrips(plan.getPlanElements())){
+			String mainMode = TripStructureUtils.getRoutingModeIdentifier().identifyMainMode(tr.getTripElements());
+			if(tr.getOriginActivity().getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER) && !mainMode.equals("car")) {
+				return false;
+			}else if(tr.getDestinationActivity().getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) && !mainMode.equals("car")) {
+				return false;
+			}
+		}
+		return true;
+	}
 	private boolean doesNotHavePluginOrPlugOut(Subtour subtour) {
 		for(Trip t:subtour.getTrips()) {
-			if(t.getDestinationActivity().getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) || t.getDestinationActivity().getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER)) {
+			if(t.getDestinationActivity().getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER) || t.getOriginActivity().getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER)) {
 				return false;
 			}
 		}

@@ -15,7 +15,6 @@ import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.contrib.ev.infrastructure.ChargerReader;
-import org.matsim.contrib.ev.infrastructure.ChargerSpecification;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureSpecification;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureSpecificationImpl;
 import org.matsim.core.network.NetworkUtils;

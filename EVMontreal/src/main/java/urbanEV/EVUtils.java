@@ -20,15 +20,20 @@
 
 package urbanEV;
 
-import com.google.common.collect.ImmutableList;
-import org.matsim.api.core.v01.Id;
-import org.matsim.api.core.v01.Scenario;
-import org.matsim.api.core.v01.population.Person;
-import org.matsim.vehicles.*;
-
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
+
+import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.Scenario;
+import org.matsim.api.core.v01.population.Person;
+import org.matsim.vehicles.EngineInformation;
+import org.matsim.vehicles.Vehicle;
+import org.matsim.vehicles.VehicleType;
+import org.matsim.vehicles.VehicleUtils;
+import org.matsim.vehicles.VehiclesFactory;
+
+import com.google.common.collect.ImmutableList;
 
 public class EVUtils {
 

@@ -1,12 +1,8 @@
 package withinDay;
 import java.util.Map.Entry;
 
-import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
-import org.matsim.api.core.v01.population.Population;
 import org.matsim.contrib.ev.infrastructure.Charger;
-import org.matsim.core.population.PopulationUtils;
-import org.xml.sax.Attributes;
 
 import EVPricing.ChargerPricingProfile;
 import EVPricing.ChargerPricingProfileReader;

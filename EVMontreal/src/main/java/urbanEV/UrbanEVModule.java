@@ -25,7 +25,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.matsim.contrib.ev.EvModule;
-
 import org.matsim.contrib.ev.discharging.DischargingModule;
 import org.matsim.contrib.ev.fleet.ElectricFleetModule;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureModule;
@@ -38,6 +37,8 @@ import org.matsim.core.mobsim.qsim.AbstractQSimModule;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 
+import aiagent.AIAgentReplanningModule;
+import aiagent.AIAgentStrategyProvider;
 import binding.ChargerPricingModule;
 import binding.ChargingModule;
 import urbanEV.analysis.ActsWhileChargingAnalyzer;
@@ -68,7 +69,7 @@ public class UrbanEVModule extends AbstractModule {
 		install(new EvStatsModule());
 		install(new ChargerPricingModule());
 		addPlanStrategyBinding(UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName).toProvider(EvTripPlanningStrategyProvider.class);
-		
+		addPlanStrategyBinding(AIAgentReplanningModule.AIReplanningStategyName).toProvider(AIAgentStrategyProvider.class);
 		
 		//bind custom EVFleet stuff
 //		bind(MATSimVehicleWrappingEVSpecificationProvider.class).in(Singleton.class);
@@ -114,6 +115,7 @@ public class UrbanEVModule extends AbstractModule {
 		//bind urban ev planning stuff
 //		addMobsimListenerBinding().to(UrbanEVTripsPlanner.class);
 		bind(UrbanEVTripPlanningStrategyModule.class).asEagerSingleton();
+		bind(AIAgentReplanningModule.class).asEagerSingleton();
 		//TODO find a better solution for this
 		Collection<String> whileChargingActTypes = configGroup.getWhileChargingActivityTypes().isEmpty() ? config.planCalcScore().getActivityTypes() : configGroup.getWhileChargingActivityTypes();
 		bind(ActivityWhileChargingFinder.class).toInstance(new ActivityWhileChargingFinder(whileChargingActTypes, configGroup.getMinWhileChargingActivityDuration_s()));

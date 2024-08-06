@@ -63,7 +63,7 @@ public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener,MobsimS
 //					PersonMoneyEvent ee = new PersonMoneyEvent(e.getSimulationTime(), Id.createPersonId(ev.getId().toString()), -5000.00, "punnishment", "EVOut");
 //					manager.processEvent(ee);
 //				}
-				double rangeAnxiety = -1*this.rangeAnxietyCoefficientA*(Math.exp(this.rangeAnxietyCoefficientB*(-1*ev.getBattery().getSoc()/ev.getBattery().getCapacity()+1))-1);
+				double rangeAnxiety = -1*this.rangeAnxietyCoefficientA*(Math.exp(this.rangeAnxietyCoefficientB*(-1*ev.getBattery().getSoc()+1))-1);
 
 				//PersonMoneyEvent ee = new PersonMoneyEvent(e.getSimulationTime(), Id.createPersonId(ev.getId().toString()), rangeAnxiety, "range anxiety", "EVOut");
 				this.moneyToThrough.compute(Id.createPersonId(ev.getId().toString()),(k,v)->v==null?rangeAnxiety:v+rangeAnxiety);
