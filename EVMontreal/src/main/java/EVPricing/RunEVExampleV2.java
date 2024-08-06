@@ -32,6 +32,7 @@ import org.matsim.vehicles.Vehicles;
 
 import aiagent.AIAgentReplanningModule;
 import experienceSOC.ActivitySOCModule;
+import modeChoiceFix.ReRouteEvPlanStrategyBinder;
 import modeChoiceFix.SubTourPlanStrategyBinder;
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
@@ -90,7 +91,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--evpricing"}, description = {"Charger pricing file location"}, defaultValue = "pricingProfiles.xml")
   private String pricingEVFile;
   
-  @Option(names = {"--distanceForCharger"}, description = {"Maximum search radius for charger around activity"}, defaultValue = "1000.0")
+  @Option(names = {"--distanceForCharger"}, description = {"Maximum search radius for charger around activity"}, defaultValue = "1500.0")
   private Double chargerDist;
   
   @Option(names = {"--thread"}, description = {"No of thread"}, defaultValue = "20")
@@ -121,10 +122,11 @@ public final class RunEVExampleV2 implements Callable<Integer> {
     //addStrategy(config, "SubtourModeChoice", null, 0.1D, (int)0.65 * this.maxIterations);
     config.strategy().clearStrategySettings();
     addStrategy(config, UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName, null, 0.85D, (int).75 * this.maxIterations);
-    addStrategy(config, AIAgentReplanningModule.AIReplanningStategyName, null, 0.01D, (int).75 * this.maxIterations);
+    addStrategy(config, AIAgentReplanningModule.AIReplanningStategyName, null, 0.001D, (int).75 * this.maxIterations);
     addStrategy(config, "ChangeExpBeta", null, 0.25D, this.maxIterations);
     addStrategy(config, DefaultStrategy.TimeAllocationMutator_ReRoute, null, 0.05D, (int)0.7*this.maxIterations);
     addStrategy(config, DefaultStrategy.ReRoute, null, 0.05D, (int)0.8*this.maxIterations);
+    //addStrategy(config, DefaultStrategy.SubtourModeChoice, null, 0.05D, (int)0.8*this.maxIterations);
     
     config.controler().setOutputDirectory(this.output);
     config.controler().setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
@@ -175,14 +177,15 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 
 	//register charging interaction activities for car//TODO: investigate further.
 	config.planCalcScore().addActivityParams(
-			new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGOUT_INTERACTION)
+			new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)
 					.setScoringThisActivityAtAll(false));
 	config.planCalcScore().addActivityParams(
-			new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGIN_INTERACTION)
+			new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER)
 					.setScoringThisActivityAtAll(false));
 	//config.qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.fromVehiclesData);
 
 	SubTourPlanStrategyBinder.addStrategy(config, 0.05, 100); 
+	//ReRouteEvPlanStrategyBinder.addStrategy(config, 0.05, 100); 
 //config.qsim().setVehiclesSource(VehiclesSource.fromVehiclesData);
 	
 	Scenario scenario = ScenarioUtils.loadScenario(config);
@@ -262,8 +265,10 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	    }
 	    
 	Controler controler = new Controler(scenario);
+	SubTourPlanStrategyBinder.configure(controler);
 	//controler.addOverridingModule(new EvModule());
 	controler.addOverridingModule(new UrbanEVModule());
+	//ReRouteEvPlanStrategyBinder.configure(controler);
 	//controler.addOverridingModule(new EVPriceModule());
 	
 	

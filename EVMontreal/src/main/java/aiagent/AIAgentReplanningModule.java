@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 
 import javax.inject.Provider;
 
+import org.jboss.logging.Logger;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
@@ -25,6 +26,7 @@ import org.matsim.api.core.v01.population.Leg;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Plan;
 import org.matsim.api.core.v01.population.PlanElement;
+import org.matsim.api.core.v01.population.PopulationFactory;
 import org.matsim.api.core.v01.replanning.PlanStrategyModule;
 import org.matsim.contrib.common.util.StraightLineKnnFinder;
 import org.matsim.contrib.ev.charging.ChargingLogic;
@@ -48,6 +50,7 @@ import org.matsim.core.router.TripRouter;
 import org.matsim.core.router.TripStructureUtils;
 import org.matsim.core.router.util.TravelTime;
 import org.matsim.core.utils.timing.TimeInterpretation;
+import org.matsim.facilities.ActivityFacility;
 import org.matsim.vehicles.PersonVehicles;
 import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleUtils;
@@ -60,6 +63,7 @@ import com.google.inject.Inject;
 import EVPricing.ChargerPricingProfiles;
 import apikeys.APIKeys;
 import gsonprocessor.ActivityGson;
+import gsonprocessor.LegGson;
 import gsonprocessor.PlanElementGson;
 import gsonprocessor.PlanElementGsonDeserializer;
 import gsonprocessor.PlanGson;
@@ -69,6 +73,7 @@ import rest.ChatCompletionClient;
 import rest.Prompt;
 import urbanEV.ActivityWhileChargingFinder;
 import urbanEV.UrbanEVConfigGroup;
+import urbanEV.UrbanVehicleChargingHandler;
 
 public class AIAgentReplanningModule implements PlanStrategyModule{
 	public static final String PLUGIN = "plugin";
@@ -80,6 +85,7 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 	private final Set<String> allowedMode = new HashSet<>();
 	public static final String AIReplanningStategyName = "AIEvReplanning";
 	public static final int maxTry = 5;
+	public final Logger logger = Logger.getLogger(AIAgentReplanningModule.class);
 	
 	@Inject
 	protected Provider<TripRouter> tripRouterProvider;
@@ -231,6 +237,14 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 	@Override
 	public void handlePlan(Plan plan) {
 		if(!this.getUsedEV(plan).isEmpty()) {
+			Plan originalPlan = (Plan)plan.getPerson().getAttributes().getAttribute("originalPlan");
+			if(originalPlan==null) {
+				originalPlan = PopulationUtils.createPlan();
+				PopulationUtils.copyFromTo(plan, originalPlan, true);
+				plan.getPerson().getAttributes().putAttribute("originalPlan",originalPlan);
+			}else {
+				PopulationUtils.copyFromTo(originalPlan, plan, true);
+			}
 			this.plans.add(plan);
 		}
 	}
@@ -273,28 +287,28 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 				try {
 					pgOut = gson.fromJson(aiString, PlanGson.class);
 					if(pgOut==null) {
-						errors.add(new ErrorMessage("Wrong gson syntax. Could not convert."));
+						errors.add(new ErrorMessage("Wrong gson syntax. Could not convert.",logger));
 					}
 				}catch (Exception e) {
 					// TODO Auto-generated catch block
 					//System.out.println("Wrong gson syntax. Could not convert.");
-					errors.add(new ErrorMessage("Wrong gson syntax. Could not convert."));
+					errors.add(new ErrorMessage("Wrong gson syntax. Could not convert.",logger));
 				}
 				
-				if(pgOut!=null)planOut = identifyChargingActivityAndInsertChargingLink(pgOut,plan,errors);
+				if(pgOut!=null)planOut = identifyChargingActivityAndInsertChargingLink(pgOut,plan,errors, scenario.getNetwork(), scenario.getPopulation().getFactory());
 				if(planOut!=null)break;
 			}
 			if(planOut==null) {
 				unsuccessfulReplanning++;
-				System.out.println("Total unsuccessful replanning = "+ unsuccessfulReplanning);	
+				logger.info("Total unsuccessful replanning = "+ unsuccessfulReplanning);	
 				makeChargingStaged(plan);
 			}else {
-				makeChargingStaged(planOut);
+				//makeChargingStaged(planOut);
 				PopulationUtils.copyFromTo(planOut, plan);
 				plan.getAttributes().putAttribute("IfAiGenerated", true);
 			}
 			ii++;
-			if(ii%10==0)System.out.println(ii+" plans finished out of "+this.plans.size());
+			if(ii%10==0)logger.info(ii+" plans finished out of "+this.plans.size());
 		}
 	}
 	
@@ -317,8 +331,7 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 	 * @return
 	 * TODO: Order check, existence of all old activity check. 
 	 */
-	public Plan identifyChargingActivityAndInsertChargingLink(PlanGson planGson, Plan originalPlan, List<ErrorMessage> msgs) {
-		
+	public Plan identifyChargingActivityAndInsertChargingLink(PlanGson planGson, Plan originalPlan, List<ErrorMessage> msgs, Network network, PopulationFactory popFac) {
 		
 		
 		
@@ -343,12 +356,12 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 					ag.linkId = actsWithId.get(ag.id).getLinkId().toString();
 					ag.coord = actsWithId.get(ag.id).getCoord();
 				}else {
-					if(ag.activityType.equals(PLUGIN) || ag.activityType.equals(PLUGOUT)) {
+					if(ag.activityType.contains(PLUGIN) || ag.activityType.contains(PLUGOUT)) {
 						numEv++;
 						//set a dummy link id to create the activity. 
-						ag.linkId = "atCharger";
+						//ag.linkId = "atCharger";
 					}else {
-						msgs.add(new ErrorMessage(ag.id+" is not present in the original given plan. You cannot insert new activity other than plug in and plugout."));
+						msgs.add(new ErrorMessage(ag.id+" is not present in the original given plan. You cannot insert new activity other than plug in and plugout.",logger));
 						return null;
 					}
 					
@@ -357,11 +370,12 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 		}
 		
 		if(numEv==0) {
-			msgs.add(new ErrorMessage("No plugin or plugout charger in the given plan!!! Your task was to include plugin and plugout in the given plan"));
+			msgs.add(new ErrorMessage("No plugin or plugout charger in the given plan!!! Your task was to include plugin and plugout in the given plan",logger));
 			return null;
 		}
 		
-		Plan plan = planGson.getPlan();
+		//Plan plan = planGson.getPlan();
+		Plan plan = popFac.createPlan();
 		
 		boolean ifCharging = false;
 		Id<Link> linkIdForCharger = null;
@@ -385,98 +399,133 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 		int a = 0;
 		
 		double time = 0;
-		
-		for(PlanElement pe:plan.getPlanElements()) {
-			if(pe instanceof Activity) {// while charging is happening, there has to be only one link id for both the plugin and plugout event 
-				Activity act = ((Activity)pe);
-				if(act.getEndTime().isDefined())time = act.getEndTime().seconds();
-				if(((Activity)pe).getType().contains(PLUGIN)) {
+		String previousLegMode = null;
+		for(PlanElementGson pe:planGson.activitiesAndLegs) {
+			if(pe instanceof ActivityGson) {// while charging is happening, there has to be only one link id for both the plugin and plugout event 
+				ActivityGson act = ((ActivityGson)pe);
+				
+				if(act.endTime!=null)time = act.endTime;
+				if(act.activityType.contains(PLUGIN)) {
 					if(ifCharging) {
-						msgs.add(new ErrorMessage("Cannot have two consecutive plugin event!"));
+						msgs.add(new ErrorMessage("Cannot have two consecutive plugin event!",logger));
 						return null;
 					}
 					Leg beforeLeg = null;
 					if(i>0)beforeLeg = (Leg)plan.getPlanElements().get(i-1);
 					
 					if(!beforeLeg.getMode().equals(TransportMode.car)) {
-						msgs.add(new ErrorMessage("The mode before plugin must be car. You need to bring car to plug it in!!!"));
+						msgs.add(new ErrorMessage("The mode before plugin must be car. You need to bring car to plug it in!!!",logger));
 						return null;
 					}
 					
 					
-					Activity nextAct = (Activity)plan.getPlanElements().get(i+2);
-					if(nextAct.getType().equals(PLUGOUT)) {
-						msgs.add(new ErrorMessage("Charging must be performed while performing other activities. Activities while charging list is empty!!!"));
+					ActivityGson nextAct = (ActivityGson)planGson.activitiesAndLegs.get(i+2);
+					if(nextAct.activityType.contains(PLUGOUT)) {
+						msgs.add(new ErrorMessage("Charging must be performed while performing other activities. Activities while charging list is empty!!!",logger));
 						return null;
 					}
-					
-					ChargerSpecification charger = this.selectChargerNearToLink(originalPlan.getPerson().getId(), nextAct.getLinkId(), 
+					if(nextAct.linkId==null) {
+						logger.debug("next activity has no link Id!!! check!!!");
+						msgs.add(new ErrorMessage("consecutive plugin or plugout events."));
+						return null;
+						
+					}
+					ChargerSpecification charger = this.selectChargerNearToLink(originalPlan.getPerson().getId(), Id.createLinkId(nextAct.linkId), 
 							electricVehicleSpecification, this.scenario.getNetwork(), time);
+					String mode = ((LegGson)planGson.activitiesAndLegs.get(i-1)).mode;
 					
+					Activity pluginAct = null;
 					if(charger!=null) {
-						act.setLinkId(charger.getLinkId());
+						pluginAct =PopulationUtils.createActivityFromCoordAndLinkId(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER,network.getLinks().get(charger.getLinkId()).getCoord(),
+								charger.getLinkId()); 
+						pluginAct.setLinkId(charger.getLinkId());
+						pluginAct.setCoord(network.getLinks().get(charger.getLinkId()).getCoord());
+						pluginAct.setEndTime(time+15*60);
 					}else {
-						msgs.add(new ErrorMessage("No charger found within 1000m of the following activity to the plugin activity. Choose a different activity."));
+						msgs.add(new ErrorMessage("No charger found within 1000m of the following activity to the plugin activity. Choose a different activity.",logger));
 						return null;
 					}
 					linkIdForCharger = charger.getLinkId();
 					ifCharging = true;
+					plan.addActivity(pluginAct);
 					
-				}else if(((Activity)pe).getType().contains(PLUGOUT)) {
+				}else if(act.activityType.contains(PLUGOUT)) {
 					if(!ifCharging) {
-						msgs.add(new ErrorMessage("Nothing to plug out!!! There is no plugin event before this!!!"));
+						msgs.add(new ErrorMessage("Nothing to plug out!!! There is no plugin event before this!!!",logger));
 						return null;
 					}
 					
-					Leg afterLeg = null;
-					afterLeg = (Leg)plan.getPlanElements().get(i+1);
+					ActivityGson nextAct = (ActivityGson)planGson.activitiesAndLegs.get(i+2);
+					if(nextAct.linkId==null) {
+						logger.debug("next activity has no link Id!!! check!!!");
+						msgs.add(new ErrorMessage("consecutive plugin or plugout events."));
+						return null;
+						
+					}
+					LegGson afterLeg = null;
+					afterLeg = (LegGson)planGson.activitiesAndLegs.get(i+1);
 					
-					if(!afterLeg.getMode().equals(TransportMode.car)) {
-						msgs.add(new ErrorMessage("The mode after plugout must be car. You need to take your car from charger!!!"));
+					if(!afterLeg.mode.equals(TransportMode.car)) {
+						msgs.add(new ErrorMessage("The mode after plugout must be car. You need to take your car from charger!!!",logger));
 						return null;
 					}
 					
 					if(actsWhileCharging.isEmpty()) {
-						msgs.add(new ErrorMessage("Charging must be performed while performing other activities. Activities while charging list is empty!!!"));
+						msgs.add(new ErrorMessage("Charging must be performed while performing other activities. Activities while charging list is empty!!!",logger));
 						return null;
 					}
-					act.setLinkId(linkIdForCharger);
+					Activity plugOutAct = PopulationUtils.createActivityFromCoordAndLinkId(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER, network.getLinks().get(linkIdForCharger).getCoord(),
+							linkIdForCharger);
+					plugOutAct.setLinkId(linkIdForCharger);
+					plugOutAct.setCoord(network.getLinks().get(linkIdForCharger).getCoord());
+					plugOutAct.setEndTime(time+15*60);
 					ifCharging = false;
 					actsWhileCharging.clear();
+					plan.addActivity(plugOutAct);
 				}else {
+					
+					Activity activity = popFac.createActivityFromActivityFacilityId(act.activityType, Id.create(act.facilityId,ActivityFacility.class));
+					activity.setCoord(network.getLinks().get(Id.createLinkId(act.linkId)).getCoord());
+					if(act.endTime!=null)activity.setEndTime(act.endTime);
+					plan.addActivity(activity);
 					if(ifCharging) {
-						actsWhileCharging.add(act.getType());
+						actsWhileCharging.add(act.activityType);
 					}
 				}
 				
 			}else {
-				Leg leg = (Leg)pe;
-				if(!this.allowedMode.contains(leg.getMode())) {
-					msgs.add(new ErrorMessage("Unrecognized leg mode!!!Exiting!!!"));
+				LegGson legGson = (LegGson)pe;
+				previousLegMode = legGson.mode;
+				Leg leg = popFac.createLeg(legGson.mode);
+				leg.setRoutingMode(legGson.mode);
+				plan.addLeg(leg);
+				if(!this.allowedMode.contains(legGson.mode)) {
+					msgs.add(new ErrorMessage("Unrecognized leg mode!!!Exiting!!!",logger));
 					return null;
 				}
 			}
 			
 			i++;
 		}
+		//makeChargingNotStaged(plan);
 		return plan;
 	}
 	
 	public static void makeChargingNotStaged(Plan plan) {
 		plan.getPlanElements().stream().filter(pe->pe instanceof Activity).forEach(pe->{
-			if(((Activity)pe).getType().equals(PlanCalcScoreConfigGroup.createStageActivityType(PLUGIN))) {
-				((Activity)pe).setType(PLUGIN);
-			}else if(((Activity)pe).getType().equals(PlanCalcScoreConfigGroup.createStageActivityType(PLUGOUT))) {
-				((Activity)pe).setType(PLUGOUT);
+			if(((Activity)pe).getType().contains(PlanCalcScoreConfigGroup.createStageActivityType(PLUGIN))) {
+				((Activity)pe).setType(((Activity)pe).getType().replace(" interaction", ""));
+			}else if(((Activity)pe).getType().contains(PlanCalcScoreConfigGroup.createStageActivityType(PLUGOUT))) {
+				((Activity)pe).setType(((Activity)pe).getType().replace(" interaction", ""));
 			}
 		});
 		}
 		public static void makeChargingStaged(Plan plan) {
 			plan.getPlanElements().stream().filter(pe->pe instanceof Activity).forEach(pe->{
-				if(((Activity)pe).getType().equals(PLUGIN)) {
-					((Activity)pe).setType(PlanCalcScoreConfigGroup.createStageActivityType(PLUGIN));
-				}else if(((Activity)pe).getType().equals(PLUGOUT)) {
-					((Activity)pe).setType(PlanCalcScoreConfigGroup.createStageActivityType(PLUGOUT));
+				if(((Activity)pe).getType().contains(PLUGIN)) {
+					((Activity)pe).setType(PlanCalcScoreConfigGroup.createStageActivityType(((Activity)pe).getType()));
+				}else if(((Activity)pe).getType().contains(PLUGOUT)) {
+					((Activity)pe).setType(PlanCalcScoreConfigGroup.createStageActivityType(((Activity)pe).getType()));
 				}
 			});
 			}
@@ -484,6 +533,10 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 		public static class ErrorMessage{
 			public ErrorMessage(String msg) {
 				System.out.println(msg);
+				errorMessage = msg;
+			}
+			public ErrorMessage(String msg,Logger logger) {
+				logger.error(msg);
 				errorMessage = msg;
 			}
 			public String errorMessage;

@@ -105,7 +105,7 @@ public class UrbanVehicleChargingHandler
 	 */
 	@Override
 	public void handleEvent(ActivityStartEvent event) {
-		if (event.getActType().endsWith(PLUGIN_INTERACTION)) {
+		if (event.getActType().contains(PLUGIN_IDENTIFIER)) {
 			Id<Vehicle> vehicleId = lastVehicleUsed.get(event.getPersonId());
 			if (vehicleId != null) {
 				Id<ElectricVehicle> evId = Id.create(vehicleId, ElectricVehicle.class);
@@ -145,6 +145,8 @@ public class UrbanVehicleChargingHandler
 					throw new IllegalStateException("can not plug in non-registered ev " + evId + " of person " + event.getPersonId());
 				}
 			} else {
+				Person person = scenario.getPopulation().getPersons().get(event.getPersonId());
+				person.getSelectedPlan();
 				throw new IllegalStateException("last used vehicle  of person " + event.getPersonId() + "is null. should not happen");
 			}
 		}
@@ -152,7 +154,7 @@ public class UrbanVehicleChargingHandler
 
 	@Override
 	public void handleEvent(ActivityEndEvent event) {
-		if (event.getActType().endsWith(PLUGOUT_INTERACTION)) {
+		if (event.getActType().contains(PLUGOUT_IDENTIFIER)) {
 			chargingInfo tuple = chargingProcedures.get(event.getLinkId()).remove(event.getPersonId());
 			if (tuple != null) {
 				Id<ElectricVehicle> evId = tuple.vehicleId;

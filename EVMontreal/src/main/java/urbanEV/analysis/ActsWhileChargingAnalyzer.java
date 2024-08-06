@@ -84,7 +84,7 @@ public class ActsWhileChargingAnalyzer implements ActivityStartEventHandler, Act
             containers.get(event.getPersonId()).acts.add(event.getActType());
 
         }
-        else if (event.getActType().contains(UrbanVehicleChargingHandler.PLUGIN_INTERACTION)){
+        if (event.getActType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)){
             String chargingActAndTime = event.getActType()+ event.getTime();
             containers.get(event.getPersonId()).acts.add(chargingActAndTime);
 

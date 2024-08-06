@@ -15,8 +15,10 @@ public class RunFromEclipse {
 				"--plan","plan.xml",
 				"--evpricing","data/1p daily/pricingProfiles.xml",
 				"--vehicles","vehicle.xml",
-				"--thread","1",
+				"--thread","10",
 				"--output", "output/1_percent/aiagent",
+				"--scale",".01",
+//				"--firstiterations","40",
 				"--lastiterations","60"
 			};
 		RunEVExampleV2.main(args2);

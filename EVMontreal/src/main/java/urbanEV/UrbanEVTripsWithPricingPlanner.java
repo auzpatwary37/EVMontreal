@@ -264,11 +264,11 @@ public class UrbanEVTripsWithPricingPlanner extends UrbanEVTripsPlanner{
 					}
 				}
 			} else if (planElement instanceof Activity) {
-				if (((Activity) planElement).getType().contains(UrbanVehicleChargingHandler.PLUGIN_INTERACTION)) {
+				if (((Activity) planElement).getType().contains(UrbanVehicleChargingHandler.PLUGIN_IDENTIFIER)) {
 					Leg legToCharger = (Leg) modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(planElement) - 1);
 					chargingBegin = legToCharger.getDepartureTime().seconds() + legToCharger.getTravelTime().seconds();
 
-				} else if (((Activity) planElement).getType().contains(UrbanVehicleChargingHandler.PLUGOUT_INTERACTION)) {
+				} else if (((Activity) planElement).getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER)) {
 
 					Leg legFromCharger = (Leg) modifiablePlan.getPlanElements().get(modifiablePlan.getPlanElements().indexOf(planElement) + 1);
 					if (chargingBegin == null) throw new IllegalStateException();

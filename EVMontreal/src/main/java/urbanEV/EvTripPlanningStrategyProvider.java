@@ -1,13 +1,19 @@
 package urbanEV;
 
 import org.matsim.api.core.v01.Scenario;
+import org.matsim.api.core.v01.population.Activity;
+import org.matsim.api.core.v01.population.Plan;
+import org.matsim.api.core.v01.replanning.PlanStrategyModule;
 import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.replanning.PlanStrategy;
 import org.matsim.core.replanning.PlanStrategyImpl;
+import org.matsim.core.replanning.ReplanningContext;
 import org.matsim.core.replanning.selectors.ExpBetaPlanSelector;
 
 import com.google.inject.Inject;
 import com.google.inject.Provider;
+
+import aiagent.AIAgentReplanningModule;
 
 public class EvTripPlanningStrategyProvider implements Provider<PlanStrategy> {
 
@@ -28,6 +34,26 @@ public class EvTripPlanningStrategyProvider implements Provider<PlanStrategy> {
         PlanStrategyImpl.Builder builder = new PlanStrategyImpl.Builder(new ExpBetaPlanSelector<>(logitScaleFactor));
         
         builder.addStrategyModule(module);
+        
+        builder.addStrategyModule(new PlanStrategyModule() {
+
+			@Override
+			public void prepareReplanning(ReplanningContext replanningContext) {
+				
+			}
+
+			@Override
+			public void handlePlan(Plan plan) {
+				AIAgentReplanningModule.makeChargingNotStaged(plan);
+				//plan.getPlanElements().stream().filter(a-> a instanceof Activity).forEach(a->a.getAttributes().removeAttribute("actSOC"));
+			}
+
+			@Override
+			public void finishReplanning() {
+			
+			}
+        	
+        });
         //eventsManager.addHandler(changeChargingBehaviourModule);
         return builder.build();
     }
