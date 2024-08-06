@@ -5,6 +5,7 @@ import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.Plan;
 import org.matsim.api.core.v01.replanning.PlanStrategyModule;
 import org.matsim.core.api.experimental.events.EventsManager;
+import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
 import org.matsim.core.replanning.PlanStrategy;
 import org.matsim.core.replanning.PlanStrategyImpl;
 import org.matsim.core.replanning.ReplanningContext;
@@ -13,10 +14,9 @@ import org.matsim.core.replanning.selectors.ExpBetaPlanSelector;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 
-import aiagent.AIAgentReplanningModule;
-
 public class EvTripPlanningStrategyProvider implements Provider<PlanStrategy> {
-
+	public final static String PLUGIN = "plugin";
+	public final static String PLUGOUT = "plugout";
     private EventsManager eventsManager;
     private Scenario scenario;
     private UrbanEVTripPlanningStrategyModule module;
@@ -44,7 +44,7 @@ public class EvTripPlanningStrategyProvider implements Provider<PlanStrategy> {
 
 			@Override
 			public void handlePlan(Plan plan) {
-				AIAgentReplanningModule.makeChargingNotStaged(plan);
+				makeChargingNotStaged(plan);
 				//plan.getPlanElements().stream().filter(a-> a instanceof Activity).forEach(a->a.getAttributes().removeAttribute("actSOC"));
 			}
 
@@ -57,5 +57,13 @@ public class EvTripPlanningStrategyProvider implements Provider<PlanStrategy> {
         //eventsManager.addHandler(changeChargingBehaviourModule);
         return builder.build();
     }
-
+	public static void makeChargingNotStaged(Plan plan) {
+		plan.getPlanElements().stream().filter(pe->pe instanceof Activity).forEach(pe->{
+			if(((Activity)pe).getType().contains(PlanCalcScoreConfigGroup.createStageActivityType(PLUGIN))) {
+				((Activity)pe).setType(((Activity)pe).getType().replace(" interaction", ""));
+			}else if(((Activity)pe).getType().contains(PlanCalcScoreConfigGroup.createStageActivityType(PLUGOUT))) {
+				((Activity)pe).setType(((Activity)pe).getType().replace(" interaction", ""));
+			}
+		});
+		}
 }

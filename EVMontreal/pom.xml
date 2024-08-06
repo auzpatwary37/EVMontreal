@@ -267,10 +267,5 @@
 	    <version>ev-5.5.2-g5d9dd01-144</version>
 	</dependency>
 -->
-	<dependency>
-		<groupId>ca.polymtl</groupId>
-		<artifactId>matsim_llm_plugins</artifactId>
-		<version>0.0.1-SNAPSHOT</version>
-	</dependency>
 </dependencies>
 </project>
