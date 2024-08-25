@@ -232,7 +232,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			//if(!haveSufficientCharging(plan)) {
 			if(!this.purePlan.containsKey(plan.getPerson().getId())) {
 				this.purePlan.put(plan.getPerson().getId(), new ArrayList<>());
-				plan.getPerson().getAttributes().putAttribute("purePlan", plan);
+				if(plan.getPerson().getAttributes().getAttribute("purePlan")==null)plan.getPerson().getAttributes().putAttribute("purePlan", plan);
 			}
 			boolean unique = true;
 			for(Plan pl : this.purePlan.get(plan.getPerson().getId())) {
@@ -256,6 +256,12 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 			//			}
 			this.plans.add(plan);
 		}
+		
+		plan.getPlanElements().stream().filter(f->f instanceof Activity).forEach(a->{
+			if(((Activity)a).getType().equals("car charging interaction")){
+			System.out.println("car charging interaction!!!");
+		};
+		});
 	}
 
 	private boolean planEquals(Plan plan1, Plan plan2) {
@@ -769,7 +775,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				logicSwitch = "optimized";
 			}
 			
-//			logicSwitch= "activityDuration";
+//			logicSwitch= "optimized";
 			modifiablePlan.getAttributes().putAttribute("logicSwitch", logicSwitch);
 			List<Activity> pe;
 			switch(logicSwitch){

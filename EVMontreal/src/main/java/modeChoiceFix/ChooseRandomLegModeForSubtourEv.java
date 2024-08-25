@@ -34,12 +34,15 @@ import org.apache.log4j.Logger;
 import org.matsim.api.core.v01.BasicLocation;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.population.Activity;
+import org.matsim.api.core.v01.population.Leg;
 import org.matsim.api.core.v01.population.Plan;
+import org.matsim.api.core.v01.population.PlanElement;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.population.algorithms.ChooseRandomSingleLegMode;
 import org.matsim.core.population.algorithms.PermissibleModesCalculator;
 import org.matsim.core.population.algorithms.PlanAlgorithm;
 import org.matsim.core.population.algorithms.TripsToLegsAlgorithm;
+import org.matsim.core.population.routes.NetworkRoute;
 import org.matsim.core.replanning.modules.SubtourModeChoice;
 import org.matsim.core.router.MainModeIdentifier;
 import org.matsim.core.router.TripRouter;
@@ -169,6 +172,9 @@ public final class ChooseRandomLegModeForSubtourEv implements PlanAlgorithm {
 				// (means that in the end we are changing modes only for one subtour)
 				
 				applyChange(whatToDo, plan);
+		}
+		if(!ifConsistent(plan)) {
+			logger.debug("inconsistent plan!!!");
 		}
 	}
 	
@@ -359,6 +365,32 @@ public final class ChooseRandomLegModeForSubtourEv implements PlanAlgorithm {
 						trip.getDestinationActivity());
 			}
 
+	}
+	
+	private boolean ifConsistent(Plan plan) {
+		boolean consecutiveActOrLeg = false;
+		boolean nothaveRoute = false;
+		int i = 0;
+		for(PlanElement pe:plan.getPlanElements()) {
+			if(pe instanceof Activity && i%2.!=0) {
+				consecutiveActOrLeg = true;
+				break;
+			}else if(pe instanceof Leg && i%2.==0) {
+				consecutiveActOrLeg = true; 
+				break;
+			}else if(pe instanceof Leg && i%2.!=0 ) {
+				Leg l = ((Leg)pe);
+				if(l.getMode().equals("car") && l.getRoute()==null || 
+						(l.getRoute() instanceof NetworkRoute) && ((NetworkRoute)l.getRoute()).getLinkIds().size()==0) {
+					nothaveRoute = true;
+					break;
+				}
+			}
+			i++;
+		}
+		if(consecutiveActOrLeg)return false;
+		if(nothaveRoute)return false;
+		return true;
 	}
 
 }

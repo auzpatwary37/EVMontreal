@@ -9,12 +9,12 @@ import org.matsim.vehicles.Vehicles;
 
 	public class PopulationSize {
 	    public static void main(String[] args) {
-	        String configFile = "C:\\Users\\arsha\\OneDrive\\Desktop\\ABMTrans\\config_with_calibrated_parameters.xml"; // Replace with the path to your MATSim configuration file
+	        String configFile = "C:\\Users\\arsha\\git\\EVMontreal_newVersion\\EVMontreal\\TRB2024\\config_with_calibrated_parameters.xml"; // Replace with the path to your MATSim configuration file
 
 	        // Load the MATSim configuration and scenario
 	        Config config = ConfigUtils.loadConfig(configFile);
-	        config.plans().setInputFile("C:\\Users\\arsha\\OneDrive\\Desktop\\ABMTrans\\prepared_population.xml.gz");
-	        config.vehicles().setVehiclesFile("C:\\Users\\arsha\\OneDrive\\Desktop\\ABMTrans\\vehicle.xml");
+	        config.plans().setInputFile("C:\\Users\\arsha\\git\\EVMontreal_newVersion\\EVMontreal\\TRB2024\\population_with_locations10P.xml.gz");
+	        config.vehicles().setVehiclesFile("C:\\Users\\arsha\\git\\EVMontreal_newVersion\\EVMontreal\\TRB2024\\vehicle.xml");
 	        Scenario scenario = ScenarioUtils.loadScenario(config);
 
 	        // Get the population from the scenario

@@ -89,14 +89,14 @@ public class ChargingWithQueueingLogic implements ChargingLogic {
 			// so when updating SOC every 10 seconds, SOC increases by less then 1%
 			ev.getBattery().changeSoc(ev.getChargingPower().calcChargingPower(charger) * chargePeriod);
 //___________________________________________________comment these lines to not kick vehicles from queue_______________
-//			if (chargingStrategy.isChargingCompleted(ev)) {
-//				Person person = scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString()));
-//				ChargingEndEvent event = new ChargingEndEventUrbanEv(now, charger.getId(), ev.getId(),person);
-//				scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString())).getAttributes().putAttribute("charginatLogicIndicator", false);
-//				eventsManager.processEvent(event);
-//				listeners.remove(ev.getId()).notifyChargingEnded(ev, now);
-//				pluggedVehicles.remove(evEntry.getKey());
-//			}
+			if (chargingStrategy.isChargingCompleted(ev)) {
+				Person person = scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString()));
+				ChargingEndEvent event = new ChargingEndEventUrbanEv(now, charger.getId(), ev.getId(),person);
+				scenario.getPopulation().getPersons().get(Id.createPersonId(ev.getId().toString())).getAttributes().putAttribute("charginatLogicIndicator", false);
+				eventsManager.processEvent(event);
+				listeners.remove(ev.getId()).notifyChargingEnded(ev, now);
+				pluggedVehicles.remove(evEntry.getKey());
+			}
 //________________________________________________________________________________________________
 		}
 

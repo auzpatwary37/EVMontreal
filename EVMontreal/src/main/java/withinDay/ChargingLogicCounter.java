@@ -12,7 +12,7 @@ public class ChargingLogicCounter {
 		int optimized = 0;
 		int experienceBasedLogic=0;
 
-		Population population = PopulationUtils.readPopulation("C:\\Users\\arsha\\OneDrive\\Desktop\\TRBREsults\\Combined\\it.150\\150.plans.xml");
+		Population population = PopulationUtils.readPopulation("D:\\Arsham\\weekly\\ITERS\\it.100\\100.plans.xml.gz");
 		for (Person person : population.getPersons().values()) {
 			String chargingLogic = (String) person.getSelectedPlan().getAttributes().getAttribute("logicSwitch");
 			if (chargingLogic != null) {

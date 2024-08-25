@@ -13,8 +13,8 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 public class TimeInterval {
     public static void main(String[] args) {
 
-        String inputFile = "C:\\Users\\arsha\\Desktop\\Comparison\\100.chargingStatsPLow.xlsx";
-        String outputFile = "C:\\Users\\arsha\\Desktop\\Comparison\\100.chargingStatsPLow.xlsx";
+        String inputFile = "C:\\Users\\arsha\\Desktop\\1P\\Priced.xlsx";
+        String outputFile = "C:\\Users\\arsha\\Desktop\\1P\\PricedOutput.xlsx";
 
 
         try {

@@ -15,17 +15,17 @@ import EVPricing.ChargerPricingProfiles;
 
 public class readXml {
 	public static void main(String[] args) {
-		ChargerPricingProfiles cf = new ChargerPricingProfileReader().readChargerPricingProfiles("C:\\\\Users\\\\arsha\\\\git\\\\EVMontreal\\\\EVMontreal\\\\ABMTrans\\\\pricingProfilesPriced.xml");
+		ChargerPricingProfiles cf = new ChargerPricingProfileReader().readChargerPricingProfiles("C:\\Users\\arsha\\git\\EVMontreal_newVersion\\EVMontreal\\1PDaily\\pricingProfiles.xml");
 		for(Entry<Id<Charger>, ChargerPricingProfile> d:cf.getChargerPricingProfiles().entrySet()) {
 			for(Entry<Integer, double[]> dd:d.getValue().getPricingProfilePerHr().entrySet()) {
 //					getPricingProfile().entrySet()) {
-				if(dd.getKey()>=0 && dd.getKey()<=16) {
+				if(dd.getKey()>=8 && dd.getKey()<=16) {
 					for(int i = 0;i<dd.getValue().length;i++){
 						dd.getValue()[i] = dd.getValue()[i]*0.25;
 					}
 					
 				}
-					if(dd.getKey()>=17 && dd.getKey()<=23) {
+					if(dd.getKey()>=17 && dd.getKey()<=21) {
 						for(int i = 0;i<dd.getValue().length;i++){
 							dd.getValue()[i] = dd.getValue()[i]*4.0;
 				}
@@ -35,7 +35,7 @@ public class readXml {
 		}
 		
 	
-		new ChargerPricingProfileWriter(cf).write("C:\\Users\\arsha\\git\\EVMontreal\\EVMontreal\\ABMTrans\\pricingProfilesPricedDouble.xml");
+		new ChargerPricingProfileWriter(cf).write("C:\\Users\\arsha\\git\\EVMontreal_newVersion\\EVMontreal\\1PDaily\\pricingProfilesPriced.xml");
 		
 		
 		

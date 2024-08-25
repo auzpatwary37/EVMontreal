@@ -56,36 +56,36 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--plan"}, description = {"Optional Path to plan file to load."}, defaultValue = "plan.xml")
   private String planFile;
   
-  @Option(names = {"--network"}, description = {"Optional Path to network file to load."}, defaultValue = "montreal_network.xml.gz")
+  @Option(names = {"--network"}, description = {"Optional Path to network file to load."}, defaultValue = "montreal_network.xml")
   private String networkFileLoc;
   
-  @Option(names = {"--ts"}, description = {"Optional Path to transit schedule file to load."}, defaultValue = "montreal_transit_schedules.xml.gz")
+  @Option(names = {"--ts"}, description = {"Optional Path to transit schedule file to load."}, defaultValue = "montreal_transit_schedules.xml")
   private String tsFileLoc;
   
-  @Option(names = {"--tv"}, description = {"Optional Path to transit vehicle file to load."}, defaultValue = "montreal_transit_vehicles.xml.gz")
+  @Option(names = {"--tv"}, description = {"Optional Path to transit vehicle file to load."}, defaultValue = "montreal_transit_vehicles.xml")
   private String tvFileLoc;
   
   @Option(names = {"--facilities"}, description = {"Optional Path to facilities file to load."}, defaultValue = "montreal_facilities.xml.gz")
   private String facilitiesFileLoc;
   
-  @Option(names = {"--lastiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "100")
+  @Option(names = {"--lastiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "50")
   private int maxIterations;
   
   @Option(names = {"--firstiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "0")
   private int minIterations;
   
-  @Option(names = {"--household"}, description = {"Optional Path to household file to load."}, defaultValue = "montreal_households.xml.gz")
+  @Option(names = {"--household"}, description = {"Optional Path to household file to load."}, defaultValue = "households10P.xml.gz")
   private String householdFileLoc;
   
-  @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "0.1")
+  @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "0.01")
   private Double scale;
   
-  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/KWUsage&TimeBaseScenarioAllHomeChargersAllLogicRevisedPunishmentPricedHighCharger")
+  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/DailyKickOutTest")
   private String output;
   
   @Option(names = {"--charger"}, description = {"Charger file location"}, defaultValue = "charger.xml")
   private String chargerFile;
-  
+   
   @Option(names = {"--vehicles"}, description = {"Vehicles file"}, defaultValue = "vehicle.xml")
   private String vehicleFile;
   
@@ -124,7 +124,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
     config.controler().setLastIteration(this.maxIterations);
     config.controler().setFirstIteration(this.minIterations);
     //addStrategy(config, "SubtourModeChoice", null, 0.1D, (int)0.65 * this.maxIterations);
-    addStrategy(config, UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName, null, 0.85D, (int).75 * this.maxIterations);
+    addStrategy(config, UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName, null, 0.5D, (int).75 * this.maxIterations);
     addStrategy(config, "ChangeExpBeta", null, 0.25D, this.maxIterations);
     addStrategy(config, DefaultStrategy.TimeAllocationMutator_ReRoute, null, 0.05D, (int)0.7*this.maxIterations);
     addStrategy(config, DefaultStrategy.ReRoute, null, 0.05D, (int)0.8*this.maxIterations);
@@ -153,6 +153,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	config.qsim().setStorageCapFactor(scale);
 	config.global().setNumberOfThreads(14);
 	config.qsim().setNumberOfThreads(10);
+	config.qsim().setEndTime(174*3600);
 	//config.qsim().setVehiclesSource(VehiclesSource.defaultVehicle);
 	
 //	config.planCalcScore().getActivityParams().forEach(actParam->actParam.setScoringThisActivityAtAll(true));
@@ -165,7 +166,8 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 
 	//TODO actually, should also work with all AccessEgressTypes but we have to check (write JUnit test)
 	config.plansCalcRoute().setAccessEgressType(PlansCalcRouteConfigGroup.AccessEgressType.none);
-
+	config.qsim().setRemoveStuckVehicles(false);
+	config.qsim().setStuckTime(5400);
 	//register charging interaction activities for car
 	config.planCalcScore().addActivityParams(
 			new PlanCalcScoreConfigGroup.ActivityParams(TransportMode.car + UrbanVehicleChargingHandler.PLUGOUT_INTERACTION)
@@ -288,7 +290,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 				}
 				
 			});
-			addMobsimListenerBinding().to(TrialWithinday.class);
+//			addMobsimListenerBinding().to(TrialWithinday.class);
 			
 		}
 	});
@@ -297,6 +299,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	controler.configureQSimComponents(components -> components.addNamedComponent(EvModule.EV_COMPONENT));
 	SubTourPlanStrategyBinder.configure(controler);
 	ActivitySOCModule.configure(controler);
+
 	controler.run();
     return Integer.valueOf(0);
   }

@@ -60,11 +60,12 @@ public class UrbanEVModule extends AbstractModule {
 		//if(configGroup == null) throw new IllegalArgumentException("no config group of type " + UrbanEVConfigGroup.GROUP_NAME + " was specified in the config");
 		
 		//standard EV stuff except for ElectricFleetModule
-		install(new ElectricFleetModule());
+		
 		install(new ChargingInfrastructureModule());
 		install(new ChargingModule());
 		install(new DischargingModule());
 		install(new EvStatsModule());
+		install(new ElectricFleetModule());
 		addPlanStrategyBinding(UrbanEVTripPlanningStrategyModule.urbanEVTripPlannerStrategyName).toProvider(EvTripPlanningStrategyProvider.class);
 		
 		

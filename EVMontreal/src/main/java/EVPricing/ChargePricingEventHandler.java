@@ -3,13 +3,11 @@ package EVPricing;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -21,12 +19,14 @@ import org.matsim.api.core.v01.events.LinkLeaveEvent;
 import org.matsim.api.core.v01.events.PersonEntersVehicleEvent;
 import org.matsim.api.core.v01.events.PersonLeavesVehicleEvent;
 import org.matsim.api.core.v01.events.PersonMoneyEvent;
+import org.matsim.api.core.v01.events.PersonStuckEvent;
 import org.matsim.api.core.v01.events.TransitDriverStartsEvent;
 import org.matsim.api.core.v01.events.VehicleEntersTrafficEvent;
 import org.matsim.api.core.v01.events.VehicleLeavesTrafficEvent;
 import org.matsim.api.core.v01.events.handler.LinkLeaveEventHandler;
 import org.matsim.api.core.v01.events.handler.PersonEntersVehicleEventHandler;
 import org.matsim.api.core.v01.events.handler.PersonLeavesVehicleEventHandler;
+import org.matsim.api.core.v01.events.handler.PersonStuckEventHandler;
 import org.matsim.api.core.v01.events.handler.TransitDriverStartsEventHandler;
 import org.matsim.api.core.v01.events.handler.VehicleEntersTrafficEventHandler;
 import org.matsim.api.core.v01.events.handler.VehicleLeavesTrafficEventHandler;
@@ -40,7 +40,6 @@ import org.matsim.contrib.ev.charging.ChargingStartEventHandler;
 import org.matsim.contrib.ev.fleet.ElectricFleet;
 import org.matsim.contrib.ev.fleet.ElectricFleetSpecification;
 import org.matsim.contrib.ev.fleet.ElectricVehicle;
-import org.matsim.contrib.ev.fleet.ElectricVehicleSpecification;
 import org.matsim.contrib.ev.infrastructure.Charger;
 import org.matsim.contrib.ev.infrastructure.ChargingInfrastructureSpecification;
 import org.matsim.core.api.experimental.events.EventsManager;
@@ -52,7 +51,6 @@ import org.matsim.core.mobsim.framework.events.MobsimBeforeSimStepEvent;
 import org.matsim.core.mobsim.framework.listeners.MobsimAfterSimStepListener;
 import org.matsim.core.mobsim.framework.listeners.MobsimBeforeCleanupListener;
 import org.matsim.core.mobsim.framework.listeners.MobsimBeforeSimStepListener;
-import org.matsim.core.population.PersonUtils;
 import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleUtils;
 
@@ -71,7 +69,7 @@ import com.google.inject.Inject;
  */
 
 
-public class ChargePricingEventHandler implements ChargingStartEventHandler, ChargingEndEventHandler, LinkLeaveEventHandler,TransitDriverStartsEventHandler,
+public class ChargePricingEventHandler implements ChargingStartEventHandler,PersonStuckEventHandler, ChargingEndEventHandler, LinkLeaveEventHandler,TransitDriverStartsEventHandler,
 PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTrafficEventHandler,VehicleLeavesTrafficEventHandler, MobsimScopeEventHandler, MobsimAfterSimStepListener,MobsimBeforeSimStepListener,MobsimBeforeCleanupListener{
 
 	
@@ -79,7 +77,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 	private Set<Event> queuedEvents = new HashSet<>();
 	private ChargingInfrastructureSpecification chargingInfrastructure;
 	
-	
+	private Set<Id<Person>> personStuck = new HashSet<>();
 	@Inject
 	private ChargerPricingProfiles pricingProfies;
 	
@@ -147,7 +145,7 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 //		this.vehicleToPersonMapping.clear();
 		this.vehicleToDistance.clear();
 		this.personLists.clear();
-		
+		this.personStuck.clear();
 	}
 
 	@Override
@@ -281,6 +279,8 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 					pricingProfile = cpf.getPricingProfile().get(timeId);
 				}
 			}
+			int timeInHr = (int) (time/cpf.getProfileTimeStepInMin());
+			//if(timeInHr<0)timeInHr = 60/(int)cpf.getProfileTimeStepInMin()-1;
 			if(cd.chargeDetails.get(t)>0) {
 				cost+=pricingProfile[i]*(cd.chargeDetails.get(t)-charge)*2.78e-7;
 			}
@@ -431,6 +431,11 @@ PersonEntersVehicleEventHandler, PersonLeavesVehicleEventHandler,VehicleEntersTr
 			this.personLists.remove(pId.toString());
 			this.scenario.getPopulation().getPersons().get(pId).getAttributes().putAttribute("chargingIndicator", false);
 		}
+	}
+
+	@Override
+	public void handleEvent(PersonStuckEvent event) {
+		this.personStuck.add(event.getPersonId());
 	}
 	
 	

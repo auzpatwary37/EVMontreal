@@ -18,7 +18,8 @@ public class EvTripPlanningStrategyProvider implements Provider<PlanStrategy> {
     @Inject
     public EvTripPlanningStrategyProvider(EventsManager eventsManager, Scenario scenario, UrbanEVTripPlanningStrategyModule module) {
         this.eventsManager = eventsManager;
-        this.scenario = scenario;this.module = module;
+        this.scenario = scenario;
+        this.module = module;
     }
 
     @Override

@@ -31,9 +31,15 @@ public class ChargerPricingProfileWriter {
 	
 	
 	public void write(String fileLoc) {
-		try {
+		
 			DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
-			DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
+			DocumentBuilder documentBuilder = null;
+			try {
+				documentBuilder = documentBuilderFactory.newDocumentBuilder();
+			} catch (ParserConfigurationException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 
 			Document document = documentBuilder.newDocument();
 
@@ -110,19 +116,30 @@ public class ChargerPricingProfileWriter {
 			document.appendChild(rootEle);
 			
 
-			Transformer tr = TransformerFactory.newInstance().newTransformer();
+			Transformer tr = null;
+			try {
+				tr = TransformerFactory.newInstance().newTransformer();
+			} catch (TransformerConfigurationException | TransformerFactoryConfigurationError e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			tr.setOutputProperty(OutputKeys.INDENT, "yes");
 			tr.setOutputProperty(OutputKeys.METHOD, "xml");
 			tr.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
 			//tr.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, "measurements.dtd");
 			tr.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
-			tr.transform(new DOMSource(document), new StreamResult(new FileOutputStream(fileLoc)));
+			try {
+				tr.transform(new DOMSource(document), new StreamResult(new FileOutputStream(fileLoc)));
+			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (TransformerException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 
 
-		}catch(Exception e) {
-			System.out.println("Error while writing charger pricing file... Please check!!!");
-			System.out.println(e);
-		}
+		
 		
 	}
 }
