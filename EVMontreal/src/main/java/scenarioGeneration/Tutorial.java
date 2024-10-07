@@ -87,20 +87,20 @@ public class Tutorial {
 		double evPercentage = 0.5; // Percentage of cars to take as EV
 		boolean assignChargersToEveryone = true;
 		double homeChargerPercentage = 1.0;
+		String folder = "data\\1p daily\\";
+		String configIn = folder+ "config_with_calibrated_parameters.xml";// input MATSim Montreal Config without ev
+		String planInput = folder +"population_with_locations_linkId.xml.gz";// Population file without EV
+		String networkInput = folder +"montreal_network.xml";// Input Network File
+		String chargerFileInput = folder +"cleaned_station.csv";//Charger file with exactly same headers as given to me by Arsham but in .csv format. Save the excel as csv and input its file location
 
-		String configIn = "config_with_calibrated_parameters.xml";// input MATSim Montreal Config without ev
-		String planInput = "population_with_locations_linkId.xml.gz";// Population file without EV
-		String networkInput = "montreal_network.xml";// Input Network File
-		String chargerFileInput = "cleaned_station.csv";//Charger file with exactly same headers as given to me by Arsham but in .csv format. Save the excel as csv and input its file location
+		String planOutput = folder +"Output/plan.xml"; // Saving location of the EV included population
+		String vehicleOutput = folder +"Output/vehicle.xml"; // Vehicle xml file write location
 
-		String planOutput = "Output/plan.xml"; // Saving location of the EV included population
-		String vehicleOutput = "Output/vehicle.xml"; // Vehicle xml file write location
-
-		String chargerOutput = "Output/charger.xml"; // charger xml file write location
-		String evVehicleOutput = "Output/evehicle.xml";// ev vehicle file write location
-		String configOut = "Output/config.xml"; // Config out file write location. The charger file, vehicle file, plan file, ev vehicle file locations are already set in the config as the out location.
+		String chargerOutput = folder +"Output/charger.xml"; // charger xml file write location
+		String evVehicleOutput = folder +"Output/evehicle.xml";// ev vehicle file write location
+		String configOut = folder +"Output/config.xml"; // Config out file write location. The charger file, vehicle file, plan file, ev vehicle file locations are already set in the config as the out location.
 		String resultOut = "Output";
-		String pricingProfileOutputLoc = "Output/pricingProfiles.xml";
+		String pricingProfileOutputLoc = folder +"Output/pricingProfiles.xml";
 
 		//Set of battery capacity available in the new version. Have to create different vehicle type for each. We set 
 		//put the min and max same to make capacity non random
@@ -128,7 +128,9 @@ public class Tutorial {
 		config.network().setInputFile(resultOut);
 		ConfigUtils.loadConfig(config,configIn);
 		config.plans().setInputFile(planInput);
-		
+		config.network().setInputFile(networkInput);;
+		config.transit().setTransitScheduleFile("data\\1p daily\\montreal_transit_schedules.xml");
+		config.transit().setVehiclesFile("data\\1p daily\\montreal_transit_vehicles.xm");
 
 		Scenario scenario = ScenarioUtils.loadScenario(config);
 		checkPlanConsistancy(scenario.getPopulation());
