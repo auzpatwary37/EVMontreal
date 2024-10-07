@@ -53,31 +53,31 @@ public final class RunEVExampleV2 implements Callable<Integer> {
   @Option(names = {"--plan"}, description = {"Optional Path to plan file to load."}, defaultValue = "plan.xml")
   private String planFile;
   
-  @Option(names = {"--network"}, description = {"Optional Path to network file to load."}, defaultValue = "montreal_network.xml")
+  @Option(names = {"--network"}, description = {"Optional Path to network file to load."}, defaultValue = "Siouxfalls_network_PT.xml")
   private String networkFileLoc;
   
-  @Option(names = {"--ts"}, description = {"Optional Path to transit schedule file to load."}, defaultValue = "montreal_transit_schedules.xml")
+  @Option(names = {"--ts"}, description = {"Optional Path to transit schedule file to load."}, defaultValue = "Siouxfalls_transitSchedule.xml")
   private String tsFileLoc;
   
-  @Option(names = {"--tv"}, description = {"Optional Path to transit vehicle file to load."}, defaultValue = "montreal_transit_vehicles.xml")
+  @Option(names = {"--tv"}, description = {"Optional Path to transit vehicle file to load."}, defaultValue = "Siouxfalls_vehicles.xml")
   private String tvFileLoc;
   
-  @Option(names = {"--facilities"}, description = {"Optional Path to facilities file to load."}, defaultValue = "montreal_facilities.xml.gz")
+  @Option(names = {"--facilities"}, description = {"Optional Path to facilities file to load."}, defaultValue = "Siouxfalls_facilities.xml")
   private String facilitiesFileLoc;
   
-  @Option(names = {"--lastiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "100")
+  @Option(names = {"--lastiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "60")
   private int maxIterations;
   
   @Option(names = {"--firstiterations"}, description = {"Maximum number of iteration to simulate."}, defaultValue = "0")
   private int minIterations;
   
-  @Option(names = {"--household"}, description = {"Optional Path to household file to load."}, defaultValue = "households.xml.gz")
+  @Option(names = {"--household"}, description = {"Optional Path to household file to load."}, defaultValue = "")
   private String householdFileLoc;
   
-  @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "1.00")
+  @Option(names = {"--scale"}, description = {"Scale of simulation"}, defaultValue = "1.0")
   private Double scale;
   
-  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/NewVersionTest")
+  @Option(names = {"--output"}, description = {"Result output directory"}, defaultValue = "output/SFPricedOptimized")
   private String output;
   
   @Option(names = {"--charger"}, description = {"Charger file location"}, defaultValue = "charger.xml")
@@ -143,8 +143,8 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	urbanEv.setChargerPricingFileLocation(pricingEVFile);
 	urbanEv.setChargingLogic(PersonChargingLogic.OPTIMIZED);
 	urbanEv.setPricingLogic(PricingLogic.TIME_BASED);
-	urbanEv.setRangeAnxietyConstA(.00001);
-	urbanEv.setRangeAnxietyConstB(20);
+	urbanEv.setRangeAnxietyConstA(0.0001);
+	urbanEv.setRangeAnxietyConstB(15);
 	
 	((EvConfigGroup)config.getModules().get("ev")).chargersFile = chargerFile;
 	//((EvConfigGroup)config.getModules().get("ev"))this.evehicleFile);
@@ -277,7 +277,7 @@ public final class RunEVExampleV2 implements Callable<Integer> {
 	controler.addOverridingModule(new AbstractModule() {
 		@Override
 		public void install() {
-			addRoutingModuleBinding(TransportMode.car).toProvider(new EvNetworkRoutingProvider(TransportMode.car));
+			//addRoutingModuleBinding(TransportMode.car).toProvider(new EvNetworkRoutingProvider(TransportMode.car));
 			addMobsimListenerBinding().to(TrialWithinday.class);
 			
 		}

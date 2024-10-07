@@ -37,7 +37,7 @@ public class EVOutOfBatteryChecker implements MobsimAfterSimStepListener,MobsimS
 //	private Map<Id<ElectricVehicle>,Id<Person>> vehicleOwners = new HashMap<>();
 
 	// the assumption is that the function looks like a*(exp(b*(soc-1))-1)
-	private double rangeAnxietyCoefficientA = .000001;
+	private double rangeAnxietyCoefficientA = .0001;
 	private double rangeAnxietyCoefficientB = 20;
 	private double endTime = 0;
 	

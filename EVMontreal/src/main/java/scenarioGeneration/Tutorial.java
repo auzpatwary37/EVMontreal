@@ -86,10 +86,10 @@ public class Tutorial {
 		//Inputs
 		double evPercentage = 0.5; // Percentage of cars to take as EV
 		boolean assignChargersToEveryone = true;
-		double homeChargerPercentage = 1.0;
+		double homeChargerPercentage = 0.0;
 
 		String configIn = "config_with_calibrated_parameters.xml";// input MATSim Montreal Config without ev
-		String planInput = "population_with_locations_linkId.xml.gz";// Population file without EV
+		String planInput = "population_with_locations10P.xml.gz";// Population file without EV
 		String networkInput = "montreal_network.xml";// Input Network File
 		String chargerFileInput = "cleaned_station.csv";//Charger file with exactly same headers as given to me by Arsham but in .csv format. Save the excel as csv and input its file location
 
