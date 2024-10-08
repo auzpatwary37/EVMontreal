@@ -76,6 +76,7 @@ import urbanEV.UrbanEVConfigGroup.PersonChargingLogic;
 
 
 public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
+	public int chargerNotFound = 0;
 	public static final String urbanEVTripPlannerStrategyName = "evTripPlanner";
 	public static final double cov = 1.2;
 	public static final String ifBrokenActivity = "ifBroken";
@@ -148,6 +149,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	@Override
 	public void prepareReplanning(ReplanningContext replanningContext) {
 		plans = new HashSet<>();
+		this.chargerNotFound = 0;
 	}
 	@Inject
 	UrbanEVTripPlanningStrategyModule(Config config){
@@ -671,7 +673,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 				Activity lastActivity = acts.get(acts.size()-1);
 				Activity secondLastActivity = acts.get(acts.size()-2);
 				Activity thirdLastActivity = null;
-				if(acts.size()>3)thirdLastActivity = acts.get(acts.size()-3);
+				if(acts.size()>=3)thirdLastActivity = acts.get(acts.size()-3);
 
 				boolean isSecondLastPlugout = secondLastActivity.getType().contains(UrbanVehicleChargingHandler.PLUGOUT_IDENTIFIER);
 				boolean isLastWithinTimeRange =  lastActivity.getStartTime().isUndefined()||lastActivity.getStartTime().isDefined() &&
@@ -819,6 +821,11 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 							this.scenario.getActivityFacilities().getFacilities().get(act.getFacilityId()).getLinkId(), 
 							electricVehicleSpecification, modeNetwork,timeOfCharge );
 					//			Link chargingLink = modeNetwork.getLinks().get(actWhileCharging.getLinkId());
+					if(charger==null) {
+						log.error("charger not found for person id"+plan.getPerson().getId());
+						this.chargerNotFound++;
+						continue;
+					}
 					Link chargingLink = modeNetwork.getLinks().get(charger.getLinkId());
 					if(charger!= null) {
 						String routingMode = TripStructureUtils.getRoutingMode(leg);
@@ -852,7 +859,7 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 						act.setEndTime(config.qsim().getEndTime().seconds()-600);
 						modifiablePlan.addActivity(actEnd);
 						this.planPlugoutTrip(modifiablePlan, routingMode, electricVehicleSpecification, act, actEnd, chargingLink, tripRouter, config.qsim().getEndTime().seconds()-600);
-						log.info(plan.getPerson().getId() + " is charging at home.");
+						//log.info(plan.getPerson().getId() + " is charging at home.");
 						PersonContainer2 personContainer2 = new PersonContainer2(plan.getPerson().getId(), "is charging at home.");
 						personContainer2s.add(personContainer2);
 					}
@@ -1490,11 +1497,12 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	public void finishReplanning() {
 		long t = System.currentTimeMillis();
 		// TODO Auto-generated method stub
-		//this.plans.parallelStream().forEach(p->this.execute(p));
-		for(Plan p:this.plans) {
-			this.execute(p);
-		}
+		this.plans.parallelStream().forEach(p->this.execute(p));
+//		for(Plan p:this.plans) {
+//			this.execute(p);
+//		}
 		log.info("total time for replanning"+this.plans.size()+"plans = "+(System.currentTimeMillis()-t));
+		log.info("Number of people with charger not found = "+this.chargerNotFound + " out of "+this.plans.size());
 	}
 
 	protected Activity findRealOrChargingActBefore(Plan plan, int index) {
