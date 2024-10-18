@@ -16,6 +16,9 @@ public class Hotspot {
 	public static final String acitivityDurationString = "duration";
 	public static final String EvUserString = "evUser";
 	public static final String nonEvUserString = "nonEvUser";
+	
+	public Map<ChargerType,Integer> plugCountPerChargerType = new HashMap<>();
+	public static Map<ChargerType,Double> powerPerChargerType = new HashMap<>();
 	// hour should go from 1-24 or Am-peak (7-11) , Pm-Peak (5-8), BeforeAm Peak (0-7), AfterAmPeak (11-5), AfterPmPeak (8-12 and onwards)
 	
 	private boolean isLockedCentroid = false;
@@ -136,5 +139,22 @@ public class Hotspot {
 		this.centroidFacilityId = centroidFacilityId;
 		this.centroidFacilityFeature = centroidVector;
 	}
+
+	public Map<ChargerType, Integer> getPlugCountPerChargerType() {
+		return plugCountPerChargerType;
+	}
+
+	public void setPlugCountPerChargerType(Map<ChargerType, Integer> plugCountPerChargerType) {
+		this.plugCountPerChargerType = plugCountPerChargerType;
+	}
+
+	public Map<ChargerType, Double> getPowerPerChargerType() {
+		return powerPerChargerType;
+	}
+
+	public static void setPowerPerChargerType(Map<ChargerType, Double> powerPerCharger) {
+		powerPerChargerType = powerPerCharger;
+	}
+	
 	
 }

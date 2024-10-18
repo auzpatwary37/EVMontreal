@@ -302,7 +302,18 @@ public static void main(String[] args) {
 	
 	offPeakPricing.put("Fast", nonLinear);
 	
+	Map<ChargerType,Double> chargerPower = new HashMap<>();
+	chargerPower.put(ChargerType.fast, 1000*50.);
+	chargerPower.put(ChargerType.level1, 1000*30.);
+	chargerPower.put(ChargerType.level2, 1000*10.);
+	chargerPower.put(ChargerType.fast, 1000*6.);
+	
+	
+	
+	Hotspot.setPowerPerChargerType(chargerPower);
+	
 	hotspots.forEach(h->{
+		h.setPlugCountPerChargerType(Map.of(ChargerType.fast,10));
 		if(!csp.getChargerSpecifications().containsKey(Id.create(h.getHotspotId().toString(), Charger.class))) {
 			ChargerSpecification c = ImmutableChargerSpecification.newBuilder()
 					.id(Id.create(h.getHotspotId().toString(), Charger.class))
