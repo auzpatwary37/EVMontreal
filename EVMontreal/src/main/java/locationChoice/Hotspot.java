@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.apache.commons.math.linear.MatrixUtils;
 import org.apache.commons.math.linear.RealVector;
+import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.facilities.ActivityFacility;
 
@@ -29,6 +30,19 @@ public class Hotspot {
 	private MapToArray<String> featureMap;
 	private Map<Id<ActivityFacility>,RealVector> features = new HashMap<>();
 	
+	private Coord coord;
+	
+	
+	
+	
+	public Coord getCoord() {
+		return coord;
+	}
+
+	public void setCoord(Coord coord) {
+		this.coord = coord;
+	}
+
 	public Hotspot(String id, MapToArray<String> featureMap) {
 		this.hotspotId = Id.create(id, Hotspot.class);
 		this.featureMap = featureMap;
@@ -100,6 +114,8 @@ public class Hotspot {
         
         centroidFacilityId = closestFacilityId;
         this.centroidFacilityFeature = closestFacilityFeature;
+        Map<String, Double> map = this.featureMap.getMap(this.centroidFacilityFeature.getData());
+        this.coord = new Coord(map.get(Hotspot.locationX),map.get(Hotspot.locationY));
         return centroidFacilityId;
     }
 	

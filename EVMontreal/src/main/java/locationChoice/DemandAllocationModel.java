@@ -1,21 +1,27 @@
 package locationChoice;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.apache.commons.math.linear.RealVector;
+import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.network.Network;
+import org.matsim.api.core.v01.network.Node;
+import org.matsim.core.network.NetworkUtils;
 import org.matsim.facilities.ActivityFacility;
 
 
-public class DemanAllocationModel {
+public class DemandAllocationModel {
 
     private Map<Id<Hotspot>, Hotspot> hotspots;
-    private Map<Id<ActivityFacility>, RealVector> facilities;
+    private Map<Id<ActivityFacility>, Map<String, Double>> facilities;
     private Map<Id<Hotspot>, Double> activeHotspots;  // Hotspots with capacity
     private Map<Id<ActivityFacility>, List<Hotspot>> nearestChargersPerFacility;  // Facility -> nearest 6 chargers
     private Map<Id<Hotspot>, Map<ChargerType, Integer>> chargerAllocation;  // External input with charger info
@@ -25,13 +31,19 @@ public class DemanAllocationModel {
     private Map<Id<ActivityFacility>, Double> demand;  // Demand per facility
     private Map<Id<Hotspot>,Double> demandPerCharger = new HashMap<>();
     private MapToArray<String>featureMap;// the map to array converter for facility features
-    private double bprAlpha = 0.5;
-    private double bprBeta = 2;
+    private double bprAlpha = 0.15;
+    private double bprBeta = 1;
     //private double chargerEfficiencyFactor = 0.75;
-    private double peakHourFactor = 1.0;
+    private double peakHourFactor = 0.12;
+ // Class variable to store the previous total gap
+    private double previousTotalGap = Double.MAX_VALUE;  // Initialized to a large value
+    
+    private double maxChargerDistance = 2000;
+    
+    private double logitScalingParameter = 0.000001;
 
     // Constructor
-    public DemanAllocationModel(Map<Id<Hotspot>, Hotspot> hotspots, Map<Id<ActivityFacility>, RealVector> facilities,MapToArray<String> featureMap) {
+    public DemandAllocationModel(Map<Id<Hotspot>, Hotspot> hotspots, Map<Id<ActivityFacility>, Map<String,Double>> facilities,MapToArray<String> featureMap) {
         this.hotspots = hotspots;
         this.facilities = facilities;
         this.featureMap = featureMap;
@@ -40,12 +52,14 @@ public class DemanAllocationModel {
     // Main function to run demand allocation
     public void allocateDemand(Map<Id<Hotspot>, Map<ChargerType, Integer>> chargerAllocation, Map<Id<ActivityFacility>, Double> demand) {
         this.chargerAllocation = chargerAllocation;
-        if(demand!=null)this.demand = demand;
-        else {
+        if(demand!=null) {
+        	this.demand = demand;
+        }else {
         	demand = new HashMap<>();
-        	for(Entry<Id<ActivityFacility>, RealVector> f:this.facilities.entrySet()){
-        		demand.put(f.getKey(), this.featureMap.getMap(f.getValue().getData()).get(Hotspot.EvUserString+"_"+Hotspot.activityNumberString));
+        	for(Entry<Id<ActivityFacility>, Map<String,Double>> f:this.facilities.entrySet()){
+        		demand.put(f.getKey(), f.getValue().get(Hotspot.EvUserString+"_"+Hotspot.activityNumberString));
         	}
+        	this.demand = demand;
         }
         // Step 1: Initialize variables
         initialize();
@@ -58,21 +72,22 @@ public class DemanAllocationModel {
         for (int iteration = 1; iteration <= maxIterations; iteration++) {
             System.out.println("Iteration: " + iteration);
 
-            // Step 3: Calculate allocation probabilities using the logit model
-            calculateAllocationProbability();
-
+            // Step 3: Calculate allocation probabilities using the logit model            calculateAllocationProbability();
+            this.calculateAllocationProbability();
             // Step 4: Update demand, t_0, and t using MSA
             boolean equilibrium = update(iteration);
 
             // Break the loop if equilibrium is reached
             if (equilibrium) {
                 System.out.println("Equilibrium reached at iteration: " + iteration);
+                this.outputMetrics();
                 break;
             }
 
             // If max iteration is reached without equilibrium
             if (iteration == maxIterations) {
                 System.out.println("Max iterations reached without equilibrium.");
+                this.outputMetrics();
             }
         }
 
@@ -88,11 +103,18 @@ public class DemanAllocationModel {
 
         // Step 1: Calculate active hotspots based on charger allocation
         calculateActiveHotspots();
+        
+        Network network = NetworkUtils.createNetwork();
+        for(Id<Hotspot> hId:this.activeHotspots.keySet()) {
+        	network.addNode(NetworkUtils.createNode(Id.createNodeId(hId.toString()),this.hotspots.get(hId).getCoord()));
+        	this.demandPerCharger.put(hId, 0.);
+        }
+        
 
         // Step 2: For each facility, find the 6 nearest chargers and initialize probabilities
         for (Id<ActivityFacility> facilityId : facilities.keySet()) {
             // Find the nearest 6 chargers for this facility
-            List<Hotspot> nearestChargers = findNearestChargers(facilityId);
+            List<Hotspot> nearestChargers = findNearestChargers(facilityId,network);
             nearestChargersPerFacility.put(facilityId, nearestChargers);
 
             // Step 2.1: Initialize facility-to-charger probabilities to be equal (1/6)
@@ -114,10 +136,12 @@ public class DemanAllocationModel {
     // Initialize average charging duration t_0 and charging time t
     private void initializeChargingDurations() {
         for (Map.Entry<Id<Hotspot>, Map<ChargerType, Integer>> entry : chargerAllocation.entrySet()) {
+        	if(this.activeHotspots.containsKey(entry.getKey())) {
             Id<Hotspot> hotspotId = entry.getKey();
             double t_0 = calculateInitialChargingDuration(entry.getValue());  // Calculate t_0 from charger type and power
             AverageChargingDuration.put(hotspotId, t_0);  // Initialize with t_0
             ChargingTime.put(hotspotId, t_0);  // Initialize charging time with t_0 (no queue at the beginning)
+        	}
         }
     }
 
@@ -127,7 +151,11 @@ public class DemanAllocationModel {
         // Placeholder example:
         double standardEVBatteryCapacity = 50;  // kWh (example)
         double totalPower = chargers.keySet().stream().mapToDouble(type -> Hotspot.powerPerChargerType.get(type) * chargers.get(type)).sum();
+        if(totalPower==0) {
+        	System.out.println("averageDuration is infinite!!!");
+        }
         return standardEVBatteryCapacity / totalPower;  // Charging time t_0 = Battery capacity / total power
+        
     }
 
     // Calculate active hotspots based on the number of plugs and charger type
@@ -138,7 +166,7 @@ public class DemanAllocationModel {
 
             // Capacity (for now, calculated based on plug count, can be extended)
             double capacity = calculateHotspotCapacity(chargers);
-            activeHotspots.put(hotspotId, capacity);
+            if(capacity>0)activeHotspots.put(hotspotId, capacity);
         }
     }
     
@@ -169,7 +197,7 @@ public class DemanAllocationModel {
         // Loop through each facility and its nearest chargers
         for (Id<ActivityFacility> facilityId : facilities.keySet()) {
             double q_f = demand.get(facilityId);  // Demand from facility f
-
+            if(q_f==0)continue;
             // Get the allocation probabilities for this facility
             Map<Id<Hotspot>, Double> chargerProbabilities = facilityToChargerProbability.get(facilityId);
 
@@ -180,9 +208,13 @@ public class DemanAllocationModel {
 
                 // Calculate the demand for charger c
                 double q_c = q_f * peakHourFactor * P_f_c;
+                if(Double.isNaN(q_c)) {
+                	System.out.println("q_c is NaN!!!");
+                }
 
                 // Update total demand for the charger
                 chargerDemand.put(chargerId, chargerDemand.getOrDefault(chargerId, 0.0) + q_c);
+                
             }
         }
         
@@ -197,8 +229,9 @@ public class DemanAllocationModel {
 
         // Loop through each facility and its nearest chargers
         for (Id<ActivityFacility> facilityId : facilities.keySet()) {
-            double q_f = demand.get(facilityId);  // Demand from facility f
-            double facilityDuration = featureMap.getMap(facilities.get(facilityId).getData()).get(Hotspot.EvUserString+"_"+Hotspot.acitivityDurationString);  // Get activity duration
+            double q_f = demand.get(facilityId);// Demand from facility f
+            if(q_f==0)continue;
+            double facilityDuration = facilities.get(facilityId).get(Hotspot.EvUserString+"_"+Hotspot.acitivityDurationString);  // Get activity duration
 
             // Get the allocation probabilities for this facility
             Map<Id<Hotspot>, Double> chargerProbabilities = facilityToChargerProbability.get(facilityId);
@@ -227,7 +260,9 @@ public class DemanAllocationModel {
 
             // Calculate the average duration (t_0) for this charger
             double averageDuration = totalDemandForCharger > 0 ? durationSum / totalDemandForCharger : 0.0;
-
+            if(Double.isInfinite(averageDuration)) {
+            	System.out.println("average duration is nan");
+            }
             // Store the average duration in the class variable
             AverageChargingDuration.put(chargerId, averageDuration);
         }
@@ -237,49 +272,45 @@ public class DemanAllocationModel {
 
 
     // Find the 6 nearest chargers for a given facility
-    private List<Hotspot> findNearestChargers(Id<ActivityFacility> facilityId) {
-        // Implement logic to find the nearest 6 active hotspots based on distance
-        // Placeholder implementation:
-        List<Hotspot> sortedHotspots = new ArrayList<>(hotspots.values());
-        sortedHotspots.sort(Comparator.comparingDouble(h -> calculateDistance(facilityId, h)));
-        return sortedHotspots.subList(0, Math.min(6, sortedHotspots.size()));
+    private List<Hotspot> findNearestChargers(Id<ActivityFacility> facilityId, Network network) {
+        List<Hotspot> hotspots = new ArrayList<>();
+        Collection<Node> nodes= NetworkUtils.getNearestNodes(network, new Coord(this.facilities.get(facilityId).get(Hotspot.locationX),this.facilities.get(facilityId).get(Hotspot.locationY)), maxChargerDistance);
+        nodes.forEach(n->{
+        	hotspots.add(this.hotspots.get(Id.create(n.getId().toString(), Hotspot.class)));
+        });
+        return hotspots;
     }
 
  // Calculate Euclidean distance between a facility and a hotspot
     private double calculateDistance(Id<ActivityFacility> facilityId, Hotspot hotspot) {
         // Extract coordinates of the facility from the facilityFeatures_raw
-        RealVector facilityFeatures = facilities.get(facilityId);
-        Map<String, Double> facilityFeatureMap = featureMap.getMap(facilityFeatures.getData());  // Convert RealVector to Map
+        
+        Map<String, Double> facilityFeatureMap = facilities.get(facilityId);  // Convert RealVector to Map
         double x1 = facilityFeatureMap.get(Hotspot.locationX);
         double y1 = facilityFeatureMap.get(Hotspot.locationY);
 
         // Extract coordinates of the hotspot's centroid
-        Map<String, Double> hotspotFeatureMap = featureMap.getMap(hotspot.getCentroidFeatureVector().getData());
-        double x2 = hotspotFeatureMap.get(Hotspot.locationX);
-        double y2 = hotspotFeatureMap.get(Hotspot.locationY);
+       Double d = NetworkUtils.getEuclideanDistance(new Coord(x1,y1), hotspot.getCoord());
 
         // Calculate Euclidean distance between the two points
-        return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        return d;
     }
 
 
- // Calculate allocation probabilities using the logit model (without recalculating t, using t_0 initially)
+ // Calculate allocation probabilities using the numerically stable logit model
     private void calculateAllocationProbability() {
         double betaDistance = -1.0;  // Sensitivity to distance
         double betaTime = -1.0;      // Sensitivity to charging time
-//        double betaPrice = -1.0;	// Sensitivity to money.
 
         // Loop through each facility to calculate the probabilities of choosing each charger
-        for (Id<ActivityFacility> facilityId : facilities.keySet()) {
-            Map<Id<Hotspot>, Double> chargerProbabilities = new HashMap<>();
+        this.facilities.keySet().parallelStream().forEach(facilityId->{
+        	Map<Id<Hotspot>, Double> chargerProbabilities = new HashMap<>();
             List<Hotspot> nearestChargers = nearestChargersPerFacility.get(facilityId);
 
-            // Extract facility features (coordinates) from the facility
-//            RealVector facilityFeatures = facilities.get(facilityId);
-//            Map<String, Double> facilityFeatureMap = featureMap.getMap(facilityFeatures.getData());
+            // Step 1: Calculate the utilities for each charger
+            Map<Id<Hotspot>, Double> utilities = new HashMap<>();
+            double maxUtility = Double.NEGATIVE_INFINITY;
 
-            // Calculate total utility for normalization
-            double totalUtility = 0.0;
             for (Hotspot charger : nearestChargers) {
                 Id<Hotspot> chargerId = charger.getHotspotId();
 
@@ -290,29 +321,47 @@ public class DemanAllocationModel {
                 double t_0 = AverageChargingDuration.get(chargerId);
 
                 // Use t_0 as the initial charging time (before any updates)
-                double t = ChargingTime.getOrDefault(chargerId, t_0);  // t is initialized as t_0
+                double t = ChargingTime.getOrDefault(chargerId, t_0);
 
                 // Utility function for this charger
-                double utility = Math.exp(betaDistance * distance + betaTime * t);
+                double utility = betaDistance * distance + betaTime * t;
+                utilities.put(chargerId, utility);
 
-                // Store utility in probabilities map for normalization later
-                chargerProbabilities.put(chargerId, utility);
-
-                // Sum up total utility
-                totalUtility += utility;
+                // Track the maximum utility for numerical stability
+                if (utility > maxUtility) {
+                    maxUtility = utility;
+                }
             }
 
-            // Normalize the probabilities by dividing each utility by the total utility
-            for (Map.Entry<Id<Hotspot>, Double> entry : chargerProbabilities.entrySet()) {
+            // Step 2: Calculate numerically stable probabilities
+            double totalUtility = 0.0;
+            for (Map.Entry<Id<Hotspot>, Double> entry : utilities.entrySet()) {
                 Id<Hotspot> chargerId = entry.getKey();
                 double utility = entry.getValue();
-                double probability = utility / totalUtility;  // Normalize
+
+                // Numerically stable exponential: exp(utility - maxUtility)
+                double stableUtility = Math.exp(this.logitScalingParameter*(utility - maxUtility));
+                chargerProbabilities.put(chargerId, stableUtility);
+
+                // Sum up total utility for normalization
+                totalUtility += stableUtility;
+            }
+
+            // Step 3: Normalize the probabilities
+            for (Map.Entry<Id<Hotspot>, Double> entry : chargerProbabilities.entrySet()) {
+                Id<Hotspot> chargerId = entry.getKey();
+                double stableUtility = entry.getValue();
+                double probability = stableUtility / totalUtility;  // Normalize
 
                 // Store the probability in the facilityToChargerProbability map
                 facilityToChargerProbability.computeIfAbsent(facilityId, k -> new HashMap<>()).put(chargerId, probability);
             }
-        }
+        });
+//        for (Id<ActivityFacility> facilityId : facilities.keySet()) {
+//            
+//        }
     }
+
 
 
     // Method to calculate total charging time using VDF (power demand and capacity)
@@ -320,7 +369,7 @@ public class DemanAllocationModel {
         if (powerDemand <= capacity) {
             return t_0;  // No delay if power demand is less than or equal to capacity
         } else {
-            return t_0 * (1 + alpha * Math.pow((powerDemand / capacity - 1), beta));
+            return t_0 * (1 + alpha * Math.pow((powerDemand / capacity), beta));
         }
     }
 
@@ -343,11 +392,17 @@ public class DemanAllocationModel {
 
 
 
- // Method to update demand, average duration, and charging time using MSA
-    private boolean update(int iterationCount) {
  
+
+    // Method to update demand, average duration, and charging time using modified MSA with fixed parameters for increasing and decreasing errors
+    private boolean update(int iterationCount) {
+        double totalGap = 0;
         boolean isEquilibrium = true;  // Assume equilibrium is reached, we will check if it holds
         double tolerance = 0.001;  // Threshold for equilibrium check
+
+        // Fixed parameters for increasing and decreasing errors
+        double alphaIncrease = 2;  // Parameter for increasing error
+        double alphaDecrease = 0.7;  // Parameter for decreasing error
 
         // Step 1: Store old demand (for equilibrium check)
         Map<Id<Hotspot>, Double> oldDemand = new HashMap<>(this.demandPerCharger);
@@ -355,32 +410,43 @@ public class DemanAllocationModel {
         // Step 2: Calculate the new demand for each charger
         Map<Id<Hotspot>, Double> newDemand = calculateDemandPerCharger(peakHourFactor);  // New demand calculation
 
-        // Step 3: Apply MSA to update the demand
+        // Step 3: Calculate the total gap
         for (Id<Hotspot> chargerId : newDemand.keySet()) {
             double oldDemand_c = oldDemand.getOrDefault(chargerId, 0.0);
             double newDemand_c = newDemand.getOrDefault(chargerId, 0.0);
 
-            // MSA formula: X^{(k+1)} = (k/(k+1)) * oldDemand + (1/(k+1)) * newDemand
-            double updatedDemand = (iterationCount / (iterationCount + 1.0)) * oldDemand_c + (1.0 / (iterationCount + 1.0)) * newDemand_c;
+            totalGap += Math.abs(newDemand_c - oldDemand_c);
+        }
+
+        // Step 4: Choose the alpha value based on whether the gap is increasing or decreasing
+        double alpha = totalGap > previousTotalGap ? alphaIncrease : alphaDecrease;
+
+        // Step 5: Apply modified MSA to update the demand
+        for (Id<Hotspot> chargerId : newDemand.keySet()) {
+            double oldDemand_c = oldDemand.getOrDefault(chargerId, 0.0);
+            double newDemand_c = newDemand.getOrDefault(chargerId, 0.0);
+
+            // Modified MSA formula: oldDemand + (newDemand - oldDemand) * 1 / (1 + alpha)
+            double updatedDemand = oldDemand_c + (newDemand_c - oldDemand_c) * 1.0 / (1.0 + alpha);
 
             // Update the demand variable in class
             demandPerCharger.put(chargerId, updatedDemand);
         }
 
-        // Step 4: Calculate the average duration using the updated (MSA) demand
+        // Step 6: Calculate the average duration using the updated (MSA) demand
         calculateAverageDurationPerCharger(demandPerCharger);  // Updates the AverageChargingDuration class variable
 
-        // Step 5: Calculate the charging time using the average duration and the MSA demand
+        // Step 7: Calculate the charging time using the average duration and the MSA demand
         for (Id<Hotspot> chargerId : demandPerCharger.keySet()) {
             double avgChargerPower = calculateAverageChargerPower(chargerId);
             double updatedDemand_c = demandPerCharger.getOrDefault(chargerId, 0.0);  // MSA demand
             double t_0 = AverageChargingDuration.get(chargerId);  // Updated average duration
 
             // Convert demand to power demand
-            double powerDemand = updatedDemand_c * avgChargerPower;
+            double powerDemand = updatedDemand_c * avgChargerPower*Double.max(t_0, 3600);
 
             // Get charger capacity in power
-            double capacity = activeHotspots.get(chargerId);  // Capacity is in power (kW)
+            double capacity = activeHotspots.get(chargerId)*3600;  // Capacity is in power (kW)
 
             // Calculate total charging time t using VDF
             double chargingTime = calculateChargingTime(t_0, powerDemand, capacity, this.bprAlpha, this.bprBeta);
@@ -389,20 +455,118 @@ public class DemanAllocationModel {
             ChargingTime.put(chargerId, chargingTime);
         }
 
-        // Step 6: Check for equilibrium
+        // Step 8: Check for equilibrium
         for (Id<Hotspot> chargerId : newDemand.keySet()) {
             double oldDemand_c = oldDemand.getOrDefault(chargerId, 0.0);
-            double newDemand_c = demandPerCharger.getOrDefault(chargerId, 0.0);  // MSA updated demand
+            double newDemand_c = demandPerCharger.getOrDefault(chargerId, 0.0);
 
             if (Math.abs(newDemand_c - oldDemand_c) > tolerance) {
                 isEquilibrium = false;  // If the change in demand is greater than the tolerance, equilibrium not reached
             }
         }
 
+        // Update the previous total gap for the next iteration
+        previousTotalGap = totalGap;
+
         // Increment iteration count for MSA
         iterationCount++;
+        System.out.println("Total gap in iteration " + (iterationCount - 1) + " = " + totalGap);
 
         return isEquilibrium;  // Return true if equilibrium is reached
     }
+    
+    public void outputMetrics() {
+        // 1. Average queue (t - t_0) for all active hotspots in hours
+        double totalQueueTime = 0.0;
+        int activeHotspotCount = 0;
+
+        for (Id<Hotspot> chargerId : activeHotspots.keySet()) {
+            double chargingTime = ChargingTime.getOrDefault(chargerId, 0.0);
+            double averageDuration = AverageChargingDuration.getOrDefault(chargerId, 0.0);
+            double queueTimeInSeconds = chargingTime - averageDuration;  // Calculate the queue time in seconds
+
+            double queueTimeInHours = queueTimeInSeconds / 3600.0;  // Convert to hours
+
+            if (!Double.isNaN(queueTimeInHours) && queueTimeInHours >= 0) {
+                totalQueueTime += queueTimeInHours;
+                activeHotspotCount++;
+            }
+        }
+
+        double averageQueueTime = activeHotspotCount > 0 ? totalQueueTime / activeHotspotCount : 0.0;
+        System.out.println("Average queue time (t - t_0) in hours for all active hotspots: " + averageQueueTime);
+
+        // 2. Number of facilities without any assigned hotspots/chargers and with non-zero demand
+        int unassignedFacilityCount = 0;
+
+        for (Id<ActivityFacility> facilityId : facilities.keySet()) {
+            double facilityDemand = demand.getOrDefault(facilityId, 0.0);  // Get facility demand
+
+            Map<Id<Hotspot>, Double> chargerProbabilities = facilityToChargerProbability.get(facilityId);
+            boolean hasAssignedCharger = chargerProbabilities != null && chargerProbabilities.values().stream().anyMatch(probability -> probability > 0);
+
+            // Check if facility has non-zero demand and no assigned charger
+            if (facilityDemand > 0 && !hasAssignedCharger) {
+                unassignedFacilityCount++;
+            }
+        }
+
+        System.out.println("Number of facilities with non-zero demand and without any assigned hotspots or chargers: " + unassignedFacilityCount);
+
+        // 3. Served demand (sum of facility demand * peak factor - charger demand)
+        double totalFacilityDemand = 0.0;
+        double totalChargerDemand = 0.0;
+
+        // Sum up facility demand with peak factor
+        for (Id<ActivityFacility> facilityId : demand.keySet()) {
+            double facilityDemand = demand.getOrDefault(facilityId, 0.0);
+            totalFacilityDemand += facilityDemand * peakHourFactor;
+        }
+
+        // Sum up charger demand directly from the charger demand map
+        for (Id<Hotspot> chargerId : demandPerCharger.keySet()) {
+            double chargerDemand = demandPerCharger.getOrDefault(chargerId, 0.0);
+            totalChargerDemand += chargerDemand;
+        }
+
+        // Calculate the served demand
+        double servedDemand = totalFacilityDemand - totalChargerDemand;
+
+        System.out.println("Total unserved demand: " + servedDemand*this.peakHourFactor+" out of "+ totalFacilityDemand*this.peakHourFactor);
+        writeChargerDemandToFile(this.demandPerCharger,this.AverageChargingDuration,this.ChargingTime,"chargerDemandFromModel.csv");
+    }
+
+    public void writeChargerDemandToFile(Map<Id<Hotspot>, Double> chargerDemand, 
+            Map<Id<Hotspot>, Double> t0Map, 
+            Map<Id<Hotspot>, Double> tMap, 
+            String filePath) {
+try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+// Write the header
+writer.write("HotspotID,Demand,X,Y,t_0,t\n");
+
+// Iterate over charger demand entries
+for (Map.Entry<Id<Hotspot>, Double> entry : chargerDemand.entrySet()) {
+Id<Hotspot> hotspotId = entry.getKey();
+
+// Get demand, coordinates, t_0, and t for each hotspot
+double demand = entry.getValue() * this.peakHourFactor;
+double x = this.hotspots.get(hotspotId).getCoord().getX();
+double y = this.hotspots.get(hotspotId).getCoord().getY();
+double t0 = t0Map.getOrDefault(hotspotId, 0.0); // Default to 0.0 if not present
+double t = tMap.getOrDefault(hotspotId, 0.0);   // Default to 0.0 if not present
+
+// Write the line with the Hotspot ID, Demand, X, Y, t_0, and t
+writer.write(hotspotId.toString() + "," 
++ (int) demand + "," 
++ x + "," 
++ y + "," 
++ t0 + "," 
++ t + "\n");
+}
+} catch (IOException e) {
+System.out.println("Error writing to file: " + e.getMessage());
+}
+}
+
 
 }

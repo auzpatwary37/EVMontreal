@@ -46,27 +46,27 @@ import EVPricing.ChargerPricingProfiles;
 
 public class FirstStepAnalysis {
 public static void main(String[] args) {
-	String PopulationFileLocation = "data\\10p\\plan.xml";
-	String FacilityFileLocation = "data\\10p\\montreal_facilities.xml.gz";
-	String VehicleFileLocation = "data\\10p\\vehicle.xml";
-	String NetworkFileLocation = "data\\10p\\montreal_network.xml";
-	String chargerSpecificationFile = "data\\10p\\charger.xml";
+	String PopulationFileLocation = "data/10p/plan.xml";
+	String FacilityFileLocation = "data/10p/montreal_facilities.xml.gz";
+	String VehicleFileLocation = "data/10p/vehicle.xml";
+	String NetworkFileLocation = "data/10p/montreal_network.xml";
+	String chargerSpecificationFile = "data/10p/charger.xml";
 	
-	String usedFacilityCoordsLocation = "data\\10p\\facilityUsed.csv";
-	String chargerCoordsLocation = "data\\10p\\chargerCoords.csv";
-	String chargerCoordsLocationNew = "data\\10p\\chargerCoordsNew_noDuration.csv";
-	String featureFileLocation = "data\\10p\\features_noDuration.csv";
-	String oldPricingProfileFile = "data\\10p\\pricingProfiles.xml";
-	String newPricingProfileFile = "data\\10p\\pricingProfiles_new_noDuration.xml";
-	String newChargerFile = "data\\10p\\charger_new_noDuration.xml";
+	String usedFacilityCoordsLocation = "data/10p/facilityUsed.csv";
+	String chargerCoordsLocation = "data/10p/chargerCoords.csv";
+	String chargerCoordsLocationNew = "data/10p/chargerCoordsNew.csv";
+	String featureFileLocation = "data/10p/features_noDuration.csv";
+	String oldPricingProfileFile = "data/10p/pricingProfiles.xml";
+	String newPricingProfileFile = "data/10p/pricingProfiles_new.xml";
+	String newChargerFile = "data/10p/charger_new_noDuration.xml";
 	Config config = ConfigUtils.createConfig();
-	ConfigUtils.loadConfig(config,"data\\10p\\config.xml");
+	ConfigUtils.loadConfig(config,"data/10p/config.xml");
 	config.plans().setInputFile(PopulationFileLocation);
 	config.vehicles().setVehiclesFile(VehicleFileLocation);
 	config.network().setInputFile(NetworkFileLocation);
 	config.facilities().setInputFile(FacilityFileLocation);
-	config.transit().setTransitScheduleFile("data\\10p\\montreal_transit_schedules.xml");
-	config.transit().setVehiclesFile("data\\10p\\montreal_transit_vehicles.xml");
+	config.transit().setTransitScheduleFile("data/10p/montreal_transit_schedules.xml");
+	config.transit().setVehiclesFile("data/10p/montreal_transit_vehicles.xml");
 	
 	
 	Scenario scenario  = ScenarioUtils.loadScenario(config);
@@ -161,8 +161,8 @@ public static void main(String[] args) {
 			Map<String,Double>oldFeature = featuresMapToArray.getMap(features.get(linkToFacilityMap.get(linkId)).toArray());
 			evUser = oldFeature.get(Hotspot.activityNumberString+"_"+Hotspot.EvUserString);
 			nonEvUser = oldFeature.get(Hotspot.activityNumberString+"_"+Hotspot.nonEvUserString);
-			//evUserDuration = oldFeature.get(Hotspot.acitivityDurationString+"_"+Hotspot.EvUserString);
-			//nonEvUserDuration = oldFeature.get(Hotspot.acitivityDurationString+"_"+Hotspot.nonEvUserString);
+			evUserDuration = oldFeature.get(Hotspot.acitivityDurationString+"_"+Hotspot.EvUserString);
+			nonEvUserDuration = oldFeature.get(Hotspot.acitivityDurationString+"_"+Hotspot.nonEvUserString);
 		}else {
 			linkToFacilityMap.put(linkId, facId);
 		}
@@ -183,8 +183,8 @@ public static void main(String[] args) {
 		}
 		featureMap.put(Hotspot.locationX, facilities.getFacilities().get(facId).getCoord().getX());
 		featureMap.put(Hotspot.locationY, facilities.getFacilities().get(facId).getCoord().getY());
-		//featureMap.put(Hotspot.acitivityDurationString+"_"+Hotspot.EvUserString, evUserDuration);
-		//featureMap.put(Hotspot.acitivityDurationString+"_"+Hotspot.nonEvUserString, nonEvUserDuration);
+		featureMap.put(Hotspot.acitivityDurationString+"_"+Hotspot.EvUserString, evUserDuration);
+		featureMap.put(Hotspot.acitivityDurationString+"_"+Hotspot.nonEvUserString, nonEvUserDuration);
 		featureMap.put(Hotspot.activityNumberString+"_"+Hotspot.EvUserString, evUser);
 		featureMap.put(Hotspot.activityNumberString+"_"+Hotspot.nonEvUserString, nonEvUser);
 		if(featuresMapToArray==null) {
@@ -212,8 +212,8 @@ public static void main(String[] args) {
 			Map<String,Double> featureMap = new HashMap<>();
 			featureMap.put(Hotspot.locationX, facilities.getFacilities().get(facId).getCoord().getX());
 			featureMap.put(Hotspot.locationY, facilities.getFacilities().get(facId).getCoord().getY());
-			//featureMap.put(Hotspot.acitivityDurationString+"_"+Hotspot.EvUserString, evUserDuration);
-			//featureMap.put(Hotspot.acitivityDurationString+"_"+Hotspot.nonEvUserString, nonEvUserDuration);
+			featureMap.put(Hotspot.acitivityDurationString+"_"+Hotspot.EvUserString, evUserDuration);
+			featureMap.put(Hotspot.acitivityDurationString+"_"+Hotspot.nonEvUserString, nonEvUserDuration);
 			featureMap.put(Hotspot.activityNumberString+"_"+Hotspot.EvUserString, evUser);
 			featureMap.put(Hotspot.activityNumberString+"_"+Hotspot.nonEvUserString, nonEvUser);
 			features.put(facId, featuresMapToArray.getRealVector(featureMap));
@@ -268,14 +268,16 @@ public static void main(String[] args) {
 	
 	try {
 		FileWriter fwCharger = new FileWriter(new File(chargerCoordsLocationNew));
-		fwCharger.append("chargerId,X,Y,plugCount,power\n");
+		fwCharger.append("chargerId,X,Y,plugCount,power,CentroidFacilityId,chargerType\n");
 		for(Hotspot h:hotspots) {
 			Coord coord = facilities.getFacilities().get(h.getCentroidFacility()).getCoord();
-			int plugCount = csp.getChargerSpecifications().get(Id.create(h.getHotspotId().toString(), Charger.class)).getPlugCount();
-			double power = csp.getChargerSpecifications().get(Id.create(h.getHotspotId().toString(), Charger.class)).getPlugPower();
-			fwCharger.append(h.getHotspotId().toString()+","+coord.getX()+","+coord.getY()+","+plugCount+","+power+"\n");
+			int plugCount = csp.getChargerSpecifications().get(Id.create(h.getHotspotId().toString(), Charger.class))==null?0:csp.getChargerSpecifications().get(Id.create(h.getHotspotId().toString(), Charger.class)).getPlugCount();
+			double power = csp.getChargerSpecifications().get(Id.create(h.getHotspotId().toString(), Charger.class))==null?0:csp.getChargerSpecifications().get(Id.create(h.getHotspotId().toString(), Charger.class)).getPlugPower();
+			String chargerType = csp.getChargerSpecifications().get(Id.create(h.getHotspotId().toString(), Charger.class))==null?null:csp.getChargerSpecifications().get(Id.create(h.getHotspotId().toString(), Charger.class)).getChargerType();
+			fwCharger.append(h.getHotspotId().toString()+","+coord.getX()+","+coord.getY()+","+plugCount+","+power+","+h.getCentroidFacility().toString()+","+chargerType+"\n");
 			fwCharger.flush();
 		}
+		fwCharger.close();
 		
 	} catch (IOException e) {
 		// TODO Auto-generated catch block
