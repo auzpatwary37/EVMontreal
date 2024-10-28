@@ -54,11 +54,11 @@ public static void main(String[] args) {
 	
 	String usedFacilityCoordsLocation = "data/10p/facilityUsed.csv";
 	String chargerCoordsLocation = "data/10p/chargerCoords.csv";
-	String chargerCoordsLocationNew = "data/10p/chargerCoordsNew.csv";
-	String featureFileLocation = "data/10p/features_noDuration.csv";
+	String chargerCoordsLocationNew = "data/10p/chargerCoordsNew_startTime.csv";
+	String featureFileLocation = "data/10p/features_startTime.csv";
 	String oldPricingProfileFile = "data/10p/pricingProfiles.xml";
-	String newPricingProfileFile = "data/10p/pricingProfiles_new.xml";
-	String newChargerFile = "data/10p/charger_new_noDuration.xml";
+	String newPricingProfileFile = "data/10p/pricingProfiles_new_startTime.xml";
+	String newChargerFile = "data/10p/charger_new_startTime.xml";
 	Config config = ConfigUtils.createConfig();
 	ConfigUtils.loadConfig(config,"data/10p/config.xml");
 	config.plans().setInputFile(PopulationFileLocation);
@@ -121,6 +121,8 @@ public static void main(String[] args) {
 	//create the feature vectors. First create maps. 
 	Map<Id<ActivityFacility>,Tuple<Double,Double>> evUserFacilityUsage = new HashMap<>();
 	Map<Id<ActivityFacility>,Tuple<Double,Double>> evNonUserFacilityUsage = new HashMap<>();
+	Map<Id<ActivityFacility>,Double> evUserStartTime = new HashMap<>();
+	Map<Id<ActivityFacility>,Double> nonEvUserStartTime = new HashMap<>();
 	
 	population.getPersons().values().forEach(p->{
 		boolean evUser = false;
@@ -131,18 +133,25 @@ public static void main(String[] args) {
 		boolean atAll = evUser;
 		TripStructureUtils.getActivities(p.getSelectedPlan().getPlanElements(),StageActivityHandling.ExcludeStageActivities).stream().forEach(a->{
 			double duration = config.planCalcScore().getActivityParams(a.getType()).getTypicalDuration().seconds();
+			double startTime = 0;
 			if(a.getStartTime().isDefined() && a.getEndTime().isDefined()) {
 				duration =a.getEndTime().seconds()-a.getStartTime().seconds();
+				startTime = a.getStartTime().seconds();
 			}else if(a.getStartTime().isUndefined() && a.getEndTime().isDefined()) {
 				duration = a.getEndTime().seconds();
+				startTime = 0;
 			}else if(a.getStartTime().isDefined() && a.getEndTime().isUndefined()) {
 				duration = 24*3600.-a.getStartTime().seconds();
+				startTime = a.getStartTime().seconds();
 			}
 			double d = duration;
+			double s = startTime;
 			if(atAll) {
 				evUserFacilityUsage.compute(a.getFacilityId(), (k,v)->v==null?new Tuple<>(1.,d):new Tuple<>(v.getFirst()+1,v.getSecond()+d));
+				evUserStartTime.compute(a.getFacilityId(), (k,v)->v==null?s:v+s);
 			}else {
 				evNonUserFacilityUsage.compute(a.getFacilityId(), (k,v)->v==null?new Tuple<>(1.,d):new Tuple<>(v.getFirst()+1,v.getSecond()+d));
+				nonEvUserStartTime.compute(a.getFacilityId(), (k,v)->v==null?s:v+s);
 			}
 		});
 		
@@ -157,12 +166,16 @@ public static void main(String[] args) {
 		double nonEvUser = 0;
 		double evUserDuration = 0;
 		double nonEvUserDuration = 0;
+		double evUserStartTime_ = 0;
+		double nonEvUserStartTime_ = 0;
 		if(linkToFacilityMap.containsKey(linkId)) {
 			Map<String,Double>oldFeature = featuresMapToArray.getMap(features.get(linkToFacilityMap.get(linkId)).toArray());
 			evUser = oldFeature.get(Hotspot.activityNumberString+"_"+Hotspot.EvUserString);
 			nonEvUser = oldFeature.get(Hotspot.activityNumberString+"_"+Hotspot.nonEvUserString);
 			evUserDuration = oldFeature.get(Hotspot.acitivityDurationString+"_"+Hotspot.EvUserString);
 			nonEvUserDuration = oldFeature.get(Hotspot.acitivityDurationString+"_"+Hotspot.nonEvUserString);
+//			evUserStartTime_ = oldFeature.get(Hotspot.startTime+"_"+Hotspot.EvUserString);
+//			nonEvUserStartTime_ = oldFeature.get(Hotspot.startTime+"_"+Hotspot.nonEvUserString);
 		}else {
 			linkToFacilityMap.put(linkId, facId);
 		}
@@ -175,11 +188,13 @@ public static void main(String[] args) {
 			
 			evUserDuration = (evUserDuration*evUser+ evUserFacilityUsage.get(facId).getSecond())/(evUser+evUserFacilityUsage.get(facId).getFirst());
 			evUser = evUser + evUserFacilityUsage.get(facId).getFirst();
+			evUserStartTime_ = (evUserStartTime_*evUser+evUserStartTime.get(facId))/(evUser+evUserFacilityUsage.get(facId).getFirst());
 		}
 		if(evNonUserFacilityUsage.get(facId)!=null) {
 			
 			nonEvUserDuration = (nonEvUser*nonEvUserDuration+evNonUserFacilityUsage.get(facId).getSecond())/(nonEvUser+evNonUserFacilityUsage.get(facId).getFirst());
 			nonEvUser = nonEvUser+evNonUserFacilityUsage.get(facId).getFirst();
+			nonEvUserStartTime_ = (nonEvUserStartTime_*nonEvUser+nonEvUserStartTime.get(facId))/(nonEvUser+evNonUserFacilityUsage.get(facId).getFirst());
 		}
 		featureMap.put(Hotspot.locationX, facilities.getFacilities().get(facId).getCoord().getX());
 		featureMap.put(Hotspot.locationY, facilities.getFacilities().get(facId).getCoord().getY());
@@ -187,6 +202,10 @@ public static void main(String[] args) {
 		featureMap.put(Hotspot.acitivityDurationString+"_"+Hotspot.nonEvUserString, nonEvUserDuration);
 		featureMap.put(Hotspot.activityNumberString+"_"+Hotspot.EvUserString, evUser);
 		featureMap.put(Hotspot.activityNumberString+"_"+Hotspot.nonEvUserString, nonEvUser);
+//		featureMap.put(Hotspot.startTime+"_"+Hotspot.EvUserString, evUserStartTime_);
+//		featureMap.put(Hotspot.startTime+"_"+Hotspot.nonEvUserString, nonEvUserStartTime_);
+		
+	
 		if(featuresMapToArray==null) {
 			featuresMapToArray = new MapToArray<String>("features",featureMap.keySet());
 		}
@@ -206,6 +225,8 @@ public static void main(String[] args) {
 			facilities.addActivityFacility(facility);
 			facId = facility.getId();
 			double evUser = 0;
+			double evUserStartTime_ = 0;
+			double nonEvUserStartTime_ = 0;
 			double nonEvUser = 0;
 			double evUserDuration = 0;
 			double nonEvUserDuration = 0;
@@ -216,6 +237,9 @@ public static void main(String[] args) {
 			featureMap.put(Hotspot.acitivityDurationString+"_"+Hotspot.nonEvUserString, nonEvUserDuration);
 			featureMap.put(Hotspot.activityNumberString+"_"+Hotspot.EvUserString, evUser);
 			featureMap.put(Hotspot.activityNumberString+"_"+Hotspot.nonEvUserString, nonEvUser);
+//			featureMap.put(Hotspot.startTime+"_"+Hotspot.EvUserString, evUserStartTime_);
+//			featureMap.put(Hotspot.startTime+"_"+Hotspot.nonEvUserString, nonEvUserStartTime_);
+			
 			features.put(facId, featuresMapToArray.getRealVector(featureMap));
 			hotspot.addFacility(facId,features.get(facId));
 			hotspot.setCentroidFacilityId(facId,features.get(facId));
@@ -245,12 +269,12 @@ public static void main(String[] args) {
 		}
 		fwCharger.close();
 		FileWriter fwFacilityFeature = new FileWriter(new File(featureFileLocation));
-		fwFacilityFeature.append("facilityId,X,Y,evUser,evUserDuration,nonEvUser,nonEvUserDuration\n");
+		fwFacilityFeature.append("facilityId,X,Y,evUser,evUserDuration,nonEvUser,nonEvUserDuration,EvUserStartTime,nonEVUserStartTime\n");
 		for(Id<ActivityFacility> facId:features.keySet()) {
 			Map<String,Double> f = featuresMapToArray.getMap(features.get(facId).toArray());
 			fwFacilityFeature.append(facId+","+f.get(Hotspot.locationX)+","+f.get(Hotspot.locationY)+","+f.get(Hotspot.activityNumberString+"_"+Hotspot.EvUserString)
 			+","+f.get(Hotspot.acitivityDurationString+"_"+Hotspot.EvUserString)+","+f.get(Hotspot.activityNumberString+"_"+Hotspot.nonEvUserString)+
-			","+f.get(Hotspot.acitivityDurationString+"_"+Hotspot.nonEvUserString)+"\n");
+			","+f.get(Hotspot.acitivityDurationString+"_"+Hotspot.nonEvUserString)+","+f.get(Hotspot.startTime+"_"+Hotspot.EvUserString)+","+f.get(Hotspot.startTime+"_"+Hotspot.nonEvUserString)+"\n");
 			fwFacilityFeature.flush();
 		}
 		fwFacilityFeature.close();
@@ -308,7 +332,7 @@ public static void main(String[] args) {
 	chargerPower.put(ChargerType.fast, 1000*50.);
 	chargerPower.put(ChargerType.level1, 1000*30.);
 	chargerPower.put(ChargerType.level2, 1000*10.);
-	chargerPower.put(ChargerType.fast, 1000*6.);
+	chargerPower.put(ChargerType.home, 1000*6.);
 	
 	
 	

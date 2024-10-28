@@ -267,11 +267,20 @@
 	    <version>ev-5.5.2-g5d9dd01-144</version>
 	</dependency>
 -->
+
    <dependency>
       <groupId>com.gurobi</groupId>
       <artifactId>gurobi</artifactId>
       <version>11.0.2</version>
     </dependency>
+    
+<!-- https://mvnrepository.com/artifact/de.xypron.jcobyla/jcobyla -->
+<dependency>
+    <groupId>de.xypron.jcobyla</groupId>
+    <artifactId>jcobyla</artifactId>
+    <version>1.4</version>
+</dependency>
+
 
 </dependencies>
 </project>

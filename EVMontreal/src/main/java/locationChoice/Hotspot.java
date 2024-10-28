@@ -17,6 +17,7 @@ public class Hotspot {
 	public static final String acitivityDurationString = "duration";
 	public static final String EvUserString = "evUser";
 	public static final String nonEvUserString = "nonEvUser";
+	public static final String startTime = "startTime";
 	
 	public Map<ChargerType,Integer> plugCountPerChargerType = new HashMap<>();
 	public static Map<ChargerType,Double> powerPerChargerType = new HashMap<>();
