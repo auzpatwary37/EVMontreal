@@ -1,12 +1,15 @@
 package locationChoice;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -186,7 +189,7 @@ public class SecondStepTrial {
 		
 		MapToArray<String> variablesMapToArray = new MapToArray<String>("variables",variables.keySet());
 		Calcfc newFunc = new Calcfc() {
-
+			private int i=0;
 			@Override
 			public double compute(int n, int m, double[] x, double[] con) {
 				
@@ -300,9 +303,15 @@ public class SecondStepTrial {
 		            // Upper bound: value should be <= 1
 		            con[constraintIndex++] = 1.0 - value;
 		        }
-
-		        
-				return model.getAverageQueueTime();
+		        double avgQueue = model.getAverageQueueTime();
+		        try {
+					logIteration(i, avgQueue, new LinkedHashMap<>(variables), model.getServedDemand(), model.getUnAllocatedFacilities(), "data/10p/secondStepIterLogger_28Oct24.csv");
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+		        i++;
+				return avgQueue;
 			}
 			
 		};
@@ -331,5 +340,27 @@ public class SecondStepTrial {
             return ChargerType.fast;
         }
     }
+	
+	public static void logIteration(int iteration, double objectiveValue, LinkedHashMap<String, Double> variables,
+			double servedDemand, int allocatedFacilities, String filePath) throws IOException {
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath, true))) {
+			// Write header with variable names only on the first iteration
+			if (iteration == 1) {
+				writer.write("Iteration,CurrentObjective,ServedDemand,AllocatedFacilities");
+				for (String paramName : variables.keySet()) {
+					writer.write("," + paramName);
+				}
+				writer.newLine();
+			}
+
+			// Write data for the current iteration
+			writer.write(iteration + "," + objectiveValue + "," + servedDemand + "," + allocatedFacilities);
+			for (Double paramValue : variables.values()) {
+				writer.write("," + paramValue);
+			}
+			writer.newLine();
+		}
+	}
+	
 
 }

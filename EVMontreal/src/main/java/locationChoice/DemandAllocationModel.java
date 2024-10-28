@@ -34,6 +34,9 @@ public class DemandAllocationModel {
 	private MapToArray<String>featureMap;// the map to array converter for facility features
 	private Map<Id<Hotspot>,Double> averagePlugPowerAtCharger = new HashMap<>();
 	
+	private double servedDemand = 0;
+	private int unAllocatedFacilities = 0;
+	
 	// Add this at the top of your class
 	private Map<Id<Hotspot>, double[]> hourlyDemandPerCharger = new HashMap<>();
 	private Map<Id<Hotspot>, Integer> peakHourPerCharger = new HashMap<>();
@@ -651,7 +654,7 @@ public class DemandAllocationModel {
 				unassignedFacilityCount++;
 			}
 		}
-
+		this.unAllocatedFacilities = unassignedFacilityCount;
 		System.out.println("Number of facilities with non-zero demand and without any assigned hotspots or chargers: " + unassignedFacilityCount);
 
 		// 3. Served demand (sum of facility demand * peak factor - charger demand)
@@ -681,7 +684,7 @@ public class DemandAllocationModel {
 		// Calculate the served demand
 		double servedDemand = totalFacilityDemand - totalChargerDemand;
 		
-		
+		this.servedDemand = servedDemand;
 
 		System.out.println("Total unserved demand: " + servedDemand*this.peakHourFactor+" out of "+ totalFacilityDemand*this.peakHourFactor);
 		writeChargerDemandToFile(this.demandPerCharger,this.AverageChargingDuration,this.ChargingTime,"chargerDemandFromModel.csv");
@@ -744,6 +747,14 @@ public class DemandAllocationModel {
 
 	public Map<Id<Hotspot>, Double> getAveragePlugPowerAtCharger() {
 		return averagePlugPowerAtCharger;
+	}
+
+	public double getServedDemand() {
+		return servedDemand;
+	}
+
+	public int getUnAllocatedFacilities() {
+		return unAllocatedFacilities;
 	}
 
 	
