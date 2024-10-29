@@ -77,8 +77,8 @@ public class SecondStepTrial {
 		
 		Map<ChargerType, Double> setupCostPerChargerType = new HashMap<>();
 		Map<ChargerType, Double> operationCostPerChargerType = new HashMap<>();
-		double setUpBudget = 500000; // Example budget, adjust as necessary
-		double operationBudget = 3000;//Example operation budget, adjust as necessary
+		double setUpBudget = 1284600*1.6; // Example budget, adjust as necessary
+		double operationBudget = 1284600*1.6;//Example operation budget, adjust as necessary
 		
 		// Define the setup and operation costs for each charger type
 		setupCostPerChargerType.put(ChargerType.level1, 5000.0); // Example setup cost for level1 charger
@@ -180,7 +180,7 @@ public class SecondStepTrial {
 			zonesNet.getNodes().get(Id.createNodeId(part[0])).getAttributes().putAttribute("Power Limit",Double.parseDouble(part[4]));
 		}
 		bf_zones.close();
-		Map<Id<Node>,Set<Id<Hotspot>>> chargerToZonesAssignment = new HashMap<>();
+		Map<Id<Node>,Set<Id<Hotspot>>> chargerToZonesAssignment = new LinkedHashMap<>();
 		hotspots.entrySet().forEach(h->{
 			Node zone = NetworkUtils.getNearestNode(zonesNet, h.getValue().getCoord());
 			if(!chargerToZonesAssignment.containsKey(zone.getId()))chargerToZonesAssignment.put(zone.getId(), new HashSet<>());
@@ -291,7 +291,7 @@ public class SecondStepTrial {
 		            }
 
 		            // Set the constraint to ensure max draw does not exceed allowed limit
-		            con[constraintIndex++] = maxAllowedPowerDraw - maxHourlyPowerDraw;
+		            con[constraintIndex++] = maxAllowedPowerDraw/3600000 - maxHourlyPowerDraw/3600000;
 		        }
 		     // Add upper and lower bound constraints at the end
 		        for (Map.Entry<String, Double> entry : variables.entrySet()) {
@@ -305,7 +305,7 @@ public class SecondStepTrial {
 		        }
 		        double avgQueue = model.getAverageQueueTime();
 		        try {
-					logIteration(i, avgQueue, new LinkedHashMap<>(variables), model.getServedDemand(), model.getUnAllocatedFacilities(), "data/10p/secondStepIterLogger_28Oct24.csv");
+					logIteration(i, avgQueue, new LinkedHashMap<>(variables),con, model.getServedDemand(), model.getUnAllocatedFacilities(), "data/10p/secondStepIterLogger_28Oct24.csv");
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -341,12 +341,12 @@ public class SecondStepTrial {
         }
     }
 	
-	public static void logIteration(int iteration, double objectiveValue, LinkedHashMap<String, Double> variables,
+	public static void logIteration(int iteration, double objectiveValue, LinkedHashMap<String, Double> variables,double[] con,
 			double servedDemand, int allocatedFacilities, String filePath) throws IOException {
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath, true))) {
 			// Write header with variable names only on the first iteration
-			if (iteration == 1) {
-				writer.write("Iteration,CurrentObjective,ServedDemand,AllocatedFacilities");
+			if (iteration == 0) {
+				writer.write("Iteration,CurrentObjective,ServedDemand,AllocatedFacilities,constraint bduget_1, const budget2, const zone1, const zone2, const zone3, const zone4, const zone 5, const zone6");
 				for (String paramName : variables.keySet()) {
 					writer.write("," + paramName);
 				}
@@ -354,7 +354,7 @@ public class SecondStepTrial {
 			}
 
 			// Write data for the current iteration
-			writer.write(iteration + "," + objectiveValue + "," + servedDemand + "," + allocatedFacilities);
+			writer.write(iteration + "," + objectiveValue + "," + servedDemand + "," + allocatedFacilities+ "," +con[0]+ "," +con[1]+ "," +con[2]+ "," +con[3]+ "," +con[4]+ "," +con[5]+ "," +con[6]+ "," +con[7]);
 			for (Double paramValue : variables.values()) {
 				writer.write("," + paramValue);
 			}
