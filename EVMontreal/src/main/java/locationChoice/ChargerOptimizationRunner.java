@@ -1,40 +1,32 @@
 package locationChoice;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-import org.apache.commons.math.linear.MatrixUtils;
-import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.network.Node;
-import org.matsim.core.network.NetworkUtils;
-import org.matsim.facilities.ActivityFacility;
 import org.opt4j.core.Individual;
 import org.opt4j.core.genotype.DoubleGenotype;
 import org.opt4j.core.optimizer.Archive;
 import org.opt4j.core.problem.Creator;
 import org.opt4j.core.problem.Decoder;
-import org.opt4j.core.problem.Evaluator;
 import org.opt4j.core.problem.ProblemModule;
 import org.opt4j.core.start.Opt4JTask;
 import org.opt4j.optimizers.ea.EvolutionaryAlgorithmModule;
 import org.opt4j.viewer.ViewerModule;
 
-import com.google.inject.Binder;
 import com.google.inject.Inject;
-import com.google.inject.multibindings.Multibinder;
 
 public class ChargerOptimizationRunner {
 
@@ -232,12 +224,51 @@ public class ChargerOptimizationRunner {
                 System.out.println("Solution: " + individual.getPhenotype());
                 System.out.println("Objectives: " + individual.getObjectives());
             }
+            this.writeSolutionsToFile(archive, "data/10p/secondStepOptimizationResult.csv");
+            
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
             task.close();
         }
+        
+        
     }
+    // Method to write optimization details to a file
+    public void writeSolutionsToFile(Archive archive, String filePath) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+            // Write header
+            writer.write("Phenotype, Objectives\n");
+
+            // Iterate over each individual in the archive
+            for (Individual individual : archive) {
+                // Get the phenotype (solution representation)
+                Map<String, Double> phenotypeMap = (Map<String, Double>) individual.getPhenotype();
+
+                // Convert the phenotype map to a readable string
+                StringBuilder phenotypeString = new StringBuilder();
+                phenotypeMap.forEach((key, value) -> phenotypeString.append(key).append(": ").append(value).append("; "));
+
+                // Get objectives as a formatted string
+                StringBuilder objectivesString = new StringBuilder();
+                individual.getObjectives().forEach(objective -> objectivesString.append(objective.getValue()).append(", "));
+
+                // Remove the last comma and space from objectives string
+                if (objectivesString.length() > 0) {
+                    objectivesString.setLength(objectivesString.length() - 2);
+                }
+
+                // Write phenotype and objectives to the file
+                writer.write(phenotypeString.toString() + ", " + objectivesString.toString() + "\n");
+            }
+
+            System.out.println("Solutions written to file: " + filePath);
+
+        } catch (IOException e) {
+            System.out.println("Error writing to file: " + e.getMessage());
+        }
+    }
+    
 
     private static class ChargerProblemModule extends ProblemModule {
     	DemandAllocationModel demandModel;
