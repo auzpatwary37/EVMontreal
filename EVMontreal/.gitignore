@@ -3,3 +3,5 @@ calib_5per/*
 EV_5Percent_100Iter/*
 data/*
 montreal scenario5/*
+/.apt_generated/
+/.apt_generated_tests/

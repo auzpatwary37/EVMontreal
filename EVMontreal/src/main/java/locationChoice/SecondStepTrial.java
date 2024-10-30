@@ -77,8 +77,12 @@ public class SecondStepTrial {
 		
 		Map<ChargerType, Double> setupCostPerChargerType = new HashMap<>();
 		Map<ChargerType, Double> operationCostPerChargerType = new HashMap<>();
-		double setUpBudget = 1284600*1.6; // Example budget, adjust as necessary
+		
+		
+		double setUpBudget = 1284600*5; // Example budget, adjust as necessary
 		double operationBudget = 1284600*1.6;//Example operation budget, adjust as necessary
+		
+		
 		
 		// Define the setup and operation costs for each charger type
 		setupCostPerChargerType.put(ChargerType.level1, 5000.0); // Example setup cost for level1 charger

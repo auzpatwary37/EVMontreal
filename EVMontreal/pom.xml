@@ -280,6 +280,27 @@
     <artifactId>jcobyla</artifactId>
     <version>1.4</version>
 </dependency>
+<!-- https://mvnrepository.com/artifact/org.opt4j/opt4j-core -->
+<dependency>
+    <groupId>org.opt4j</groupId>
+    <artifactId>opt4j-core</artifactId>
+    <version>3.1.4</version>
+</dependency>
+<!-- https://mvnrepository.com/artifact/org.opt4j/opt4j-optimizers -->
+<dependency>
+    <groupId>org.opt4j</groupId>
+    <artifactId>opt4j-optimizers</artifactId>
+    <version>3.1.4</version>
+</dependency>
+<!-- https://mvnrepository.com/artifact/org.opt4j/opt4j-viewer -->
+<dependency>
+    <groupId>org.opt4j</groupId>
+    <artifactId>opt4j-viewer</artifactId>
+    <version>3.1.4</version>
+</dependency>
+
+
+
 
 
 </dependencies>

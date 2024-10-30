@@ -63,8 +63,15 @@ public class DemandAllocationModel {
 	}
 
 	// Main function to run demand allocation
-	public void allocateDemand(Map<Id<Hotspot>, Map<ChargerType, Integer>> chargerAllocation, Map<Id<ActivityFacility>, Double> demand) {
-		this.chargerAllocation = chargerAllocation;
+	public synchronized void allocateDemand(Map<Id<Hotspot>, Map<ChargerType, Integer>> chargerAllocation, Map<Id<ActivityFacility>, Double> demand) {
+		if(chargerAllocation==null) {
+			this.chargerAllocation = new HashMap<>();
+			this.hotspots.entrySet().forEach(e->{
+				this.chargerAllocation.put(e.getKey(), e.getValue().getPlugCountPerChargerType());
+			});
+		}else {
+			this.chargerAllocation = chargerAllocation;
+		}
 		if(demand!=null) {
 			this.demand = demand;
 		}else {
@@ -114,6 +121,8 @@ public class DemandAllocationModel {
 		ChargingTime = new HashMap<>();
 		facilityToChargerProbability = new HashMap<>();
 		this.averageQueueTime = 0;
+		this.demandPerCharger.clear();
+		this.startTimePerCharger.clear();
 
 		// Step 1: Calculate active hotspots based on charger allocation
 		calculateActiveHotspots();
@@ -138,6 +147,9 @@ public class DemandAllocationModel {
 			double equalProbability = 1.0 / nearestChargers.size();  // Equal probability for each charger
 
 			for (Hotspot charger : nearestChargers) {
+				if(!this.activeHotspots.containsKey(charger.getHotspotId())){
+					System.out.println("How come charger is present while it is not active!");
+				}
 				chargerProbabilities.put(charger.getHotspotId(), equalProbability);  // Set equal probability for each charger
 			}
 
@@ -755,6 +767,14 @@ public class DemandAllocationModel {
 
 	public int getUnAllocatedFacilities() {
 		return unAllocatedFacilities;
+	}
+
+	public Map<Id<Hotspot>, Hotspot> getHotspots() {
+		return hotspots;
+	}
+
+	public Map<Id<Hotspot>, Map<ChargerType, Integer>> getChargerAllocation() {
+		return chargerAllocation;
 	}
 
 	
