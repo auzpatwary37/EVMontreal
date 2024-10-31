@@ -413,35 +413,24 @@ public class ChargerEvaluatorV2 implements Evaluator<Map<Id<Hotspot>,Map<Charger
 
 		double obj = demandModel.getAverageQueueTime();
 
-		//        for(double d:con) {
-		//        	obj+=d*d;
-		//        }
-		//        
+        for(double d:con) {
+        	obj+=-1*Math.min(d, 0);
+        }
+		        
 
 		objectives.add("Queue", Sign.MIN, obj);
-		objectives.add("budget_1", Sign.MIN, -1*Math.min(con[0], 0));
-		objectives.add("budget_2", Sign.MIN, -1*Math.min(con[1], 0));
-		objectives.add("zone1",  Sign.MIN, -1*Math.min(con[2], 0));
-		objectives.add("zone2",  Sign.MIN, -1*Math.min(con[3], 0));
-		objectives.add("zone3",  Sign.MIN, -1*Math.min(con[4], 0));
-		objectives.add("zone4",  Sign.MIN, -1*Math.min(con[5], 0));
-		objectives.add("zone5",  Sign.MIN, -1*Math.min(con[6], 0));
-		objectives.add("zone6",  Sign.MIN, -1*Math.min(con[7], 0));
+//		objectives.add("budget_1", Sign.MIN, -1*Math.min(con[0], 0));
+//		objectives.add("budget_2", Sign.MIN, -1*Math.min(con[1], 0));
+//		objectives.add("zone1",  Sign.MIN, -1*Math.min(con[2], 0));
+//		objectives.add("zone2",  Sign.MIN, -1*Math.min(con[3], 0));
+//		objectives.add("zone3",  Sign.MIN, -1*Math.min(con[4], 0));
+//		objectives.add("zone4",  Sign.MIN, -1*Math.min(con[5], 0));
+//		objectives.add("zone5",  Sign.MIN, -1*Math.min(con[6], 0));
+//		objectives.add("zone6",  Sign.MIN, -1*Math.min(con[7], 0));
 
 		return objectives;
 	}
 
 
-
-
-	private ChargerType mapToChargerType(double value) {
-		if (value < 1.0 / 3.0) {
-			return ChargerType.level1;
-		} else if (value < 2.0 / 3.0) {
-			return ChargerType.level2;
-		} else {
-			return ChargerType.fast;
-		}
-	}
 }
 

@@ -43,6 +43,7 @@ public class ChargerOptimizationRunnerV2 {
         EvolutionaryAlgorithmModule eaModule = new EvolutionaryAlgorithmModule();
         eaModule.setGenerations(200);
         eaModule.setAlpha(50);
+        
 
         // Optional viewer for monitoring optimization
         ViewerModule viewerModule = new ViewerModule();
@@ -136,6 +137,16 @@ public class ChargerOptimizationRunnerV2 {
     	MapToArray<String> variablesType;
     	MapToArray<String> variablesPlug;
     	Random random ;
+    	Map<ChargerType, Double> setupCostPerChargerType = new HashMap<>();
+		Map<ChargerType, Double> operationCostPerChargerType = new HashMap<>();
+
+
+		double setUpBudget = 1284600*5; // Example budget, adjust as necessary
+		double operationBudget = 1284600*1.6;//Example operation budget, adjust as necessary
+
+
+
+		
     	
     	@Inject
     	public ChargerCreatorV2(){
@@ -180,6 +191,14 @@ public class ChargerOptimizationRunnerV2 {
     		});
     		this.variablesType = new MapToArray<String>("variablesType",variablesType.keySet());
     		this.variablesPlug = new MapToArray<String>("variablesPlug",variablesPlug.keySet());
+    		// Define the setup and operation costs for each charger type
+    		setupCostPerChargerType.put(ChargerType.level1, 5000.0); // Example setup cost for level1 charger
+    		setupCostPerChargerType.put(ChargerType.level2, 10000.0); // Example setup cost for level2 charger
+    		setupCostPerChargerType.put(ChargerType.fast, 20000.0);   // Example setup cost for fast charger
+
+    		operationCostPerChargerType.put(ChargerType.level1, 200.0); // Example operation cost for level1 charger
+    		operationCostPerChargerType.put(ChargerType.level2, 400.0); // Example operation cost for level2 charger
+    		operationCostPerChargerType.put(ChargerType.fast, 800.0);   // Example operation cost for fast charger
     	}
     	
     	@Override
@@ -190,9 +209,54 @@ public class ChargerOptimizationRunnerV2 {
             typeGenotype.init(random, numberOfTypeVariables);
 
             // IntegerGenotype for plug count (1–10)
-            IntegerGenotype plugGenotype = new IntegerGenotype(0, 10);
+            IntegerGenotype plugGenotype = new IntegerGenotype(0, 5);
             int numberOfPlugVariables = variablesPlug.getKeySet().size();
             plugGenotype.init(random, numberOfPlugVariables);
+            // Random reduction factors for adjustment (e.g., 50% probability for each reduction)
+            double plugReductionProbability = 0.25;
+            double typeReductionProbability = 0.15;
+            
+            // Calculate initial setup and operation costs
+            double setupCost = calculateTotalSetupCost(typeGenotype, plugGenotype);
+            double operationCost = calculateTotalOperationCost(typeGenotype, plugGenotype);
+            // Adjust until the solution meets budget constraints
+            int maxTry = 30;
+            int trial = 0;
+            double probabiltiyBudgetViolation = 0.1;
+            double probBudgetViolationForThisInstance = random.nextDouble();
+            while (setupCost > setUpBudget || operationCost > operationBudget) {
+                // Calculate how far off we are from the budget, used to scale probabilities
+                double setupScalingFactor = Math.max(0.1, (setupCost - setUpBudget) / setUpBudget);
+                double operationScalingFactor = Math.max(0.1, (operationCost - operationBudget) / operationBudget);
+
+                // Dynamically adjust probabilities based on scaling factors
+                double adjustedPlugReductionProb = plugReductionProbability * setupScalingFactor;
+                double adjustedTypeReductionProb = typeReductionProbability * operationScalingFactor;
+
+                for (int i = 0; i < typeGenotype.size(); i++) {
+                    // Randomly decide to reduce plug count, with a higher chance if far from budget
+                    if (random.nextDouble() < adjustedPlugReductionProb && plugGenotype.get(i) > 1) {
+                        plugGenotype.set(i, plugGenotype.get(i) - 1);
+                    }
+
+                    // Randomly decide to downgrade charger type
+                    if (random.nextDouble() < adjustedTypeReductionProb && typeGenotype.get(i) > 0) {
+                        typeGenotype.set(i, typeGenotype.get(i) - 1);
+                    }
+                }
+
+                    // Recalculate costs after adjustments
+                    setupCost = calculateTotalSetupCost(typeGenotype, plugGenotype);
+                    operationCost = calculateTotalOperationCost(typeGenotype, plugGenotype);
+
+                    // Exit early if costs meet budget constraints
+                    if (setupCost <= setUpBudget && operationCost <= operationBudget) {
+                        break;
+                    }
+                    trial++;
+                    if(probBudgetViolationForThisInstance<probabiltiyBudgetViolation && trial>maxTry) break;
+                }
+                
 
             // Combine into a CompositeGenotype
             CompositeGenotype<String, Genotype> compositeGenotype = new CompositeGenotype<>();
@@ -200,11 +264,55 @@ public class ChargerOptimizationRunnerV2 {
             compositeGenotype.put("plug", plugGenotype);
 
             return compositeGenotype;
-        }
+       }
+    	
+    	
+    	private double calculateTotalSetupCost(IntegerGenotype typeGenotype, IntegerGenotype plugGenotype) {
+    	    double totalSetupCost = 0.0;
+
+    	    for (int i = 0; i < typeGenotype.size(); i++) {
+    	        ChargerType chargerType = mapToChargerType(typeGenotype.get(i)); // Converts the integer to ChargerType
+    	        int plugCount = plugGenotype.get(i); // Number of plugs at this index
+
+    	        // Calculate the setup cost for this charger type and plug count
+    	        totalSetupCost += setupCostPerChargerType.get(chargerType) * plugCount;
+    	    }
+
+    	    return totalSetupCost;
+    	}
+
+    	private double calculateTotalOperationCost(IntegerGenotype typeGenotype, IntegerGenotype plugGenotype) {
+    	    double totalOperationCost = 0.0;
+
+    	    for (int i = 0; i < typeGenotype.size(); i++) {
+    	        ChargerType chargerType = mapToChargerType(typeGenotype.get(i));
+    	        int plugCount = plugGenotype.get(i);
+
+    	        // Calculate the operation cost for this charger type and plug count
+    	        totalOperationCost += operationCostPerChargerType.get(chargerType) * plugCount;
+    	    }
+
+    	    return totalOperationCost;
+    	}
+    	
+    	private ChargerType mapToChargerType(Integer value) {
+	        if (value == 0) {
+	            return ChargerType.level1;
+	        } else if (value == 1) {
+	            return ChargerType.level2;
+	        } else {
+	            return ChargerType.fast;
+	        }
+	    }
     }
 
     private static class ChargerDecoderV2 implements Decoder<CompositeGenotype<String, IntegerGenotype>, Map<Id<Hotspot>, Map<ChargerType, Integer>>> {
-    	
+    	Map<ChargerType, Double> setupCostPerChargerType = new HashMap<>();
+		Map<ChargerType, Double> operationCostPerChargerType = new HashMap<>();
+
+
+		double setUpBudget = 1284600*5; // Example budget, adjust as necessary
+		double operationBudget = 1284600*1.6;//Example operation budget, adjust as necessary
     	MapToArray<String> variablesType;
     	MapToArray<String> variablesPlug;
         
@@ -251,6 +359,14 @@ public class ChargerOptimizationRunnerV2 {
     		});
     		this.variablesType = new MapToArray<String>("variablesType",variablesType.keySet());
     		this.variablesPlug = new MapToArray<String>("variablesPlug",variablesPlug.keySet());
+    		// Define the setup and operation costs for each charger type
+    		setupCostPerChargerType.put(ChargerType.level1, 5000.0); // Example setup cost for level1 charger
+    		setupCostPerChargerType.put(ChargerType.level2, 10000.0); // Example setup cost for level2 charger
+    		setupCostPerChargerType.put(ChargerType.fast, 20000.0);   // Example setup cost for fast charger
+
+    		operationCostPerChargerType.put(ChargerType.level1, 200.0); // Example operation cost for level1 charger
+    		operationCostPerChargerType.put(ChargerType.level2, 400.0); // Example operation cost for level2 charger
+    		operationCostPerChargerType.put(ChargerType.fast, 800.0);   // Example operation cost for fast charger
     	}
     	
     	
