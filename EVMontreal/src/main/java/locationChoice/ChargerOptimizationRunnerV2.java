@@ -41,18 +41,20 @@ public class ChargerOptimizationRunnerV2 {
     private void runOptimization() {
         // Configure Evolutionary Algorithm module
         EvolutionaryAlgorithmModule eaModule = new EvolutionaryAlgorithmModule();
-        eaModule.setGenerations(200);
+        eaModule.setGenerations(500);
         eaModule.setAlpha(50);
-        
+        //eaModule.addOptimizerIterationListener(SolutionListener.class);
 
         // Optional viewer for monitoring optimization
         ViewerModule viewerModule = new ViewerModule();
         viewerModule.setCloseOnStop(true);
+        
 
         // Define and initialize the task
         Opt4JTask task = new Opt4JTask(false);
-        task.init(eaModule, new ChargerProblemModule(),viewerModule);
 
+        task.init(eaModule, new ChargerProblemModule(),viewerModule);
+        
         try {
             task.execute();
 
@@ -62,7 +64,7 @@ public class ChargerOptimizationRunnerV2 {
                 System.out.println("Solution: " + individual.getPhenotype());
                 System.out.println("Objectives: " + individual.getObjectives());
             }
-            this.writeSolutionsToFile(archive, "data/10p/secondStepOptimizationResult.csv");
+            this.writeSolutionsToFile(archive, "data/10p/secondStepOptimizationResultNov3.csv");
             
         } catch (Exception e) {
             e.printStackTrace();
@@ -128,7 +130,7 @@ public class ChargerOptimizationRunnerV2 {
         protected void config() {
         	
             bindProblem(ChargerCreatorV2.class, ChargerDecoderV2.class, ChargerEvaluatorV2.class);
-           
+            addOptimizerIterationListener(SolutionListener.class);
         }
     }
 
@@ -141,7 +143,7 @@ public class ChargerOptimizationRunnerV2 {
 		Map<ChargerType, Double> operationCostPerChargerType = new HashMap<>();
 
 
-		double setUpBudget = 1284600*5; // Example budget, adjust as necessary
+		double setUpBudget = 3211500; // Example budget, adjust as necessary
 		double operationBudget = 1284600*1.6;//Example operation budget, adjust as necessary
 
 
@@ -202,69 +204,153 @@ public class ChargerOptimizationRunnerV2 {
     	}
     	
     	@Override
-        public CompositeGenotype<String, Genotype> create() {
-            // IntegerGenotype for charger type (0–2) to represent ChargerType enum values
-            IntegerGenotype typeGenotype = new IntegerGenotype(0, ChargerType.values().length - 1);
-            int numberOfTypeVariables = variablesType.getKeySet().size();
-            typeGenotype.init(random, numberOfTypeVariables);
+    	public CompositeGenotype<String, Genotype> create() {
+    	    // Define maximum values for charger types and plug counts
+    	    int maxType = ChargerType.values().length - 1;  // Assuming charger types range from 0 to maxType
+    	    int maxPlug = 10;  // Maximum number of plugs per charger
 
-            // IntegerGenotype for plug count (1–10)
-            IntegerGenotype plugGenotype = new IntegerGenotype(0, 5);
-            int numberOfPlugVariables = variablesPlug.getKeySet().size();
-            plugGenotype.init(random, numberOfPlugVariables);
-            // Random reduction factors for adjustment (e.g., 50% probability for each reduction)
-            double plugReductionProbability = 0.25;
-            double typeReductionProbability = 0.15;
-            
-            // Calculate initial setup and operation costs
-            double setupCost = calculateTotalSetupCost(typeGenotype, plugGenotype);
-            double operationCost = calculateTotalOperationCost(typeGenotype, plugGenotype);
-            // Adjust until the solution meets budget constraints
-            int maxTry = 30;
-            int trial = 0;
-            double probabiltiyBudgetViolation = 0.1;
-            double probBudgetViolationForThisInstance = random.nextDouble();
-            while (setupCost > setUpBudget || operationCost > operationBudget) {
-                // Calculate how far off we are from the budget, used to scale probabilities
-                double setupScalingFactor = Math.max(0.1, (setupCost - setUpBudget) / setUpBudget);
-                double operationScalingFactor = Math.max(0.1, (operationCost - operationBudget) / operationBudget);
+    	    // Initialize IntegerGenotypes for charger type and plug count with zero values
+    	    IntegerGenotype typeGenotype = new IntegerGenotype(0, maxType);
+    	    IntegerGenotype plugGenotype = new IntegerGenotype(0, maxPlug);
+    	    int numberOfChargers = variablesType.getKeySet().size();
 
-                // Dynamically adjust probabilities based on scaling factors
-                double adjustedPlugReductionProb = plugReductionProbability * setupScalingFactor;
-                double adjustedTypeReductionProb = typeReductionProbability * operationScalingFactor;
+    	    // Initialize each charger with type 0 and plug count 0 (level 1 charger with 0 plugs)
+    	    for (int i = 0; i < numberOfChargers; i++) {
+    	        typeGenotype.add(0);
+    	        plugGenotype.add(0);
+    	    }
 
-                for (int i = 0; i < typeGenotype.size(); i++) {
-                    // Randomly decide to reduce plug count, with a higher chance if far from budget
-                    if (random.nextDouble() < adjustedPlugReductionProb && plugGenotype.get(i) > 1) {
-                        plugGenotype.set(i, plugGenotype.get(i) - 1);
-                    }
+    	    // Track remaining budget
+    	    double remainingSetupBudget = setUpBudget;
+    	    double remainingOperationBudget = operationBudget;
 
-                    // Randomly decide to downgrade charger type
-                    if (random.nextDouble() < adjustedTypeReductionProb && typeGenotype.get(i) > 0) {
-                        typeGenotype.set(i, typeGenotype.get(i) - 1);
-                    }
-                }
+    	    // Loop to assign random configurations while staying within the budget
+    	    while (remainingSetupBudget > 0 && remainingOperationBudget > 0) {
+    	        // Randomly select a charger index
+    	        int chargerIndex = random.nextInt(numberOfChargers);
 
-                    // Recalculate costs after adjustments
-                    setupCost = calculateTotalSetupCost(typeGenotype, plugGenotype);
-                    operationCost = calculateTotalOperationCost(typeGenotype, plugGenotype);
+    	        // Start with the maximum possible configuration and decrement if budget is exceeded
+    	        int maxConfigValue = maxType * maxPlug;
 
-                    // Exit early if costs meet budget constraints
-                    if (setupCost <= setUpBudget && operationCost <= operationBudget) {
-                        break;
-                    }
-                    trial++;
-                    if(probBudgetViolationForThisInstance<probabiltiyBudgetViolation && trial>maxTry) break;
-                }
-                
+    	        while (maxConfigValue > 0) {
+    	            // Randomly generate a number between 1 and maxConfigValue to determine type and plug count
+    	            int randomValue = 1 + random.nextInt(maxConfigValue);
 
-            // Combine into a CompositeGenotype
-            CompositeGenotype<String, Genotype> compositeGenotype = new CompositeGenotype<>();
-            compositeGenotype.put("type", typeGenotype);
-            compositeGenotype.put("plug", plugGenotype);
+    	            // Determine charger type and plug count based on randomValue
+    	            int assignedType = (randomValue - 1) / maxPlug;
+    	            int assignedPlug = (randomValue - 1) % maxPlug + 1;  // +1 ensures at least 1 plug
 
-            return compositeGenotype;
-       }
+    	            // Calculate the incremental costs for this assignment
+    	            ChargerType type = this.mapToChargerType(assignedType);
+    	            double incrementalSetupCost = this.setupCostPerChargerType.get(type) * assignedPlug;
+    	            double incrementalOperationCost = this.operationCostPerChargerType.get(type) * assignedPlug;
+
+    	            // Check if the new assignment fits within the remaining budget
+    	            if (incrementalSetupCost <= remainingSetupBudget && incrementalOperationCost <= remainingOperationBudget) {
+    	                // Accept the assignment by setting the type and plug count
+    	                typeGenotype.set(chargerIndex, assignedType);
+    	                plugGenotype.set(chargerIndex, assignedPlug);
+
+    	                // Subtract the incremental costs from the remaining budget
+    	                remainingSetupBudget -= incrementalSetupCost;
+    	                remainingOperationBudget -= incrementalOperationCost;
+    	                break;  // Exit the inner loop as the configuration fits within the budget
+    	            } else {
+    	                // Decrement maxConfigValue and redraw if the configuration exceeds the budget
+    	                maxConfigValue--;
+    	            }
+    	        }
+
+    	        // Break if no configuration can fit within the budget
+    	        if (maxConfigValue == 0) {
+    	            break;
+    	        }
+    	    }
+
+    	    // Combine into a CompositeGenotype
+    	    CompositeGenotype<String, Genotype> compositeGenotype = new CompositeGenotype<>();
+    	    compositeGenotype.put("type", typeGenotype);
+    	    compositeGenotype.put("plug", plugGenotype);
+
+    	    return compositeGenotype;
+    	}
+    	
+//    	@Override
+//        public CompositeGenotype<String, Genotype> create() {
+//            // IntegerGenotype for charger type (0–2) to represent ChargerType enum values
+//            IntegerGenotype typeGenotype = new IntegerGenotype(0, ChargerType.values().length - 1);
+//            int numberOfTypeVariables = variablesType.getKeySet().size();
+//            typeGenotype.init(random, numberOfTypeVariables);
+//
+//            // IntegerGenotype for plug count (1–10)
+//            IntegerGenotype plugGenotype = new IntegerGenotype(0, 5);
+//            int numberOfPlugVariables = variablesPlug.getKeySet().size();
+//            plugGenotype.init(random, numberOfPlugVariables);
+//            // Random reduction factors for adjustment (e.g., 50% probability for each reduction)
+////            double plugReductionProbability = 0.85;
+////            double typeReductionProbability = 0.85;
+//            
+//            // Calculate initial setup and operation costs
+//            double setupCost = calculateTotalSetupCost(typeGenotype, plugGenotype);
+//            double operationCost = calculateTotalOperationCost(typeGenotype, plugGenotype);
+//            // Adjust until the solution meets budget constraints
+//            int maxTry = 30;
+//            int trial = 0;
+//            //double probabiltiyBudgetViolation = 0.1;
+//           //double probBudgetViolationForThisInstance = random.nextDouble();
+//            double randomTypeFloorProb = 0.1;
+//            double randomPlugFloorProb = 0.25;
+//            while (setupCost > setUpBudget || operationCost > operationBudget) {
+//                // Calculate how far off we are from the budget, used to scale probabilities
+//               double scalingFactor = Math.min(Math.min(setUpBudget/setupCost, operationBudget/operationCost),1);
+//
+//                // Dynamically adjust probabilities based on scaling factors
+////                double adjustedPlugReductionProb = Math.max(plugReductionProbability * setupScalingFactor,plugReductionProbability * operationScalingFactor);
+////                double adjustedTypeReductionProb =Math.max( typeReductionProbability * setupScalingFactor,operationScalingFactor*typeReductionProbability);
+//
+//                for (int i = 0; i < typeGenotype.size(); i++) {
+//                    // Randomly decide to reduce plug count, with a higher chance if far from budget
+//                	double d = random.nextDouble();
+//                    if (plugGenotype.get(i) > 0 ) {
+//                    	if(d<randomPlugFloorProb) {
+//                    		plugGenotype.set(i, (int)Math.floor(scalingFactor*plugGenotype.get(i)));
+//                    	}else {
+//                    		plugGenotype.set(i, (int)scalingFactor*plugGenotype.get(i));
+//                    	}
+//                        
+//                    }
+//
+//                    // Randomly decide to downgrade charger type
+//                    d = random.nextDouble();
+//                    if (typeGenotype.get(i) > 0) {
+//                    	if(d<randomTypeFloorProb) {
+//                    		typeGenotype.set(i, (int)Math.floor(scalingFactor*typeGenotype.get(i)));
+//                    	}else {
+//                    		typeGenotype.set(i, (int)scalingFactor*typeGenotype.get(i));
+//                    	}
+//                    }
+//                }
+//
+//                    // Recalculate costs after adjustments
+//                    setupCost = calculateTotalSetupCost(typeGenotype, plugGenotype);
+//                    operationCost = calculateTotalOperationCost(typeGenotype, plugGenotype);
+//
+//                    // Exit early if costs meet budget constraints
+//                    if (setupCost <= setUpBudget && operationCost <= operationBudget) {
+//                        break;
+//                    }
+//                    trial++;
+//                    if(trial>maxTry) break;
+//                }
+//                
+//
+//            // Combine into a CompositeGenotype
+//            CompositeGenotype<String, Genotype> compositeGenotype = new CompositeGenotype<>();
+//            compositeGenotype.put("type", typeGenotype);
+//            compositeGenotype.put("plug", plugGenotype);
+//
+//            return compositeGenotype;
+//       }
     	
     	
     	private double calculateTotalSetupCost(IntegerGenotype typeGenotype, IntegerGenotype plugGenotype) {
@@ -311,7 +397,7 @@ public class ChargerOptimizationRunnerV2 {
 		Map<ChargerType, Double> operationCostPerChargerType = new HashMap<>();
 
 
-		double setUpBudget = 1284600*5; // Example budget, adjust as necessary
+		double setUpBudget = 3211500*0.6; // Example budget, adjust as necessary
 		double operationBudget = 1284600*1.6;//Example operation budget, adjust as necessary
     	MapToArray<String> variablesType;
     	MapToArray<String> variablesPlug;
@@ -405,5 +491,6 @@ public class ChargerOptimizationRunnerV2 {
     	        }
     	    }
     }
+    
 }
 
