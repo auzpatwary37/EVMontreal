@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 
 import javax.swing.JFrame;
@@ -63,6 +64,10 @@ public class RandomOptimizer {
 
     // Random instance for generating random values
     private final Random random = new Random();
+    
+    private Map<ChargerType,Map<Id<Hotspot>,Integer>> badSource = new HashMap<>();
+    private Map<ChargerType,Map<Id<Hotspot>,Integer>> badSink = new HashMap<>();
+    
 
     // Method to read an existing solution from a file
     public static Map<Id<Hotspot>, Map<ChargerType, Integer>> readSolution(String filePath) {
@@ -136,8 +141,9 @@ public class RandomOptimizer {
         for (int i = 0; i < maxIterations; i++) {
             // Perform multiple plug swaps in each iteration
             Map<Id<Hotspot>, Map<ChargerType, Integer>> modifiedSolution = deepCopySolution(candidateSolution);
+            List<swapDetails> swaps = new ArrayList<>();
             for (int j = 0; j < swapsPerIteration; j++) {
-                performPlugSwap(modifiedSolution);
+                swaps.add(performPlugSwap(modifiedSolution));
             }
 
             // Evaluate the modified solution
@@ -149,6 +155,15 @@ public class RandomOptimizer {
                 bestObjectiveValue = currentObjectiveValue;
                 bestSolution = deepCopySolution(modifiedSolution);  // Store the best solution
                 this.writeSolutionsToFile(bestSolution, bestObjectiveFilePath, bestObjectiveValue);
+            }else {
+            	for(swapDetails swap:swaps) {
+            		if(!this.badSource.containsKey(swap.type))this.badSource.put(swap.type, new HashMap<>());
+            		this.badSource.get(swap.type).compute(swap.source, (k,v)->v==null?1:v+1);
+            		
+            		if(!this.badSink.containsKey(swap.type))this.badSink.put(swap.type, new HashMap<>());
+            		this.badSink.get(swap.type).compute(swap.sink, (k,v)->v==null?1:v+1);
+            		
+            	}
             }
             objectivesToPlot.add(bestObjectiveValue);
             try {
@@ -241,32 +256,52 @@ public class RandomOptimizer {
             }
         }
     }
+    
+    public static class swapDetails{
+    	Id<Hotspot> source;
+    	Id<Hotspot> sink;
+    	ChargerType type;
+    	
+    	public swapDetails(Id<Hotspot>source,Id<Hotspot>sink,ChargerType type){
+    		this.source = source;
+    		this.sink = sink;
+    		this.type = type;
+    	}
+    }
 
     // Method to perform a single plug swap
-    private void performPlugSwap(Map<Id<Hotspot>, Map<ChargerType, Integer>> solution) {
+    private swapDetails performPlugSwap(Map<Id<Hotspot>, Map<ChargerType, Integer>> solution) {
         // Select a random source charger from non-zero plug hotspots
         ChargerType selectedType = selectRandomChargerType();
-        List<Id<Hotspot>> sourceHotspots = nonZeroPlugMap.get(selectedType);
+        List<Id<Hotspot>> sourceHotspots = new ArrayList<>(nonZeroPlugMap.get(selectedType));
 
         if (sourceHotspots == null || sourceHotspots.isEmpty()) {
-            return;  // No available source chargers with this type
+            return null;  // No available source chargers with this type
+        }
+        
+        for(Entry<Id<Hotspot>, Integer> h:this.badSource.get(selectedType).entrySet()) {
+        	if(h.getValue()>50)sourceHotspots.remove(h.getKey());
         }
 
         // Randomly select a source hotspot
         Id<Hotspot> sourceHotspot = sourceHotspots.get(random.nextInt(sourceHotspots.size()));
         int sourcePlugCount = solution.get(sourceHotspot).get(selectedType);
 
-        if (sourcePlugCount <= 1) {
-            return;  // Skip if the source has only 1 plug, as we cannot reduce it further
+        if (sourcePlugCount < 1) {
+            return null;  // Skip if the source has only 1 plug, as we cannot reduce it further
         }
 
         // Create a pool of sink chargers: same-type non-zero plugs and zero plug chargers
         List<Id<Hotspot>> sinkPool = new ArrayList<>(nonZeroPlugMap.get(selectedType));
         sinkPool.remove(sourceHotspot);  // Remove the source from the sink pool
         sinkPool.addAll(zeroPlugHotspots);  // Add zero-plug hotspots
+        
+        for(Entry<Id<Hotspot>, Integer> h:this.badSink.get(selectedType).entrySet()) {
+        	if(h.getValue()>50)sinkPool.remove(h.getKey());
+        }
 
         if (sinkPool.isEmpty()) {
-            return;  // No available sinks
+            return null;  // No available sinks
         }
 
         // Select a random sink hotspot
@@ -287,6 +322,8 @@ public class RandomOptimizer {
             nonZeroPlugMap.get(selectedType).remove(sourceHotspot);
             zeroPlugHotspots.add(sourceHotspot);
         }
+        
+        return new swapDetails(sourceHotspot,sinkHotspot,selectedType);
     }
 
     // Helper method to create a deep copy of the solution map
