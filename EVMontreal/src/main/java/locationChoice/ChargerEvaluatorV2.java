@@ -130,7 +130,7 @@ public class ChargerEvaluatorV2 implements Evaluator<Map<Id<Hotspot>,Map<Charger
 		Map<ChargerType, Double> operationCostPerChargerType = new HashMap<>();
 
 
-		double setUpBudget = 3211500; // Example budget, adjust as necessary
+		double setUpBudget = 0.6*32115000; // Example budget, adjust as necessary
 		double operationBudget = 1284600*1.6;//Example operation budget, adjust as necessary
 
 

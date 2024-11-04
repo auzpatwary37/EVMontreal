@@ -143,7 +143,7 @@ public class ChargerOptimizationRunnerV2 {
 		Map<ChargerType, Double> operationCostPerChargerType = new HashMap<>();
 
 
-		double setUpBudget = 3211500; // Example budget, adjust as necessary
+		double setUpBudget = 32115000*0.6; // Example budget, adjust as necessary
 		double operationBudget = 1284600*1.6;//Example operation budget, adjust as necessary
 
 
@@ -397,7 +397,7 @@ public class ChargerOptimizationRunnerV2 {
 		Map<ChargerType, Double> operationCostPerChargerType = new HashMap<>();
 
 
-		double setUpBudget = 3211500*0.6; // Example budget, adjust as necessary
+		double setUpBudget = 32115000*0.6; // Example budget, adjust as necessary
 		double operationBudget = 1284600*1.6;//Example operation budget, adjust as necessary
     	MapToArray<String> variablesType;
     	MapToArray<String> variablesPlug;
