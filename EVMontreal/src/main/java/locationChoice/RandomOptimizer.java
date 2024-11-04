@@ -1,5 +1,6 @@
 package locationChoice;
 
+import java.awt.Color;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -14,7 +15,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import javax.swing.JFrame;
+import javax.swing.SwingUtilities;
+import javax.swing.WindowConstants;
+
 import org.apache.commons.math.linear.MatrixUtils;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
+import org.jfree.data.xy.XYSeries;
+import org.jfree.data.xy.XYSeriesCollection;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
@@ -102,6 +115,7 @@ public class RandomOptimizer {
             ChargerEvaluatorV2 evaluator,
             int maxIterations, int swapsPerIteration, String bestObjectiveFilePath, String iterationLoggerFilePath) {
     	FileWriter fw = null;
+    	List<Double> objectivesToPlot = new ArrayList<>();
     	try {
 			fw = new FileWriter(new File(iterationLoggerFilePath), true);
 			fw.append("Iteration, bestObjective\n");
@@ -113,6 +127,7 @@ public class RandomOptimizer {
     	
         // Track the best solution and objective value
         double bestObjectiveValue = evaluator.evaluate(candidateSolution).get(new Objective("Queue",Sign.MIN)).getDouble();
+        objectivesToPlot.add(bestObjectiveValue);
         Map<Id<Hotspot>, Map<ChargerType, Integer>> bestSolution = deepCopySolution(candidateSolution);
 
         // Initialize tracking lists and maps
@@ -135,6 +150,7 @@ public class RandomOptimizer {
                 bestSolution = deepCopySolution(modifiedSolution);  // Store the best solution
                 this.writeSolutionsToFile(bestSolution, bestObjectiveFilePath, bestObjectiveValue);
             }
+            objectivesToPlot.add(bestObjectiveValue);
             try {
 				fw.append(Integer.toString(i)+","+bestObjectiveValue+"\n");
 				fw.flush();
@@ -142,6 +158,7 @@ public class RandomOptimizer {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
+            ConvergencePlot.plotConvergence("Swap algorithm convergence", objectivesToPlot);
         }
         try {
 			fw.close();
@@ -301,6 +318,55 @@ public class RandomOptimizer {
 
         optimizer.optimize(solution, evaluator, 100, 5,currentBestSolutionPath,iterationLoggerFilePath);
     }
+    
+    public static class ConvergencePlot extends JFrame {
+
+        public ConvergencePlot(String title, List<Double> objectiveValues) {
+            super(title);
+
+            // Create dataset
+            XYSeries series = new XYSeries("Queue Objective");
+            for (int i = 0; i < objectiveValues.size(); i++) {
+                series.add(i, objectiveValues.get(i));
+            }
+
+            XYSeriesCollection dataset = new XYSeriesCollection(series);
+
+            // Create chart
+            JFreeChart chart = ChartFactory.createXYLineChart(
+                    "Convergence Plot",
+                    "Iteration",
+                    "Queue",
+                    dataset,
+                    PlotOrientation.VERTICAL,
+                    true, true, false);
+
+            // Customize the plot
+            XYPlot plot = chart.getXYPlot();
+            XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer();
+            renderer.setSeriesPaint(0, Color.RED);
+            plot.setRenderer(renderer);
+
+            // Set plot background
+            plot.setBackgroundPaint(Color.WHITE);
+
+            // Create Panel
+            ChartPanel panel = new ChartPanel(chart);
+            setContentPane(panel);
+        }
+        
+        // Static method to create and display the plot
+        public static void plotConvergence(String title, List<Double> objectiveValues) {
+            SwingUtilities.invokeLater(() -> {
+                ConvergencePlot example = new ConvergencePlot(title, objectiveValues);
+                example.setSize(800, 400);
+                example.setLocationRelativeTo(null);
+                example.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+                example.setVisible(true);
+            });
+        }
+    }
+
     
     public void readSolutionAndCreatePricingProfile(String solutionFileLoc, 
     		String oldPricingProfileFile, String oldChargerFile,String activityFacilityFile,String newPricingProfileFile,String networkFile, 
