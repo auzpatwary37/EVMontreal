@@ -64,10 +64,6 @@ public class RandomOptimizer {
 
     // Random instance for generating random values
     private final Random random = new Random();
-    
-    private Map<ChargerType,Map<Id<Hotspot>,Integer>> badSource = new HashMap<>();
-    private Map<ChargerType,Map<Id<Hotspot>,Integer>> badSink = new HashMap<>();
-    
 
     // Method to read an existing solution from a file
     public static Map<Id<Hotspot>, Map<ChargerType, Integer>> readSolution(String filePath) {
@@ -129,10 +125,11 @@ public class RandomOptimizer {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-    	
+    	// Example usage
+        ConvergencePlot plot = ConvergencePlot.createAndShowPlot("Swap Algorithm Convergence");
         // Track the best solution and objective value
         double bestObjectiveValue = evaluator.evaluate(candidateSolution).get(new Objective("Queue",Sign.MIN)).getDouble();
-        objectivesToPlot.add(bestObjectiveValue);
+        //objectivesToPlot.add(bestObjectiveValue);
         Map<Id<Hotspot>, Map<ChargerType, Integer>> bestSolution = deepCopySolution(candidateSolution);
 
         // Initialize tracking lists and maps
@@ -141,9 +138,8 @@ public class RandomOptimizer {
         for (int i = 0; i < maxIterations; i++) {
             // Perform multiple plug swaps in each iteration
             Map<Id<Hotspot>, Map<ChargerType, Integer>> modifiedSolution = deepCopySolution(candidateSolution);
-            List<swapDetails> swaps = new ArrayList<>();
             for (int j = 0; j < swapsPerIteration; j++) {
-                swaps.add(performPlugSwap(modifiedSolution));
+                performPlugSwap(modifiedSolution);
             }
 
             // Evaluate the modified solution
@@ -155,17 +151,8 @@ public class RandomOptimizer {
                 bestObjectiveValue = currentObjectiveValue;
                 bestSolution = deepCopySolution(modifiedSolution);  // Store the best solution
                 this.writeSolutionsToFile(bestSolution, bestObjectiveFilePath, bestObjectiveValue);
-            }else {
-            	for(swapDetails swap:swaps) {
-            		if(!this.badSource.containsKey(swap.type))this.badSource.put(swap.type, new HashMap<>());
-            		this.badSource.get(swap.type).compute(swap.source, (k,v)->v==null?1:v+1);
-            		
-            		if(!this.badSink.containsKey(swap.type))this.badSink.put(swap.type, new HashMap<>());
-            		this.badSink.get(swap.type).compute(swap.sink, (k,v)->v==null?1:v+1);
-            		
-            	}
             }
-            objectivesToPlot.add(bestObjectiveValue);
+            //objectivesToPlot.add(bestObjectiveValue);
             try {
 				fw.append(Integer.toString(i)+","+bestObjectiveValue+"\n");
 				fw.flush();
@@ -173,7 +160,7 @@ public class RandomOptimizer {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-            ConvergencePlot.plotConvergence("Swap algorithm convergence", objectivesToPlot);
+            plot.updatePlot(bestObjectiveValue, i);
         }
         try {
 			fw.close();
@@ -256,52 +243,32 @@ public class RandomOptimizer {
             }
         }
     }
-    
-    public static class swapDetails{
-    	Id<Hotspot> source;
-    	Id<Hotspot> sink;
-    	ChargerType type;
-    	
-    	public swapDetails(Id<Hotspot>source,Id<Hotspot>sink,ChargerType type){
-    		this.source = source;
-    		this.sink = sink;
-    		this.type = type;
-    	}
-    }
 
     // Method to perform a single plug swap
-    private swapDetails performPlugSwap(Map<Id<Hotspot>, Map<ChargerType, Integer>> solution) {
+    private void performPlugSwap(Map<Id<Hotspot>, Map<ChargerType, Integer>> solution) {
         // Select a random source charger from non-zero plug hotspots
         ChargerType selectedType = selectRandomChargerType();
-        List<Id<Hotspot>> sourceHotspots = new ArrayList<>(nonZeroPlugMap.get(selectedType));
+        List<Id<Hotspot>> sourceHotspots = nonZeroPlugMap.get(selectedType);
 
         if (sourceHotspots == null || sourceHotspots.isEmpty()) {
-            return null;  // No available source chargers with this type
-        }
-        
-        for(Entry<Id<Hotspot>, Integer> h:this.badSource.get(selectedType).entrySet()) {
-        	if(h.getValue()>50)sourceHotspots.remove(h.getKey());
+            return;  // No available source chargers with this type
         }
 
         // Randomly select a source hotspot
         Id<Hotspot> sourceHotspot = sourceHotspots.get(random.nextInt(sourceHotspots.size()));
         int sourcePlugCount = solution.get(sourceHotspot).get(selectedType);
 
-        if (sourcePlugCount < 1) {
-            return null;  // Skip if the source has only 1 plug, as we cannot reduce it further
+        if (sourcePlugCount <= 1) {
+            return;  // Skip if the source has only 1 plug, as we cannot reduce it further
         }
 
         // Create a pool of sink chargers: same-type non-zero plugs and zero plug chargers
         List<Id<Hotspot>> sinkPool = new ArrayList<>(nonZeroPlugMap.get(selectedType));
         sinkPool.remove(sourceHotspot);  // Remove the source from the sink pool
         sinkPool.addAll(zeroPlugHotspots);  // Add zero-plug hotspots
-        
-        for(Entry<Id<Hotspot>, Integer> h:this.badSink.get(selectedType).entrySet()) {
-        	if(h.getValue()>50)sinkPool.remove(h.getKey());
-        }
 
         if (sinkPool.isEmpty()) {
-            return null;  // No available sinks
+            return;  // No available sinks
         }
 
         // Select a random sink hotspot
@@ -322,8 +289,6 @@ public class RandomOptimizer {
             nonZeroPlugMap.get(selectedType).remove(sourceHotspot);
             zeroPlugHotspots.add(sourceHotspot);
         }
-        
-        return new swapDetails(sourceHotspot,sinkHotspot,selectedType);
     }
 
     // Helper method to create a deep copy of the solution map
@@ -345,33 +310,37 @@ public class RandomOptimizer {
     }
 
     public static void main(String[] args) {
-        String filePath = "data\\10p\\solutionsAtIteration_400_2024-11-04_.csv";  // Specify the file path here
-        String currentBestSolutionPath = "data\\10p\\solutionsAtIteration_400_2024-11-04_afterRandomOptimization.csv";// specify the file path for storing the current best solution. 
-        String iterationLoggerFilePath = "data\\10p\\RandomOptimizationIterationLogger.csv";
-        RandomOptimizer optimizer = new RandomOptimizer();
-        Map<Id<Hotspot>, Map<ChargerType, Integer>> solution = readSolution(filePath);
-
-        ChargerEvaluatorV2 evaluator = new ChargerEvaluatorV2();
-
-        optimizer.optimize(solution, evaluator, 100, 5,currentBestSolutionPath,iterationLoggerFilePath);
+        String filePath = "data\\10p\\solutionsAtIteration_450_2024-11-04_.csv";  // Specify the file path here
+//        String currentBestSolutionPath = "data\\10p\\solutionsAtIteration_400_2024-11-04_afterRandomOptimization.csv";// specify the file path for storing the current best solution. 
+//        String iterationLoggerFilePath = "data\\10p\\RandomOptimizationIterationLogger.csv";
+//        RandomOptimizer optimizer = new RandomOptimizer();
+//        Map<Id<Hotspot>, Map<ChargerType, Integer>> solution = readSolution(filePath);
+//
+//        ChargerEvaluatorV2 evaluator = new ChargerEvaluatorV2();
+//
+//        optimizer.optimize(solution, evaluator, 100, 5,currentBestSolutionPath,iterationLoggerFilePath);
+        readSolutionAndCreatePricingProfile(filePath, "data\\10p\\pricingProfiles.xml", 
+        		"data\\10p\\charger.xml", "data\\10p\\montreal_facilities.xml.gz", 
+        		"data\\10p\\pricingProfiles_new_step2.xml", "data\\10p\\montreal_network.xml", 
+        		"data\\10p\\charger_new_step2.xml");
     }
     
     public static class ConvergencePlot extends JFrame {
 
-        public ConvergencePlot(String title, List<Double> objectiveValues) {
+        private final XYSeries series;
+
+        // Constructor to initialize the plot with an empty dataset
+        public ConvergencePlot(String title) {
             super(title);
 
-            // Create dataset
-            XYSeries series = new XYSeries("Queue Objective");
-            for (int i = 0; i < objectiveValues.size(); i++) {
-                series.add(i, objectiveValues.get(i));
-            }
+            // Initialize the series for the plot
+            series = new XYSeries("Queue Objective");
 
             XYSeriesCollection dataset = new XYSeriesCollection(series);
 
-            // Create chart
+            // Create the chart
             JFreeChart chart = ChartFactory.createXYLineChart(
-                    "Convergence Plot",
+                    title,
                     "Iteration",
                     "Queue",
                     dataset,
@@ -390,22 +359,26 @@ public class RandomOptimizer {
             // Create Panel
             ChartPanel panel = new ChartPanel(chart);
             setContentPane(panel);
+
+            setSize(800, 400);
+            setLocationRelativeTo(null);
+            setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         }
-        
-        // Static method to create and display the plot
-        public static void plotConvergence(String title, List<Double> objectiveValues) {
-            SwingUtilities.invokeLater(() -> {
-                ConvergencePlot example = new ConvergencePlot(title, objectiveValues);
-                example.setSize(800, 400);
-                example.setLocationRelativeTo(null);
-                example.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-                example.setVisible(true);
-            });
+
+        // Method to update the plot with a new objective value
+        public void updatePlot(double objectiveValue, int iteration) {
+            series.add(iteration, objectiveValue);
+        }
+
+        // Static method to create and show the plot window
+        public static ConvergencePlot createAndShowPlot(String title) {
+            ConvergencePlot plot = new ConvergencePlot(title);
+            SwingUtilities.invokeLater(() -> plot.setVisible(true));
+            return plot;
         }
     }
-
     
-    public void readSolutionAndCreatePricingProfile(String solutionFileLoc, 
+    public static void readSolutionAndCreatePricingProfile(String solutionFileLoc, 
     		String oldPricingProfileFile, String oldChargerFile,String activityFacilityFile,String newPricingProfileFile,String networkFile, 
     		String newChargerFile) {
     	
@@ -529,6 +502,9 @@ public class RandomOptimizer {
 				h.setPlugCountPerChargerType(map);
 				h.setCoord(new Coord(x,y));
 				hotspots.put(h.getHotspotId(), h);
+				if(h.getCentroidFacilityId() == null || h.getHotspotId().toString().equals("dynamicHotspot_1392")) {
+					System.out.println("Debug!!!");
+				}
 			}
 			bf.close();
 
@@ -539,7 +515,7 @@ public class RandomOptimizer {
     	
     	
     	Map<Id<Hotspot>, Map<ChargerType, Integer>> solution = readSolution(solutionFileLoc);
-    	ChargerPricingProfiles pricingProfiles = new ChargerPricingProfileReader().readChargerPricingProfiles(solutionFileLoc);
+    	ChargerPricingProfiles pricingProfiles = new ChargerPricingProfileReader().readChargerPricingProfiles(oldPricingProfileFile);
     	ChargingInfrastructureSpecification csp = new ChargingInfrastructureSpecificationImpl();
     	new ChargerReader(csp).readFile(oldChargerFile);
     	Config config = ConfigUtils.createConfig();
@@ -557,7 +533,7 @@ public class RandomOptimizer {
     	nonLinear[0] = 10.00;
     	nonLinear[1] = 10.00;
     	nonLinear[2] = 10.00;
-    	PeakPricing.put("Fast", nonLinear);
+    	PeakPricing.put(ChargerType.fast.toString(), nonLinear);
     	int[] peakTime = new int[] {};
     	int[] offPeakTime = new int[] {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23};
     	Map<String,double[]> offPeakPricing = new HashMap<>(); 
@@ -567,18 +543,22 @@ public class RandomOptimizer {
     	nonLinear[1] = 4.0;
     	nonLinear[2] = 4.0;
     	
-    	offPeakPricing.put("Fast", nonLinear);
+    	offPeakPricing.put(ChargerType.fast.toString(), nonLinear);
+    	offPeakPricing.put(ChargerType.level1.toString(), applyMultiplier(nonLinear,.25));
+    	offPeakPricing.put(ChargerType.level2.toString(), applyMultiplier(nonLinear,.5));
     	
     	
     	
-    	hotspots.values().forEach(h->{
+    	
+    	
+    	for(Hotspot h:hotspots.values()){
     		if(solution.containsKey(h.getHotspotId())) {
     			h.setPlugCountPerChargerType(solution.get(h.getHotspotId()));
     			if(!csp.getChargerSpecifications().containsKey(Id.create(h.getHotspotId().toString(), Charger.class))) {
-    				h.getPlugCountPerChargerType().entrySet().forEach(e->{
+    				for(Entry<ChargerType, Integer> e:h.getPlugCountPerChargerType().entrySet()){
     					ChargerSpecification c = ImmutableChargerSpecification.newBuilder()
     							.id(Id.create(h.getHotspotId().toString(), Charger.class))
-    							.linkId(facilities.getFacilities().get(h.getCentroidFacility()).getLinkId())
+    							.linkId(facilities.getFacilities().get(h.getCentroidFacility(false)).getLinkId())
     							.chargerType(e.getKey().toString())
     							.plugCount(e.getValue())
     							.plugPower(chargerPower.get(e.getKey()))
@@ -600,10 +580,10 @@ public class RandomOptimizer {
     					}
     					pricingProfiles.addChargerPricingProfile(pp);
 
-    				});
+    				}
     			}
     		}
-    	});
+    	}
     	
     	
     	new ChargerWriter(csp.getChargerSpecifications().values().stream()).write(newChargerFile);

@@ -69,7 +69,7 @@ public class KMeansClusterer {
             for (Hotspot hotspot : hotspots) {
                 if (!hotspot.isLockedCentroid()) {
                     Id<ActivityFacility> oldCentroid = hotspot.getCentroidFacilityId();
-                    Id<ActivityFacility> newCentroid = hotspot.getCentroidFacility();
+                    Id<ActivityFacility> newCentroid = hotspot.getCentroidFacility(true);
 
                     if (newCentroid != null && !newCentroid.equals(oldCentroid)) {
                         centroidsChanged = true;
@@ -88,13 +88,13 @@ public class KMeansClusterer {
     	Set<Id<ActivityFacility>> facIds = new HashSet<>(facilityFeatures_scaled.keySet()); 
     	Random random = new Random();
     	this.hotspots.stream().forEach(h->{
-    		if(h.getCentroidFacility()!=null) {
-    			facIds.remove(h.getCentroidFacility());
+    		if(h.getCentroidFacility(false)!=null) {
+    			facIds.remove(h.getCentroidFacility(false));
     			h.setCentroidFacilityId(h.getCentroidFacilityId(), facilityFeatures_scaled.get(h.getCentroidFacilityId()));
     		}
     	});
     	this.hotspots.stream().forEach(h->{
-    		if(h.getCentroidFacility()==null) {
+    		if(h.getCentroidFacility(false)==null) {
     			List<Id<ActivityFacility>> list = new ArrayList<>(facIds);
 
     	        // Generate a random index

@@ -68,7 +68,8 @@ public class Hotspot {
 		//this.facilities.clear();
 	}
 	
-	public Id<ActivityFacility> getCentroidFacility() {
+	public Id<ActivityFacility> getCentroidFacility(boolean ifCalculate) {
+		if(!ifCalculate)return centroidFacilityId;
         if (this.isLockedCentroid) {
             return centroidFacilityId;
         } else {

@@ -263,7 +263,7 @@ public static void main(String[] args) {
 		FileWriter fwCharger = new FileWriter(new File(chargerCoordsLocation));
 		fwCharger.append("chargerId,X,Y\n");
 		for(Hotspot h:hotspots) {
-			Coord coord = facilities.getFacilities().get(h.getCentroidFacility()).getCoord();
+			Coord coord = facilities.getFacilities().get(h.getCentroidFacilityId()).getCoord();
 			fwCharger.append(h.getHotspotId().toString()+","+coord.getX()+","+coord.getY()+"\n");
 			fwCharger.flush();
 		}
@@ -294,11 +294,11 @@ public static void main(String[] args) {
 		FileWriter fwCharger = new FileWriter(new File(chargerCoordsLocationNew));
 		fwCharger.append("chargerId,X,Y,plugCount,power,CentroidFacilityId,chargerType\n");
 		for(Hotspot h:hotspots) {
-			Coord coord = facilities.getFacilities().get(h.getCentroidFacility()).getCoord();
+			Coord coord = facilities.getFacilities().get(h.getCentroidFacilityId()).getCoord();
 			int plugCount = csp.getChargerSpecifications().get(Id.create(h.getHotspotId().toString(), Charger.class))==null?0:csp.getChargerSpecifications().get(Id.create(h.getHotspotId().toString(), Charger.class)).getPlugCount();
 			double power = csp.getChargerSpecifications().get(Id.create(h.getHotspotId().toString(), Charger.class))==null?0:csp.getChargerSpecifications().get(Id.create(h.getHotspotId().toString(), Charger.class)).getPlugPower();
 			String chargerType = csp.getChargerSpecifications().get(Id.create(h.getHotspotId().toString(), Charger.class))==null?null:csp.getChargerSpecifications().get(Id.create(h.getHotspotId().toString(), Charger.class)).getChargerType();
-			fwCharger.append(h.getHotspotId().toString()+","+coord.getX()+","+coord.getY()+","+plugCount+","+power+","+h.getCentroidFacility().toString()+","+chargerType+"\n");
+			fwCharger.append(h.getHotspotId().toString()+","+coord.getX()+","+coord.getY()+","+plugCount+","+power+","+h.getCentroidFacilityId().toString()+","+chargerType+"\n");
 			fwCharger.flush();
 		}
 		fwCharger.close();
@@ -343,7 +343,7 @@ public static void main(String[] args) {
 		if(!csp.getChargerSpecifications().containsKey(Id.create(h.getHotspotId().toString(), Charger.class))) {
 			ChargerSpecification c = ImmutableChargerSpecification.newBuilder()
 					.id(Id.create(h.getHotspotId().toString(), Charger.class))
-					.linkId(facilities.getFacilities().get(h.getCentroidFacility()).getLinkId())
+					.linkId(facilities.getFacilities().get(h.getCentroidFacilityId()).getLinkId())
 					.chargerType("Fast")
 					.plugCount(10)
 					.plugPower(1000 * 50)
