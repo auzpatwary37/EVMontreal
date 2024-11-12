@@ -14,14 +14,14 @@ public class RunFromEclipse {
 				"--facilities","montreal_facilities.xml.gz",
 				"--network","montreal_network.xml",
 				"--plan","plan.xml",
-				"--charger","charger.xml",
-				"--evpricing","data\\10p\\pricingProfiles.xml",
+				"--charger","charger_new_step2.xml",
+				"--evpricing","data\\10p\\pricingProfiles_new_step2.xml",
 				"--vehicles","vehicle.xml",
 				"--thread","10",
-				"--output", "F:\\EvLocationChoiceResult\\output_base",
+				"--output", "F:\\EvLocationChoiceResult\\output_step2",
 				"--scale",".1",
 //				"--firstiterations","40",
-				"--lastiterations","10"
+				"--lastiterations","100"
 			};
 		RunEVExampleV2.main(args2);
 		

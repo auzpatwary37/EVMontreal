@@ -51,7 +51,7 @@ public class KMeansClusterer {
 
         for (int iter = 0; iter < maxIterations; iter++) {
             centroidsChanged = false;
-
+            System.out.println("Iteration = "+iter);
             // Clear all facilities in all hotspots
             for (Hotspot hotspot : hotspots) {
                 hotspot.getFeatures().clear(); // Clear the feature map as well

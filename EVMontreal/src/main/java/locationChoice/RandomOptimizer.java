@@ -310,7 +310,7 @@ public class RandomOptimizer {
     }
 
     public static void main(String[] args) {
-        String filePath = "data\\10p\\solutionsAtIteration_450_2024-11-04_.csv";  // Specify the file path here
+        String filePath = "data\\10p\\solutionsAtIteration_500_2024-11-04_.csv";  // Specify the file path here
 //        String currentBestSolutionPath = "data\\10p\\solutionsAtIteration_400_2024-11-04_afterRandomOptimization.csv";// specify the file path for storing the current best solution. 
 //        String iterationLoggerFilePath = "data\\10p\\RandomOptimizationIterationLogger.csv";
 //        RandomOptimizer optimizer = new RandomOptimizer();

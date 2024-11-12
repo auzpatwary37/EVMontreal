@@ -54,11 +54,11 @@ public static void main(String[] args) {
 	
 	String usedFacilityCoordsLocation = "data/10p/facilityUsed.csv";
 	String chargerCoordsLocation = "data/10p/chargerCoords.csv";
-	String chargerCoordsLocationNew = "data/10p/chargerCoordsNew_startTime.csv";
-	String featureFileLocation = "data/10p/features_startTime.csv";
+	String chargerCoordsLocationNew = "data/test/chargerCoordsNew.csv";
+	String featureFileLocation = "data/test/features_.csv";
 	String oldPricingProfileFile = "data/10p/pricingProfiles.xml";
-	String newPricingProfileFile = "data/10p/pricingProfiles_new_startTime.xml";
-	String newChargerFile = "data/10p/charger_new_startTime.xml";
+	String newPricingProfileFile = "data/test/pricingProfiles_new.xml";
+	String newChargerFile = "data/test/charger_new.xml";
 	Config config = ConfigUtils.createConfig();
 	ConfigUtils.loadConfig(config,"data/10p/config.xml");
 	config.plans().setInputFile(PopulationFileLocation);
