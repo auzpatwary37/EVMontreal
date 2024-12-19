@@ -71,6 +71,7 @@ import gsonprocessor.PlanSchema;
 import nlprocessor.GsonTrial.PlanElementDeserializer;
 import rest.ChatCompletionClient;
 import rest.Prompt;
+import rest.Tool;
 import urbanEV.ActivityWhileChargingFinder;
 import urbanEV.UrbanEVConfigGroup;
 import urbanEV.UrbanVehicleChargingHandler;
@@ -154,14 +155,16 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 	}
 	
 	public static ChatCompletionClient getChatClient() {
+		List<Tool> tools = new ArrayList<>();
+		tools.add(PlanSchema.getPlanGsonSchemaAsFunctionTool());
 		return new ChatCompletionClient.Builder()
 		.setChatAPI_URL("https://api.openai.com/v1/chat/completions")//http://localhost:1234/v1/chat/completions
 		.setEmbeddingAPI_URL("http://localhost:1234/v1/embeddings")
-		.setModelName("gpt-4-turbo")
+		.setModelName("gpt-4o")
 		.setauthorization(APIKeys.GPT_KEY)
 		.setOrganization(APIKeys.ORGANIZATION_ID)
 		.setProject(APIKeys.PROJECT_ID)
-		.setTools(List.of(PlanSchema.getPlanGsonSchemaAsFunctionTool()))
+		.setTools(tools)
 		.setIfStream(false)
 		.setMaxToken(4096)
 		.setTemperature(.7)
@@ -308,7 +311,9 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 				plan.getAttributes().putAttribute("IfAiGenerated", true);
 			}
 			ii++;
-			if(ii%10==0)logger.info(ii+" plans finished out of "+this.plans.size());
+			if(ii%10==0) {
+				logger.info(ii+" plans finished out of "+this.plans.size());
+			}
 		}
 	}
 	
@@ -400,6 +405,7 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 		
 		double time = 0;
 		String previousLegMode = null;
+		try {
 		for(PlanElementGson pe:planGson.activitiesAndLegs) {
 			if(pe instanceof ActivityGson) {// while charging is happening, there has to be only one link id for both the plugin and plugout event 
 				ActivityGson act = ((ActivityGson)pe);
@@ -506,6 +512,10 @@ public class AIAgentReplanningModule implements PlanStrategyModule{
 			}
 			
 			i++;
+		}
+		}catch(Error e) {
+			msgs.add(new ErrorMessage("Unidentified error!!! Try again!!!"+e.getMessage(),logger));
+			return null;
 		}
 		//makeChargingNotStaged(plan);
 		return plan;

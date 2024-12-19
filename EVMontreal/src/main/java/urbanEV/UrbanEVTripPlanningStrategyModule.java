@@ -236,6 +236,10 @@ public class UrbanEVTripPlanningStrategyModule implements PlanStrategyModule{
 	public void handlePlan(Plan plan) {
 		// TODO Auto-generated method stub
 		Set<Id<Vehicle>> evs = getUsedEV(plan);
+		Boolean ifAiAgent = (Boolean) plan.getAttributes().getAttribute("IfAiGenerated");
+		if(ifAiAgent!=null) {
+			plan.getAttributes().removeAttribute("IfAiGenerated");
+		}
 		if(!evs.isEmpty()) {
 			//if(!haveSufficientCharging(plan)) {
 			if(!this.purePlan.containsKey(plan.getPerson().getId())) {
